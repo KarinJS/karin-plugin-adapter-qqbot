@@ -1,0 +1,26 @@
+{
+  "name": "@karinjs/adapter-qqbot",
+  "version": "0.0.1",
+  "author": "shijin",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "scripts": {
+    "build": "tsc --project tsconfig.json && tsc-alias -p tsconfig.json"
+  },
+  "dependencies": {
+    "@karinjs/geturls": "^1.0.2",
+    "got": "^14.4.1",
+    "jimp": "^0.22.12",
+    "qrcode": "^1.5.3",
+    "silk-wasm": "^3.6.1"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.5"
+  },
+  "karin": {
+    "apps": [],
+    "outDir": "lib",
+    "rootDir": "src"
+  }
+}
