@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.0.1...v1.0.2) (2024-08-09)
+
+
+### Bug Fixes
+
+* dirname error ([52f5897](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/52f589722a525edaaf2ef9c197545e6a27c7866a))
+
 ## [1.0.1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.0.0...v1.0.1) (2024-08-09)
 
 
