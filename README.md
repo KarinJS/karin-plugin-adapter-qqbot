@@ -3,6 +3,11 @@
 开发中...
 
 如需使用:
+
+  ```bash
+  pnpm add @karinjs/adapter-qqbot -w
+  ```
+
   在`config\plugin\@karinjs\adapter-qqbot`创建`config.yaml`
   输入以下内容，请自行配置账号。当前`Markdown`仅支持`旧图文模板`和`原生`
 
