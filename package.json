@@ -1,6 +1,6 @@
 {
   "name": "@karinjs/adapter-qqbot",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "author": "shijin",
   "type": "module",
   "main": "lib/index.js",
