@@ -226,7 +226,7 @@ export class AdapterQQBot implements KarinAdapter {
    * @param data karin格式消息
    * */
   async KarinConvertAdapter (data: Array<KarinElement>, type: PathType, openid: string, message_id?: string): Promise<ReplyReturn> {
-    let seq = 0
+    const Seq = (): number => Math.floor(Math.random() * 1000000)
     /** 待发送列表 */
     const send_list: SendMessageOptions[] = []
 
@@ -236,10 +236,10 @@ export class AdapterQQBot implements KarinAdapter {
       switch (i.type) {
         case 'text': {
           const qr = await Common.getQQBotText(i.text)
-          results.push({ index, options: this.super.buildText(qr.text, message_id, ++seq) })
+          results.push({ index, options: this.super.buildText(qr.text, message_id, Seq()) })
           if (qr.data) {
             const { file_info } = await this.super.uploadMedia(openid, type, qr.data.base64, FileType.Image)
-            results.push({ index, options: this.super.buildMedia(file_info, message_id, ++seq) })
+            results.push({ index, options: this.super.buildMedia(file_info, message_id, Seq()) })
           }
           break
         }
@@ -253,7 +253,7 @@ export class AdapterQQBot implements KarinAdapter {
           /** 上传 */
           const { file_info } = await this.super.uploadMedia(openid, type, file, FileType.Record)
           /** 构建发送参数 */
-          results.push({ index, options: this.super.buildMedia(file_info, message_id, ++seq) })
+          results.push({ index, options: this.super.buildMedia(file_info, message_id, Seq()) })
           break
         }
         case 'image':
@@ -268,7 +268,7 @@ export class AdapterQQBot implements KarinAdapter {
           /** 上传 */
           const { file_info } = await this.super.uploadMedia(openid, type, i.file, map[i.type])
           /** 构建发送参数 */
-          results.push({ index, options: this.super.buildMedia(file_info, message_id, ++seq) })
+          results.push({ index, options: this.super.buildMedia(file_info, message_id, Seq()) })
           break
         }
         // 不支持的消息类型
