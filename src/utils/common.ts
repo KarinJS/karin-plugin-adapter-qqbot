@@ -197,7 +197,7 @@ class Common {
     data?: QRRes
   }> {
     const urls = this.getUrls(text)
-    const data = await this.getQrCode(urls)
+    const data = urls.length ? (await this.getQrCode(urls)) : undefined
 
     /** 使用for循环来替换字符串 保证一致性 */
     for (const url of urls) {
@@ -205,7 +205,7 @@ class Common {
     }
     return {
       text,
-      data: urls.length ? data : undefined,
+      data,
     }
   }
 
