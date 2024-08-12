@@ -82,6 +82,7 @@ export class AdapterQQBot implements KarinAdapter {
   async init () {
     await this.super.getAccessToken()
     await this.super.getWssUrl()
+    await this.super.getAvatar()
     this.super.createWss()
 
     this.super.wss.on(QQBotEventType.GROUP_AT_MESSAGE_CREATE, (data: GroupAtMessageCreateEvent) => {
@@ -324,8 +325,11 @@ export class AdapterQQBot implements KarinAdapter {
     return { message_id: 'input' }
   }
 
-  getAvatarUrl () {
-    return 'https://p.qlogo.cn/gh/967068507/967068507/0'
+  getAvatarUrl (uid: string | undefined, size: number = 0): string {
+    if (!uid) {
+      return this.super.avatar.replace('s=0', `s=${size}`)
+    }
+    return `https://q.qlogo.cn/qqapp/${this.account.uid}/${uid}/${size}`
   }
 
   getGroupAvatar () {
