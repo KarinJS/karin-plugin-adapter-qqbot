@@ -82,7 +82,7 @@ export class AdapterQQBot implements KarinAdapter {
   async init () {
     await this.super.getAccessToken()
     await this.super.getWssUrl()
-    await this.super.getAvatar()
+    this.super.getAvatar()
     this.super.createWss()
 
     this.super.wss.on(QQBotEventType.GROUP_AT_MESSAGE_CREATE, (data: GroupAtMessageCreateEvent) => {
