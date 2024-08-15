@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.0.2...v1.1.0) (2024-08-15)
+
+
+### Features
+
+* try to support BotConfig.regex ([#8](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/8)) ([35c5e24](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/35c5e24e22c5b4a4e773d2d76aebb4b0531bb9b1))
+
 ## [1.0.2](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.0.1...v1.0.2) (2024-08-09)
 
 
