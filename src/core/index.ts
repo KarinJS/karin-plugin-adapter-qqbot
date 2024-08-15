@@ -226,7 +226,6 @@ export class AdapterQQBot implements KarinAdapter {
    * @param data karin格式消息
    * */
   async KarinConvertAdapter (data: Array<KarinElement>, type: PathType, openid: string, message_id?: string): Promise<ReplyReturn> {
-    const Seq = (): number => Math.floor(Math.random() * 1000000)
     /** 待发送列表 */
     const send_list: SendMessageOptions[] = []
 
@@ -236,10 +235,10 @@ export class AdapterQQBot implements KarinAdapter {
       switch (i.type) {
         case 'text': {
           const qr = await Common.getQQBotText(i.text)
-          results.push({ index, options: this.super.buildText(qr.text, message_id, Seq()) })
+          results.push({ index, options: this.super.buildText(qr.text, message_id, AdapterQQBot.getSeq(message_id)) })
           if (qr.data) {
             const { file_info } = await this.super.uploadMedia(openid, type, qr.data.base64, FileType.Image)
-            results.push({ index, options: this.super.buildMedia(file_info, message_id, Seq()) })
+            results.push({ index, options: this.super.buildMedia(file_info, message_id, AdapterQQBot.getSeq(message_id)) })
           }
           break
         }
@@ -253,7 +252,7 @@ export class AdapterQQBot implements KarinAdapter {
           /** 上传 */
           const { file_info } = await this.super.uploadMedia(openid, type, file, FileType.Record)
           /** 构建发送参数 */
-          results.push({ index, options: this.super.buildMedia(file_info, message_id, Seq()) })
+          results.push({ index, options: this.super.buildMedia(file_info, message_id, AdapterQQBot.getSeq(message_id)) })
           break
         }
         case 'image':
@@ -268,7 +267,7 @@ export class AdapterQQBot implements KarinAdapter {
           /** 上传 */
           const { file_info } = await this.super.uploadMedia(openid, type, i.file, map[i.type])
           /** 构建发送参数 */
-          results.push({ index, options: this.super.buildMedia(file_info, message_id, Seq()) })
+          results.push({ index, options: this.super.buildMedia(file_info, message_id, AdapterQQBot.getSeq(message_id)) })
           break
         }
         // 不支持的消息类型
@@ -382,6 +381,31 @@ export class AdapterQQBot implements KarinAdapter {
   async GetProhibitedUserList (): Promise<any> { throw new Error('Method not implemented.') }
   async PokeMember (): Promise<any> { throw new Error('Method not implemented.') }
   async SetMessageReaded (): Promise<any> { throw new Error('Method not implemented.') }
+
+  /** 缓存message_id和seq的对应关系 */
+  private static reply_message_seq: Map<string, { seq: number }> = new Map();
+
+  /** seq过期时间 */
+  private static readonly EXPIRY_TIME = 10 * 60 * 1000; // 10分钟
+
+  /** 根据message_id获取seq */
+  private static getSeq(message_id: string | undefined): number {
+    /** message_id不存在则推测为主动消息 */
+    if (!message_id) return 0;
+
+    const cached = this.reply_message_seq.get(message_id);
+
+    if (cached) {
+      // 在被动回复有效期内，递增 seq
+      cached.seq += 1;
+    } else {
+      // 初始化 seq
+      setTimeout(() => this.reply_message_seq.delete(message_id), this.EXPIRY_TIME);
+      this.reply_message_seq.set(message_id, { seq: 0 });
+    }
+
+    return this.reply_message_seq.get(message_id)!.seq;
+  }
 }
 
 const list = Object.keys(Config.Config.accounts).filter(v => v !== 'default')
