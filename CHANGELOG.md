@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.1.1...v1.2.0) (2024-08-15)
+
+
+### Features
+
+* getAvatarUrl() ([#12](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/12)) ([5f04a5e](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/5f04a5ebc5eed6d24dc8266b70cbafdc24e7d01d))
+
+
+### Bug Fixes
+
+* reply seq ([af824e1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/af824e13389cab2bbfb0fe0561d06c76bed3ae03))
+
 ## [1.1.1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.1.0...v1.1.1) (2024-08-15)
 
 
