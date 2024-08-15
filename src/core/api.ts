@@ -40,10 +40,6 @@ export class QQBotApi {
    */
   nick: string
   /**
-   * Bot的头像
-   */
-  avatar: string
-  /**
    * 调用凭证
    */
   #access_token: string
@@ -82,7 +78,6 @@ export class QQBotApi {
     this.#config = config
     this.appId = String(this.#config.appId)
     this.nick = ''
-    this.avatar = ''
     this.#Secret = this.#config.secret
     this.host = this.#config.sandBox ? this.#config.sandBoxApi : this.#config.qqBotApi
     this.#access_token = ''
@@ -202,7 +197,7 @@ export class QQBotApi {
   async getAvatar () {
     const url = `${this.host}/users/@me`;
     const data = await got.get(url, { headers: this.headers }).json();
-    this.avatar = data.avatar;
+    return data.avatar;
   }
 
   /**
