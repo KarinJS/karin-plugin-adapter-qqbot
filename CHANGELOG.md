@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.0...v1.2.1) (2024-08-15)
+
+
+### Bug Fixes
+
+* build error ([4378c9f](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/4378c9f87f115da9041daeb70d1213659bb0f0d2))
+* build error ([1ec7419](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/1ec7419a5b1ba0e9469cadc71cd3f49ef87ecb60))
+* text message send ([#15](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/15)) ([8c50d55](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/8c50d55c9232a3dd88cf9c36372def358d279974))
+
 ## [1.2.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.1.1...v1.2.0) (2024-08-15)
 
 
