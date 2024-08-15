@@ -232,7 +232,7 @@ export class AdapterQQBot implements KarinAdapter {
    * @param data karin格式消息
    * */
   async KarinConvertAdapter (data: Array<KarinElement>, type: PathType, openid: string, message_id?: string): Promise<ReplyReturn> {
-    let seq = 0
+    let seq = common.random(1, 999999)
     /** 待发送列表 */
     const send_list: SendMessageOptions[] = []
 

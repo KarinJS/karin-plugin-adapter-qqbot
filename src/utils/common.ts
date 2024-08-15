@@ -28,6 +28,10 @@ class Common {
     this.initFfmpeg()
   }
 
+  random (min: number, max: number) {
+    return lodash.random(min, max)
+  }
+
   /**
      * 语音转silk
      * @param voice - 语音文件

@@ -35,7 +35,7 @@ export async function markdownTemplate (Opt: {
   /** 待发送列表 */
   const send_list: { index: number, opt: SendMessageOptions }[] = []
 
-  let seq = 0
+  let seq = common.random(1, 999999)
   let keyboard: RawKeyboardType | undefined
   const params: Params = []
   const markdown: { index: number; custom_template_id: string; params: { key: string; values: Array<string> }[] }[] = []
@@ -66,7 +66,7 @@ export async function markdownTemplate (Opt: {
   const mediaFn = async (file: string, type: PathType, name: string, FileType: FileType) => {
     const { url } = await handler.call('qqbot.files', { file, type, name })
     const { file_info } = await bot.super.uploadMedia(openid, type, url, FileType)
-    const opt = bot.super.buildMedia(file_info, message_id, seq)
+    const opt = bot.super.buildMedia(file_info, message_id, ++seq)
     const res = await bot.super.sendMessage(openid, type, opt)
     result.raw_data.push(res)
   }
@@ -189,7 +189,7 @@ export async function markdownRaw (Opt: {
   /** 待发送列表 */
   const send_list: { index: number, opt: SendMessageOptions }[] = []
 
-  let seq = 0
+  let seq = common.random(1, 999999)
   const list: Promise<void>[] = []
   const result: ReplyReturn = {
     message_id: '',
@@ -211,7 +211,7 @@ export async function markdownRaw (Opt: {
   const mediaFn = async (file: string, type: PathType, name: string, FileType: FileType) => {
     const { url } = await handler.call('qqbot.files', { file, type, name })
     const { file_info } = await bot.super.uploadMedia(openid, type, url, FileType)
-    const opt = bot.super.buildMedia(file_info, message_id, seq)
+    const opt = bot.super.buildMedia(file_info, message_id, ++seq)
     const res = await bot.super.sendMessage(openid, type, opt)
     result.raw_data.push(res)
   }
