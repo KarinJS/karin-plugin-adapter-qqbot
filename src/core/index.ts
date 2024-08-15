@@ -388,8 +388,6 @@ export class AdapterQQBot implements KarinAdapter {
   async GetProhibitedUserList (): Promise<any> { throw new Error('Method not implemented.') }
   async PokeMember (): Promise<any> { throw new Error('Method not implemented.') }
   async SetMessageReaded (): Promise<any> { throw new Error('Method not implemented.') }
-
-  private static BotAvatar: { [uid: string]: string } = {}
 }
 
 const list = Object.keys(Config.Config.accounts).filter(v => v !== 'default')
