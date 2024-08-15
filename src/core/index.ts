@@ -167,6 +167,9 @@ export class AdapterQQBot implements KarinAdapter {
       if (index) this.adapter.index = index
     })
 
+    
+    AdapterQQBot.BotAvatar[this.account.uid] = await this.super.getAvatar()
+
     /** 等待建立连接 注册Bot */
   }
 
@@ -330,8 +333,11 @@ export class AdapterQQBot implements KarinAdapter {
     return { message_id: 'input' }
   }
 
-  getAvatarUrl () {
-    return 'https://p.qlogo.cn/gh/967068507/967068507/0'
+  getAvatarUrl (user_id = this.account.uid || this.account.uin, size = 0): string {
+    if (user_id == this.account.uid) {
+      return  AdapterQQBot.BotAvatar[this.account.uid].replace('s=0', `s=${size}`)
+    }
+    return `https://q.qlogo.cn/qqapp/${this.account.uid}/${user_id}/${size}`
   }
 
   getGroupAvatar () {
@@ -388,6 +394,8 @@ export class AdapterQQBot implements KarinAdapter {
   async GetProhibitedUserList (): Promise<any> { throw new Error('Method not implemented.') }
   async PokeMember (): Promise<any> { throw new Error('Method not implemented.') }
   async SetMessageReaded (): Promise<any> { throw new Error('Method not implemented.') }
+
+  private static BotAvatar: { [uid: string]: string } = {}
 }
 
 const list = Object.keys(Config.Config.accounts).filter(v => v !== 'default')

@@ -192,6 +192,15 @@ export class QQBotApi {
   }
 
   /**
+   * 获取Bot头像
+   */
+  async getAvatar () {
+    const url = `${this.host}/users/@me`;
+    const data = await got.get(url, { headers: this.headers }).json();
+    return data.avatar;
+  }
+
+  /**
    * 创建wss连接
    */
   createWss (isAuth = true) {
