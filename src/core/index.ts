@@ -159,6 +159,7 @@ export class AdapterQQBot implements KarinAdapter {
       listener.emit('message', e)
     })
 
+    /** 等待建立连接 注册Bot */
     this.super.wss.on('start', () => {
       this.account.name = this.super.nick
       this.logger('info', `建立连接成功: ${this.account.name}`)
@@ -166,11 +167,6 @@ export class AdapterQQBot implements KarinAdapter {
       const index = listener.addBot({ type: this.adapter.type, bot: this })
       if (index) this.adapter.index = index
     })
-
-    
-    AdapterQQBot.BotAvatar[this.account.uid] = await this.super.getAvatar()
-
-    /** 等待建立连接 注册Bot */
   }
 
   async _sendNsg (elements: Array<KarinElement>, type: PathType, openid: string, message_id?: string) {
@@ -333,10 +329,8 @@ export class AdapterQQBot implements KarinAdapter {
     return { message_id: 'input' }
   }
 
-  getAvatarUrl (user_id = this.account.uid || this.account.uin, size = 0): string {
-    if (user_id == this.account.uid) {
-      return  AdapterQQBot.BotAvatar[this.account.uid].replace('s=0', `s=${size}`)
-    }
+  getAvatarUrl (user_id: string, size = 0): string {
+    if (user_id === this.account.uid) return this.super.avatar
     return `https://q.qlogo.cn/qqapp/${this.account.uid}/${user_id}/${size}`
   }
 

@@ -31,52 +31,36 @@ export interface SendMessageResponse {
 export type Params = Array<{ key: string, values: string[] }>
 
 export class QQBotApi {
-  /**
-   * 开发者的appId
-   */
+  /** 开发者的appId */
   appId: string
-  /**
-   * Bot的昵称
-   */
+  /** Bot头像 */
+  avatar: string
+  /** Bot的昵称 */
   nick: string
-  /**
-   * 调用凭证
-   */
+  /** 调用凭证 */
   #access_token: string
-  /**
-   * wss地址
-   */
+  /** wss地址 */
   wssUrl: string
-  /**
-   * 开发者的Secret 仅在内部使用 防止泄露
-   */
+  /** 开发者的Secret 仅在内部使用 防止泄露 */
   #Secret: string
-  /**
-   * wss连接
-   */
+  /** wss连接 */
   wss!: WebSocket
-
+  /** wss连接唯一值 */
   seq: number = 0
-  /**
-   * 心跳内容
-   */
+  /** 心跳内容 */
   heartbeat: { op: 1, d: null | number, session_id: string }
-  /**
-   * 心跳生命周期 单位：毫秒
-   */
+  /** 心跳生命周期 单位：毫秒 */
   heartbeat_interval: number
-  /**
-   * 请求头 用于鉴权
-   */
+  /** 请求头 用于鉴权 */
   headers: { [key: string]: string } = {}
-  /**
-   * 基本请求接口
-   */
+  /** 基本请求接口 */
   host: string
   #config: AccountCfgType
+
   constructor (config: AccountCfgType) {
     this.#config = config
     this.appId = String(this.#config.appId)
+    this.avatar = ''
     this.nick = ''
     this.#Secret = this.#config.secret
     this.host = this.#config.sandBox ? this.#config.sandBoxApi : this.#config.qqBotApi
@@ -192,12 +176,23 @@ export class QQBotApi {
   }
 
   /**
-   * 获取Bot头像
+   * 获取当前Bot信息
    */
-  async getAvatar () {
-    const url = `${this.host}/users/@me`;
-    const data = await got.get(url, { headers: this.headers }).json();
-    return data.avatar;
+  async getBotInfo () {
+    const url = `${this.host}/users/@me`
+    const data = await got.get(url, { headers: this.headers }).json() as {
+      /** Bot id */
+      id: string,
+      /** Bot昵称 */
+      username: string,
+      /** Bot头像 */
+      avatar: string,
+      /** Bot分享链接 */
+      share_url: string,
+      /** 欢迎信息 */
+      welcome_msg: string,
+    }
+    return data
   }
 
   /**
@@ -275,6 +270,8 @@ export class QQBotApi {
         this.heartbeat.session_id = data.d.session_id
         /** 心跳 */
         setInterval(() => this.wss.send(JSON.stringify(this.heartbeat)), this.heartbeat_interval)
+        const info = await this.getBotInfo()
+        this.avatar = info.avatar
         this.nick = data.d.user.username
         this.wss.emit('start')
         break
