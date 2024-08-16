@@ -22,7 +22,7 @@ import {
   Scene,
   logger,
   Contact,
-  listener,
+  karin,
   segment,
   EventType,
   LoggerLevel,
@@ -84,7 +84,7 @@ export class AdapterQQBot implements KarinAdapter {
     await this.super.getWssUrl()
     this.super.createWss()
 
-    this.super.wss.on(QQBotEventType.GROUP_AT_MESSAGE_CREATE, (data: GroupAtMessageCreateEvent) => {
+    this.super.on(QQBotEventType.GROUP_AT_MESSAGE_CREATE, (data: GroupAtMessageCreateEvent) => {
       const user_id = data.d.author.id
       const group_id = data.d.group_id
       const time = new Date(data.d.timestamp).getTime()
@@ -119,10 +119,10 @@ export class AdapterQQBot implements KarinAdapter {
       e.bot = this
       e.replyCallback = async elements => await this._sendNsg(elements, PathType.Groups, e.contact.peer, e.message_id)
 
-      listener.emit('message', e)
+      karin.emit('adapter.message', e)
     })
 
-    this.super.wss.on(QQBotEventType.C2C_MESSAGE_CREATE, (data: C2CMessageCreateEvent) => {
+    this.super.on(QQBotEventType.C2C_MESSAGE_CREATE, (data: C2CMessageCreateEvent) => {
       const user_id = data.d.author.user_openid
       const time = new Date(data.d.timestamp).getTime()
 
@@ -156,15 +156,15 @@ export class AdapterQQBot implements KarinAdapter {
       e.bot = this
       e.replyCallback = async elements => await this._sendNsg(elements, PathType.Friends, e.contact.peer, e.message_id)
 
-      listener.emit('message', e)
+      karin.emit('adapter.message', e)
     })
 
     /** 等待建立连接 注册Bot */
-    this.super.wss.on('start', () => {
+    this.super.on('start', () => {
       this.account.name = this.super.nick
       this.logger('info', `建立连接成功: ${this.account.name}`)
       /** 注册bot */
-      const index = listener.addBot({ type: this.adapter.type, bot: this })
+      const index = karin.addBot({ type: this.adapter.type, bot: this })
       if (index) this.adapter.index = index
     })
   }

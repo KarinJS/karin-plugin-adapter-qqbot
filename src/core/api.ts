@@ -1,8 +1,9 @@
 import got from 'got'
 import WebSocket from 'ws'
+import EventEmitter from 'events'
 import { Intents } from './intents'
-import { common, logger, LoggerLevel } from 'node-karin'
 import { AccountCfgType } from '@/utils'
+import { common, logger, LoggerLevel } from 'node-karin'
 import {
   IdType,
   SeqType,
@@ -30,7 +31,7 @@ export interface SendMessageResponse {
  */
 export type Params = Array<{ key: string, values: string[] }>
 
-export class QQBotApi {
+export class QQBotApi extends EventEmitter {
   /** 开发者的appId */
   appId: string
   /** Bot头像 */
@@ -58,6 +59,7 @@ export class QQBotApi {
   #config: AccountCfgType
 
   constructor (config: AccountCfgType) {
+    super()
     this.#config = config
     this.appId = String(this.#config.appId)
     this.avatar = ''
@@ -101,13 +103,9 @@ export class QQBotApi {
       json: { appId: this.appId, clientSecret: this.#Secret },
       headers: { 'Content-Type': 'application/json' },
     }).json() as {
-      /**
-       * 凭证有效时间，单位：秒 需要在倒计时50秒内刷新凭证
-       */
+      /** 凭证有效时间，单位：秒 需要在倒计时50秒内刷新凭证 */
       expires_in: string,
-      /**
-       * 调用凭证
-       */
+      /** 调用凭证 */
       access_token: string
     }
 
@@ -121,8 +119,6 @@ export class QQBotApi {
     const time = Number(expires_in) * 1000 - 50000
     setTimeout(async () => {
       this.getAccessToken(true)
-
-      /** 重新鉴权 */
     }, time)
     return data
   }
@@ -273,17 +269,17 @@ export class QQBotApi {
         const info = await this.getBotInfo()
         this.avatar = info.avatar
         this.nick = data.d.user.username
-        this.wss.emit('start')
+        this.emit('start')
         break
       }
       case EventType.GROUP_AT_MESSAGE_CREATE: {
         this.heartbeat.d = data.s
-        this.wss.emit(EventType.GROUP_AT_MESSAGE_CREATE, data)
+        this.emit(EventType.GROUP_AT_MESSAGE_CREATE, data)
         break
       }
       case EventType.C2C_MESSAGE_CREATE: {
         this.heartbeat.d = data.s
-        this.wss.emit(EventType.C2C_MESSAGE_CREATE, data)
+        this.emit(EventType.C2C_MESSAGE_CREATE, data)
         break
       }
       // case 'GUILD_CREATE':
