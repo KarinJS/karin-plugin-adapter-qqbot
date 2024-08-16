@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.2](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.1...v1.2.2) (2024-08-16)
+
+
+### Bug Fixes
+
+* ci ([9958ac1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/9958ac1c121756552c733df6284f49ab37714610))
+* 修正断开连接收监听不到事件 跟随上游 ([3ce38b3](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/3ce38b3e9613d715ee745fac5c6128efa1ae45d9))
+
 ## [1.2.1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.0...v1.2.1) (2024-08-15)
 
 
