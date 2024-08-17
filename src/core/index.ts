@@ -213,11 +213,11 @@ export class AdapterQQBot implements KarinAdapter {
         const Match = v.match(/faceId="(\d+)"/) as RegExpMatchArray
         elements.push(segment.face(Number(Match[1])))
       } else {
-        const BotConfig = Config.getBotConfig(this.account.uid) || { regex: [] }
-        for (const reg of BotConfig.regex) {
-          if (typeof v === 'string') {
-            v = v.trim().replace(new RegExp(reg.reg), reg.rep)
-          }
+        const { regex } = Config.getBotConfig(this.account.uid) || { regex: [] }
+        for (const r of regex) {
+          const reg = r.reg
+          if (typeof reg !== 'string') continue
+          v = v.replace(reg, r.rep)
         }
         elements.push(segment.text(v))
       }

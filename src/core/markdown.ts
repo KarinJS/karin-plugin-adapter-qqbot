@@ -15,6 +15,7 @@ import {
   common as karinCommon,
   ButtonType,
   TplMarkdownElement,
+  segment,
 } from 'node-karin'
 
 /**
@@ -52,8 +53,9 @@ export async function markdownTemplate (Opt: {
   const textFn = async () => {
     text.sort((a, b) => a.index - b.index)
     const data = Common.getQQBotButton(text.map(v => v.data.text).join(''))
+    const val = type === PathType.Friends ? Common.formatText(data.text, true) : Common.formatText(data.text)
     /** 去除at全体 */
-    params.push({ key: bot.markdown.oldTemplate.textStartKey, values: [data.text.replace(/everyone/g, '').replace(/\n/g, '\r')] })
+    params.push({ key: bot.markdown.oldTemplate.textStartKey, values: [val] })
     /** 按钮 */
     buttons.push(...data.data)
   }
@@ -79,6 +81,11 @@ export async function markdownTemplate (Opt: {
       case 'image':
         image.push({ index, data })
         break
+      case 'at': {
+        if (type === PathType.Friends) break
+        text.push({ index, data: segment.text(`<qqbot-at-user id="${data.uid || data.uin}" />`) })
+        break
+      }
       case 'record': {
         const file = await common.voiceToSilk(data.file)
         list.push(mediaFn(file, type, '0.silk', FileType.Record))
@@ -222,12 +229,18 @@ export async function markdownRaw (Opt: {
         /** 先提取掉url 随后放出按钮中 */
         const res = Common.getQQBotButton(data.text)
         buttons.push(...res.data)
-        message.push({ index, data: res.text.replace(/everyone/g, '').replace(/\n/g, '\r') })
+        const text = type === PathType.Friends ? Common.formatText(res.text, true) : Common.formatText(res.text)
+        message.push({ index, data: text })
         break
       }
       case 'image':
         imageFn(index, data)
         break
+      case 'at': {
+        if (type === PathType.Friends) break
+        message.push({ index, data: `<qqbot-at-user id="${data.uid || data.uin}" />` })
+        break
+      }
       case 'record': {
         const file = await common.voiceToSilk(data.file)
         list.push(mediaFn(file, type, '0.silk', FileType.Record))

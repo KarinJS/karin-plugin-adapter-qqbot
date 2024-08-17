@@ -232,6 +232,18 @@ class Common {
       data,
     }
   }
+
+  /**
+   * 传入文本 将文本一些特殊字符转义去除 用于处理markdown
+   * @param text - 文本
+   * @param isC2C - 是否是C2C
+   * @returns 处理后的文本
+   */
+  formatText (text: string, isC2C = false) {
+    text = text.replace(/everyone/g, '').replace(/\n/g, '\r')
+    if (isC2C) text = text.replace(/<qqbot-at-user id=".+" \/>/gm, '').replace(/<@.+>/gm, '')
+    return text
+  }
 }
 
 export const common = new Common()

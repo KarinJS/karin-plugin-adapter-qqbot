@@ -71,7 +71,7 @@ export interface GlobalCfgType {
   /** 接受到消息后对文本进行表达式处理，优先级高于全局配置 */
   regex: Array<{
     /** 匹配的正则表达式 */
-    reg: string
+    reg: RegExp
 
     /** 替换为的内容 */
     rep: string
@@ -217,12 +217,26 @@ class Cfg {
     /** 全局默认配置 */
     const defCfg = allCfg.default
 
-    return {
+    /** 对regex进行处理 */
+    const regex = Array.isArray(botCfg.regex) ? botCfg.regex : defCfg.regex
+    /** 对表达式进行new RegExp处理 */
+    const regexData = regex.map(({ reg, rep }) => {
+      return {
+        reg: reg instanceof RegExp ? reg : new RegExp(reg),
+        rep,
+      }
+    })
+
+    const data = {
       ...defCfg,
       ...botCfg,
       sendMode: Number(botCfg.sendMode) as SendMode || defCfg.sendMode,
-      regex: Array.isArray(botCfg.regex) ? botCfg.regex : defCfg.regex,
+      regex: regexData,
     }
+
+    /** 缓存 */
+    this.change.set(key, data)
+    return data
   }
 
   /**
@@ -264,20 +278,6 @@ class Cfg {
     watcher.on('change', () => {
       this.change.delete(key)
       logger.mark(`[修改配置文件][${type}][${name}]`)
-
-      /** 文件修改后调用对应的方法 请自行使用 */
-
-      // switch (`change_${name}`) {
-      //   case 'change_App':
-      //     this.change_App()
-      //     break
-      //   case 'change_config':
-      //     this.change_config()
-      //     break
-      //   case 'change_group':
-      //     this.change_group()
-      //     break
-      // }
     })
 
     /** 缓存 防止重复监听 */
