@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.4](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.3...v1.2.4) (2024-08-17)
+
+
+### Bug Fixes
+
+* 修正c2c下没去掉at ([117f223](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/117f223bb9ee01dc1644decbf79c7daefcf3f075))
+
 ## [1.2.3](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.2...v1.2.3) (2024-08-16)
 
 
