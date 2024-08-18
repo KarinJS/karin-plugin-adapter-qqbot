@@ -215,9 +215,7 @@ export class AdapterQQBot implements KarinAdapter {
       } else {
         const { regex } = Config.getBotConfig(this.account.uid) || { regex: [] }
         for (const r of regex) {
-          const reg = r.reg
-          if (typeof reg !== 'string') continue
-          v = v.replace(reg, r.rep)
+          v = v.trim().replace(r.reg, r.rep)
         }
         elements.push(segment.text(v))
       }
