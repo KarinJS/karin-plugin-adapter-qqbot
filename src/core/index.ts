@@ -334,7 +334,7 @@ export class AdapterQQBot implements KarinAdapter {
     return `https://q.qlogo.cn/qqapp/${this.account.uid}/${user_id}/${size}`
   }
 
-  getGroupAvatar () {
+  getGroupAvatarUrl () {
     return 'https://p.qlogo.cn/gh/967068507/967068507/0'
   }
 
