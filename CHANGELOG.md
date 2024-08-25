@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.5](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.4...v1.2.5) (2024-08-25)
+
+
+### Bug Fixes
+
+* getGroupAvatarUrl name ([7c98c13](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/7c98c134b30c8098843d96aa6d3b2b8295bcb3dd))
+
 ## [1.2.4](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.3...v1.2.4) (2024-08-17)
 
 
