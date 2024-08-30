@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.6](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.5...v1.2.6) (2024-08-30)
+
+
+### Bug Fixes
+
+* type of reg can't be string ([#22](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/22)) ([e5ea5fd](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/e5ea5fd512c1649d4ff5b7dbc67288aa15790bbf))
+
 ## [1.2.5](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.4...v1.2.5) (2024-08-25)
 
 
