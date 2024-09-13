@@ -25,7 +25,7 @@ export const enum Opcode {
   /** Heartbeat ACK [Receive/Reply] 当发送心跳成功之后，就会收到该消息 */
   HeartbeatACK = 11,
   /** HTTP Callback ACK [Reply] 仅用于 http 回调模式的回包，代表机器人收到了平台推送的数据 */
-  HTTPCallbackACK = 12
+  HTTPCallbackACK = 12,
 }
 
 /**
@@ -55,7 +55,7 @@ export interface HeartbeatACKEvent {
 export const enum EventType {
   /** 在鉴权成功后下发 代表建立连接成功 */
   READY = 'READY',
-  /** 恢复登录状态后 不发遗漏事件完毕下发 */
+  /** 恢复登录状态后 补发遗漏事件完毕下发 */
   RESUMED = 'RESUMED',
   /** 当机器人加入新的guild时 */
   GUILD_CREATE = 'GUILD_CREATE',
@@ -140,7 +140,7 @@ export const enum EventType {
   /** 当收到@机器人的消息时 */
   AT_MESSAGE_CREATE = 'AT_MESSAGE_CREATE',
   /** 当频道的消息被删除时 */
-  PUBLIC_MESSAGE_DELETE = 'PUBLIC_MESSAGE_DELETE'
+  PUBLIC_MESSAGE_DELETE = 'PUBLIC_MESSAGE_DELETE',
 }
 
 /**
@@ -153,6 +153,16 @@ export interface Event {
   s: number,
   /** 事件类型 */
   t: EventType
+}
+
+/**
+ * 恢复登录状态子事件
+ */
+export interface ResumedEvent extends Event {
+  /** 事件类型 */
+  t: EventType.RESUMED
+  /** 空值 */
+  d: string
 }
 
 /**
@@ -208,7 +218,6 @@ export interface C2CMessageCreateEvent extends Event {
  * GROUP_AT_MESSAGE_CREATE子事件
  */
 export interface GroupAtMessageCreateEvent extends Event {
-  /** 事件类型 */
   t: EventType.GROUP_AT_MESSAGE_CREATE,
   /** 平台方消息ID 格式: GROUP_AT_MESSAGE_CREATE:abc... */
   id: string,
@@ -236,6 +245,76 @@ export interface GroupAtMessageCreateEvent extends Event {
 }
 
 /**
+ * 频道的user信息
+ */
+export interface GuildUser {
+  /** 发送者的头像url */
+  avatar: string,
+  /** 发送者是否为bot */
+  bot: boolean,
+  /** 发送者的id */
+  id: string,
+  /** 发送者的nickname */
+  username: string
+}
+
+/**
+ * 频道消息
+ */
+export interface GuildMessageCreateEvent extends Event {
+  t: EventType.MESSAGE_CREATE | EventType.AT_MESSAGE_CREATE,
+  /** 序列号 */
+  s: number,
+  /** 平台方消息ID */
+  id: string,
+  /** 事件内容 */
+  d: {
+    /** 消息id */
+    id: string,
+    /** 发送者信息 */
+    author: GuildUser,
+    /** 子频道id */
+    channel_id: string,
+    /** 频道id */
+    guild_id: string,
+    /** 消息内容 */
+    content: string,
+    /** 消息创建时间 ISO8601 timestamp */
+    timestamp: string
+    /** 用于消息间的排序 */
+    seq: number
+    /** 子频道消息 seq */
+    seq_in_channel: number
+    /** 消息创建者的member信息 */
+    member: {
+      /** 用户加入频道的时间 ISO8601 timestamp */
+      joined_at: string,
+      /** 用户在频道内的昵称 */
+      nick: string,
+      /** 用户在频道内的身份组ID 1-全体成员 2-超级管理员 4-频道主 5-子频道管理员 */
+      roles: string[]
+    },
+    /** 引用消息对象 */
+    message_reference?: {
+      /** 引用回复的消息 id */
+      message_id: string,
+      /** 是否忽略获取引用消息详情错误，默认否 */
+      ignore_get_message_error: boolean
+    },
+    /** 消息中at的人 */
+    mentions: [GuildUser],
+    /** 是否at all */
+    mention_everyone?: boolean,
+    /** 附件 */
+    attachments?: [Attachment]
+  }
+}
+
+/**
  * 所有子事件
  */
-export type SubEvent = ReadyEvent | C2CMessageCreateEvent | GroupAtMessageCreateEvent
+export type SubEvent = ReadyEvent
+  | C2CMessageCreateEvent
+  | GroupAtMessageCreateEvent
+  | GuildMessageCreateEvent
+  | ResumedEvent

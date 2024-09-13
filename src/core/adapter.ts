@@ -17,6 +17,8 @@ import {
   UploadMediaResponse,
   SubEvent,
   Opcode,
+  SendChannelMessageOptions,
+  SendMessageOptionsJson,
 } from '@/types'
 
 export interface SendMessageResponse {
@@ -141,7 +143,7 @@ export class QQBotApi extends EventEmitter {
       this.wss.send(JSON.stringify(data))
       return
     }
-    const intents = Intents(['GROUP_AT_MESSAGE_CREATE'])
+    const intents = Intents(['GROUP_AT_MESSAGE_CREATE', 'AT_MESSAGE_CREATE'])
 
     if (intents === 0) throw new Error('intents 无效，请检查传入的事件名称是否正确')
 
@@ -320,9 +322,18 @@ export class QQBotApi extends EventEmitter {
       // case 'AUDIO_FINISH':
       // case 'AUDIO_ON_MIC':
       // case 'AUDIO_OFF_MIC':
-      // case 'AT_MESSAGE_CREATE':
+      case EventType.MESSAGE_CREATE:
+      case EventType.AT_MESSAGE_CREATE: {
+        this.heartbeat.d = data.s
+        this.emit(data.t, data)
+        break
+      }
       // case 'PUBLIC_MESSAGE_DELETE':
       // case 'RESUMED:  {"op":0,"s":53,"t":"RESUMED","d":""} 在客户端恢复连接时收到
+      case EventType.RESUMED: {
+        this.logger('mark', '[重连] 客户端恢复连接')
+        return
+      }
       default:
         console.log(`Unhandled event: ${JSON.stringify(data)}`)
     }
@@ -462,15 +473,20 @@ export class QQBotApi extends EventEmitter {
   buildRawMarkdown (
     content: string,
     keyboard: SendMessageOptions['keyboard'],
+    reply: SendMessageOptions['message_reference'],
     id?: string,
     seq?: number
-  ): SendMessageOptions {
-    const options: SendMessageOptions = {
+  ): SendMessageOptionsJson {
+    const options: SendMessageOptionsJson = {
       msg_type: MessageType.Markdown,
       content: '',
       markdown: { content },
       keyboard,
+      image: '',
+      message_reference: undefined,
     }
+
+    if (reply) options.message_reference = reply
 
     /** id存在 */
     if (id) {
@@ -516,4 +532,25 @@ export class QQBotApi extends EventEmitter {
       headers: this.headers,
     }
   }
+
+  /**
+   * 发送文字子频道消息
+   * @param channel_id 子频道id
+   * @param options 请求参数
+   */
+  async sendChannelText (channel_id: string, options: SendChannelMessageOptions): Promise<any> {
+    const url = `${this.host}/channels/${channel_id}/messages`
+    /** 判断options是不是FormData */
+    if (options instanceof FormData) {
+      const data = await got.post(url, { body: options, headers: this.headers })
+      console.log(data)
+      return data
+    }
+
+    return await this.post(url, options)
+  }
+
+  /**
+   * 发送Markdown、按钮
+   */
 }

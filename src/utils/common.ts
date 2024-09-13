@@ -5,7 +5,7 @@ import { basename } from './dir'
 import { encode, isSilk } from 'silk-wasm'
 import lodash from 'node-karin/lodash'
 import GetUrls from '@karinjs/geturls'
-import { config, execs, logger, common as karinCommon, segment, ButtonElement } from 'node-karin'
+import { config, execs, logger, Common as karinCommon, segment, ButtonElement } from 'node-karin'
 import path from 'path'
 
 /**
@@ -20,10 +20,11 @@ export interface QRRes {
   height: number
 }
 
-class Common {
+class Common extends karinCommon {
   /** ffmpeg */
   ffmpeg: string
   constructor () {
+    super()
     this.ffmpeg = ''
     this.initFfmpeg()
   }
@@ -33,10 +34,10 @@ class Common {
   }
 
   /**
-     * 语音转silk
-     * @param voice - 语音文件
-     * @returns silk buffer
-     */
+   * 语音转silk
+   * @param voice - 语音文件
+   * @returns silk buffer
+   */
   async voiceToSilk (voice: string): Promise<string> {
     if (!this.ffmpeg) throw TypeError('ffmpeg未安装，请安装 ffmpeg 或者 配置ffmpeg_path')
     const time = Date.now()
@@ -46,12 +47,12 @@ class Common {
     /** 传入的是路径 则直接使用 */
     if (fs.existsSync(voice)) {
       const buffer = fs.readFileSync(voice)
-      if (isSilk(buffer)) return `base64://${Buffer.from(buffer).toString('base64')}`
+      if (isSilk(buffer)) return Buffer.from(buffer).toString('base64')
       voicePath = path.resolve(voice)
     } else {
       /** 保存到本地 */
-      const buffer = await karinCommon.buffer(voice)
-      if (isSilk(buffer)) return `base64://${Buffer.from(buffer).toString('base64')}`
+      const buffer = await this.buffer(voice)
+      if (isSilk(buffer)) return Buffer.from(buffer).toString('base64')
       fs.writeFileSync(dir, buffer)
     }
 
@@ -74,12 +75,12 @@ class Common {
       fs.promises.unlink(pcmPath)
     }
 
-    return `base64://${Buffer.from(silk.data).toString('base64')}`
+    return Buffer.from(silk.data).toString('base64')
   }
 
   /**
-     * 初始化ffmpeg
-     */
+   * 初始化ffmpeg
+   */
   async initFfmpeg () {
     try {
       /** 环境变量 */
@@ -96,10 +97,10 @@ class Common {
   }
 
   /**
-     * 处理URL
-     * @param url - URL
-     * @param exclude - 排除的URL
-     */
+   * 处理URL
+   * @param url - URL
+   * @param exclude - 排除的URL
+   */
   getUrls (url: string, exclude = []) {
     /** 中文不符合url规范 */
     url = url.replace(/[\u4e00-\u9fa5]/g, '|')
@@ -129,9 +130,9 @@ class Common {
   }
 
   /**
-     * 传入URL数组，转为二维码base64
-     * @param urls - URL数组
-     */
+   * 传入URL数组，转为二维码base64
+   * @param urls - URL数组
+   */
   async getQrCode (urls: string[]): Promise<QRRes> {
     const list = await Promise.all(urls.map(url => qrcode.toDataURL(url)))
 
@@ -191,9 +192,9 @@ class Common {
   }
 
   /**
-     * 传入文本 返回处理后的文本、图片
-     * @param text - 文本
-     */
+   * 传入文本 返回处理后的文本、图片
+   * @param text - 文本
+   */
   async getQQBotText (text: string): Promise<{
     /** 处理后的文本 */
     text: string
@@ -217,19 +218,19 @@ class Common {
    * 传入文本 处理文本 返回的按钮为多行按钮
    * @param text - 文本
    */
-  getQQBotButton (text: string) {
+  textToButton (text: string) {
     const urls = this.getUrls(text)
-    const data: ButtonElement[] = []
+    const button: ButtonElement[] = []
 
     /** 使用for循环来替换字符串 保证一致性 */
     for (const url of urls) {
       text = text.replace(url, '[请点击按钮查看]')
-      data.push(segment.button({ text: url, link: url }))
+      button.push(segment.button({ text: url, link: url }))
     }
 
     return {
       text,
-      data,
+      button,
     }
   }
 

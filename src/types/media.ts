@@ -1,7 +1,8 @@
 /**
+ * 文件类型
  * 需要注意 目前只有私聊可以收到file类型的消息
  */
-export type Content_type = 'image/gif' | 'image/jpeg' | 'image/png' | 'file'
+export type Content_type = 'image/gif' | 'image/jpeg' | 'image/png' | 'file' | 'video/mp4' | 'voice'
 
 /**
  * 富媒体文件类型
@@ -22,7 +23,7 @@ export const enum FileType {
   /**
    * 文件
    */
-  File = 4
+  File = 4,
 }
 
 /**
