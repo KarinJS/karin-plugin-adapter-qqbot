@@ -190,7 +190,6 @@ export class ParseMessage {
     }))
 
     const rows: { buttons: Array<ButtonType> }[] = []
-    const keyboard: { content: { rows: Array<{ buttons: Array<ButtonType> }> } } = { content: { rows: [] } }
 
     /** 先处理按钮 */
     if (buttons.length) {
@@ -200,6 +199,7 @@ export class ParseMessage {
       })
     }
 
+    const keyboard = rows.length ? { content: { rows } } : undefined
     /** 排序message */
     message.sort((a, b) => a.index - b.index)
     const parseScene = this.parseScene(contact.scene)
@@ -221,11 +221,9 @@ export class ParseMessage {
       }
     }
 
-    const keyboards = keyboard.content.rows.length ? keyboard : undefined
-
     if (content.length) {
       const text = content.join('')
-      const opt = bot.super.buildRawMarkdown(text, keyboards, MessageReference, message_id, ++seq)
+      const opt = bot.super.buildRawMarkdown(text, keyboard, MessageReference, message_id, ++seq)
       if (parseScene === PathType.Channels) {
         const res = await bot.super.sendChannelText(contact.peer, opt)
         result.raw_data.push(JSON.parse(res.body))
@@ -246,7 +244,7 @@ export class ParseMessage {
           result.raw_data.push(res)
         }
       } else {
-        const opt = bot.super.buildRawMarkdown(item.data, keyboards, MessageReference, message_id, ++seq)
+        const opt = bot.super.buildRawMarkdown(item.data, keyboard, MessageReference, message_id, ++seq)
         if (parseScene === PathType.Channels) {
           const res = await bot.super.sendChannelText(contact.peer, opt)
           result.raw_data.push(JSON.parse(res.body))
