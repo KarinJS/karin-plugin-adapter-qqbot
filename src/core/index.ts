@@ -31,6 +31,7 @@ import {
   KarinAdapter,
   KarinElement,
   MessageSubType,
+  button,
 } from 'node-karin'
 
 /**
@@ -60,12 +61,20 @@ export class AdapterQQBot implements KarinAdapter {
     switch (this.markdown.sendMode) {
       /** 原生 */
       case 1: {
-        this._sendNsg = async (elements, type, openid, message_id) => await markdownRaw({ bot: this, data: elements, type, openid, message_id })
+        this._sendNsg = async (e, elements, type, openid, message_id) => {
+          const list = await button(e.msg)
+          elements.push(...list)
+          return await markdownRaw({ bot: this, data: elements, type, openid, message_id })
+        }
         return
       }
       /** 旧图文模板 */
       case 3: {
-        this._sendNsg = async (elements, type, openid, message_id) => await markdownTemplate({ bot: this, data: elements, type, openid, message_id })
+        this._sendNsg = async (e, elements, type, openid, message_id) => {
+          const list = await button(e.msg)
+          elements.push(...list)
+          return await markdownTemplate({ bot: this, data: elements, type, openid, message_id })
+        }
         return
       }
       /** 纯文 现已不能申请 */
@@ -117,7 +126,7 @@ export class AdapterQQBot implements KarinAdapter {
 
       const e = new KarinMessage(message)
       e.bot = this
-      e.replyCallback = async elements => await this._sendNsg(elements, PathType.Groups, e.contact.peer, e.message_id)
+      e.replyCallback = async elements => await this._sendNsg(e, elements, PathType.Groups, e.contact.peer, e.message_id)
 
       karin.emit('adapter.message', e)
     })
@@ -154,7 +163,7 @@ export class AdapterQQBot implements KarinAdapter {
 
       const e = new KarinMessage(message)
       e.bot = this
-      e.replyCallback = async elements => await this._sendNsg(elements, PathType.Friends, e.contact.peer, e.message_id)
+      e.replyCallback = async elements => await this._sendNsg(e, elements, PathType.Friends, e.contact.peer, e.message_id)
 
       karin.emit('adapter.message', e)
     })
@@ -169,7 +178,7 @@ export class AdapterQQBot implements KarinAdapter {
     })
   }
 
-  async _sendNsg (elements: Array<KarinElement>, type: PathType, openid: string, message_id?: string) {
+  async _sendNsg (e: KarinMessage, elements: Array<KarinElement>, type: PathType, openid: string, message_id?: string) {
     return await this.KarinConvertAdapter(elements, type, openid, message_id)
   }
 

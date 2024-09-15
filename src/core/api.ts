@@ -71,7 +71,7 @@ export class QQBotApi extends EventEmitter {
     this.heartbeat = { op: 1, d: null, session_id: '' }
     this.heartbeat_interval = 0
 
-    // 后续处理 重启后重新建立历史会话
+    // todo: 后续处理 重启后重新建立历史会话
   }
 
   logger (level: LoggerLevel, ...args: any[]) {
@@ -153,7 +153,7 @@ export class QQBotApi extends EventEmitter {
         shard: [0, 1],
         properties: {
           $os: 'Linux',
-          $browser: 'karin-plugin-adapter-qqbot',
+          $browser: '@karinjs/adapter-qqbot',
           $device: 'karin',
         },
       },
