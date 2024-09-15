@@ -62,7 +62,7 @@ export class AdapterQQBot implements KarinAdapter {
       /** 原生 */
       case 1: {
         this._sendNsg = async (e, elements, type, openid, message_id) => {
-          const list = await button(e.msg)
+          const list = await button(e.msg, e)
           elements.push(...list)
           return await markdownRaw({ bot: this, data: elements, type, openid, message_id })
         }
@@ -71,7 +71,7 @@ export class AdapterQQBot implements KarinAdapter {
       /** 旧图文模板 */
       case 3: {
         this._sendNsg = async (e, elements, type, openid, message_id) => {
-          const list = await button(e.msg)
+          const list = await button(e.msg, e)
           elements.push(...list)
           return await markdownTemplate({ bot: this, data: elements, type, openid, message_id })
         }
