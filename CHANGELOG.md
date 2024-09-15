@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.8](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.7...v1.2.8) (2024-09-15)
+
+
+### Bug Fixes
+
+* button e ([d045c30](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/d045c306c9fbefe2df7641ca8ccfc86e61351a4d))
+
 ## [1.2.7](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.6...v1.2.7) (2024-09-15)
 
 
