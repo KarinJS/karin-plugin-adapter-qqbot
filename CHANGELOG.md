@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.7](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.6...v1.2.7) (2024-09-15)
+
+
+### Bug Fixes
+
+* 适配`segment.button` 和 `segment.keyboard` ([66001a0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/66001a02baf85859f855cfbe6204236210196c84))
+
 ## [1.2.6](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.5...v1.2.6) (2024-08-30)
 
 
