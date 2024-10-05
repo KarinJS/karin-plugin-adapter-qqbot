@@ -1,8 +1,8 @@
 import qrcode from 'qrcode'
 import { common } from '@/utils'
-import { FileType, MessageReference, PathType, SendChannelMessageOptions } from '@/types'
+import { AdapterQQBot } from '@/adapter'
+import { FileEnum, MessageReference, PathType, SendMessageOptions } from '@/types'
 import { ButtonElement, ButtonType, Contact, handler, KarinElement, KeyBoardElement, ReplyReturn, Scene, segment, TplMarkdownElement } from 'node-karin'
-import { AdapterQQBot } from '@/core'
 
 /** 转换方式枚举 */
 export const enum ParseType {
@@ -14,7 +14,7 @@ export const enum ParseType {
   Button = 'button',
 }
 
-export class ParseMessage {
+export class SendMarkdown {
   /**
    * 处理文本
    * 1. 提取url转按钮
@@ -33,12 +33,12 @@ export class ParseMessage {
   /**
    * 处理AT
    * 好友、频道私信下不支持at
-   * @param user_id - 用户ID
+   * @param userId - 用户ID
    * @param isPrivate - 消息类型
    */
-  async parseAt (user_id: string, isPrivate: boolean = false) {
+  async parseAt (userId: string, isPrivate: boolean = false) {
     if (isPrivate) return ''
-    return `<qqbot-at-user id="${user_id}" />`
+    return `<qqbot-at-user id="${userId}" />`
   }
 
   /**
@@ -112,10 +112,10 @@ export class ParseMessage {
   /**
    * 发送多媒体消息
    */
-  async sendMedia (bot: AdapterQQBot, url: string, type: PathType, openid: string, FileType: FileType, message_id?: string, seq?: number) {
-    const { file_info } = await bot.super.uploadMedia(openid, type, url, FileType)
-    const opt = bot.super.buildMedia(file_info, message_id, seq)
-    const result = type === PathType.Channels ? await bot.super.sendChannelText(openid, opt as SendChannelMessageOptions) : await bot.super.sendMessage(openid, type, opt)
+  async sendMedia (bot: AdapterQQBot, url: string, type: PathType, openid: string, FileType: FileEnum, messageId?: string, seq?: number) {
+    const { file_info: fileInfo } = await bot.super.uploadMedia(openid, type, url, FileType)
+    const opt = bot.super.buildMedia(fileInfo, messageId, seq)
+    const result = await bot.super.sendMessage(openid, type, opt)
     return result
   }
 
@@ -126,14 +126,17 @@ export class ParseMessage {
    * @param elements - 消息元素
    */
   async SendMessage (bot: AdapterQQBot, contact: Contact, elements: Array<KarinElement>) {
-    let message_id = ''
     let MessageReference: MessageReference | undefined
     let seq = common.random(100, 999999)
     const message: ElementList[] = []
     const markdown: MarkdownList[] = []
     const buttons: Array<ButtonElement | KeyBoardElement> = []
+    const messageId = elements.find(i => i.type === 'pasmsg')?.id
 
-    const isPrivate = contact.scene === Scene.Private
+    const isGuild = contact.scene === Scene.Guild || contact.scene === Scene.GuildDirect
+    const isDirect = contact.scene === Scene.GuildDirect
+    const isPrivate = contact.scene === Scene.Private || contact.scene === Scene.GuildDirect
+
     await Promise.all(elements.map(async (element, index) => {
       switch (element.type) {
         case 'text': {
@@ -148,11 +151,13 @@ export class ParseMessage {
           break
         }
         case 'video': {
+          if (isGuild) break
           const { data } = await this.parseVideo(element.file, false)
           message.push({ index, type: 'video', data })
           break
         }
         case 'record': {
+          if (isGuild) break
           const { data } = await this.parseRecord(element.file)
           message.push({ index, type: 'record', data })
           break
@@ -175,8 +180,7 @@ export class ParseMessage {
           buttons.push(element)
           break
         }
-        case 'passive_reply': {
-          message_id = element.id
+        case 'pasmsg': {
           break
         }
         case 'reply': {
@@ -191,8 +195,8 @@ export class ParseMessage {
 
     const rows: { buttons: Array<ButtonType> }[] = []
 
-    /** 先处理按钮 */
-    if (buttons.length) {
+    /** 先处理按钮 频道私信不支持按钮... */
+    if (!isDirect && buttons.length) {
       buttons.forEach(v => {
         const button = common.buttonToQQBot(v)
         rows.push(...button)
@@ -214,44 +218,41 @@ export class ParseMessage {
     const content: string[] = []
     for (const item of message) {
       if (item.type === 'record' || item.type === 'video') {
-        const res = await this.sendMedia(bot, item.data, parseScene, contact.peer, item.type === 'record' ? FileType.Record : FileType.Video, message_id, ++seq)
+        const res = await this.sendMedia(bot, item.data, parseScene, contact.peer, item.type === 'record' ? FileEnum.Record : FileEnum.Video, messageId, ++seq)
         result.raw_data.push(res)
       } else {
         content.push(item.data)
       }
     }
 
-    if (content.length) {
-      const text = content.join('')
-      const opt = bot.super.buildRawMarkdown(text, keyboard, MessageReference, message_id, ++seq)
-      if (parseScene === PathType.Channels) {
-        const res = await bot.super.sendChannelText(contact.peer, opt)
-        result.raw_data.push(JSON.parse(res.body))
-      } else {
-        const res = await bot.super.sendMessage(contact.peer, parseScene, opt)
+    const sendMsg = async (opt: SendMessageOptions) => {
+      const sendMethods = {
+        [PathType.Channels]: bot.super.sendGuildTextMessage,
+        [PathType.Dms]: bot.super.sendGuildDirectMessage,
+        [PathType.Friends]: bot.super.sendPrivateMessage,
+        [PathType.Groups]: bot.super.sendGroupMessage,
+      }
+
+      const sendMethod = sendMethods[parseScene]
+      if (sendMethod) {
+        const res = await sendMethod.call(bot.super, contact.scene === Scene.Guild ? contact.sub_peer! : contact.peer, opt)
         result.raw_data.push(res)
       }
     }
 
+    if (content.length) {
+      const text = content.join('')
+      const opt = bot.super.buildRawMarkdown(text, keyboard, MessageReference, messageId, ++seq)
+      await sendMsg(opt)
+    }
+
     for (const item of markdown) {
       if (item.type === 'markdown_tpl') {
-        const opt = bot.super.buildTplMarkdown(item.data.custom_template_id, item.data.params, keyboard, message_id, ++seq)
-        if (parseScene === PathType.Channels) {
-          const res = await bot.super.sendChannelText(contact.peer, opt)
-          result.raw_data.push(JSON.parse(res.body))
-        } else {
-          const res = await bot.super.sendMessage(contact.peer, parseScene, opt)
-          result.raw_data.push(res)
-        }
+        const opt = bot.super.buildTplMarkdown(item.data.custom_template_id, item.data.params, keyboard, messageId, ++seq)
+        await sendMsg(opt)
       } else {
-        const opt = bot.super.buildRawMarkdown(item.data, keyboard, MessageReference, message_id, ++seq)
-        if (parseScene === PathType.Channels) {
-          const res = await bot.super.sendChannelText(contact.peer, opt)
-          result.raw_data.push(JSON.parse(res.body))
-        } else {
-          const res = await bot.super.sendMessage(contact.peer, parseScene, opt)
-          result.raw_data.push(res)
-        }
+        const opt = bot.super.buildRawMarkdown(item.data, keyboard, MessageReference, messageId, ++seq)
+        await sendMsg(opt)
       }
     }
 
@@ -269,7 +270,7 @@ export class ParseMessage {
       case Scene.Group: return PathType.Groups
       case Scene.Private: return PathType.Friends
       case Scene.Guild: return PathType.Channels
-      case Scene.GuildPrivate: return PathType.Dms
+      case Scene.GuildDirect: return PathType.Dms
       default: {
         throw new Error('未知场景')
       }
@@ -284,7 +285,7 @@ export class ParseMessage {
       case PathType.Groups: return Scene.Group
       case PathType.Friends: return Scene.Private
       case PathType.Channels: return Scene.Guild
-      case PathType.Dms: return Scene.GuildPrivate
+      case PathType.Dms: return Scene.GuildDirect
       default: {
         throw new Error('未知场景')
       }
@@ -292,7 +293,7 @@ export class ParseMessage {
   }
 }
 
-export const parseMessage = new ParseMessage()
+export const sendMarkdown = new SendMarkdown()
 
 export interface Text { index: number, type: 'text', data: string }
 export interface At { index: number, type: 'at', data: string }

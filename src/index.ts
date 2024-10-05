@@ -1,4 +1,4 @@
-import './core/index'
+import './api/core'
 import Jimp from 'jimp'
 import { logger, common } from 'node-karin'
 import { basename, dirPath } from './utils/dir'

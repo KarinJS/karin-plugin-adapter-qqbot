@@ -88,11 +88,11 @@ class Common extends karinCommon {
       this.ffmpeg = 'ffmpeg'
     } catch {
       /** 环境变量没有读配置 */
-      const ffmpeg_path = config.Config.ffmpeg_path
-      if (!ffmpeg_path) return logger.error(logger.red('ffmpeg未安装，请安装 ffmpeg 或者 配置ffmpeg_path'))
+      const ffmpegPath = config.Config.ffmpeg_path
+      if (!ffmpegPath) return logger.error(logger.red('ffmpeg未安装，请安装 ffmpeg 或者 配置ffmpeg_path'))
       /** 检查文件是否存在 */
-      if (!fs.existsSync(ffmpeg_path)) return logger.error(logger.red('ffmpeg_path配置错误，请检查文件是否存在'))
-      this.ffmpeg = `"${ffmpeg_path}"`
+      if (!fs.existsSync(ffmpegPath)) return logger.error(logger.red('ffmpeg_path配置错误，请检查文件是否存在'))
+      this.ffmpeg = `"${ffmpegPath}"`
     }
   }
 

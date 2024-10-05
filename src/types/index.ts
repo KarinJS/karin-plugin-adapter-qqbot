@@ -1,3 +1,3 @@
 export * from './message'
 export * from './media'
-export * from './event'
+export * from './event/'

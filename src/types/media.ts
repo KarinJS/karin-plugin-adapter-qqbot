@@ -7,7 +7,7 @@ export type Content_type = 'image/gif' | 'image/jpeg' | 'image/png' | 'file' | '
 /**
  * 富媒体文件类型
  */
-export const enum FileType {
+export const enum FileEnum {
   /**
    * 图片
    */
@@ -77,7 +77,7 @@ export interface UploadMediaOptions {
    * - 3. 语音 silk
    * - 4. 文件
    */
-  file_type: FileType
+  file_type: FileEnum
 
   /**
    * 媒体资源的URL

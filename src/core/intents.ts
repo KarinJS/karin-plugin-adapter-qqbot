@@ -1,4 +1,4 @@
-const eventToIntentMap: { [key: string]: number } = {
+export const eventToIntentMap: { [key: string]: number } = {
   GUILD_CREATE: 1 << 0,
   GUILD_UPDATE: 1 << 0,
   GUILD_DELETE: 1 << 0,

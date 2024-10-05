@@ -1,5 +1,3 @@
-import { Attachment } from './media'
-
 /**
  * opcode
  * 客户端操作含义如下：
@@ -29,30 +27,9 @@ export const enum Opcode {
 }
 
 /**
- * 心跳生命周期事件
- */
-export interface HeartbeatEvent {
-  /** opcode */
-  op: Opcode.Hello,
-  /** 事件内容 */
-  d: {
-    /** 心跳声明周期 */
-    heartbeat_interval: number
-  }
-}
-
-/**
- * 心跳回包事件
- */
-export interface HeartbeatACKEvent {
-  /** opcode */
-  op: Opcode.HeartbeatACK
-}
-
-/**
  * 子事件类型
  */
-export const enum EventType {
+export const enum EventEnum {
   /** 在鉴权成功后下发 代表建立连接成功 */
   READY = 'READY',
   /** 恢复登录状态后 补发遗漏事件完毕下发 */
@@ -83,7 +60,7 @@ export const enum EventType {
   MESSAGE_REACTION_ADD = 'MESSAGE_REACTION_ADD',
   /** 为消息删除表情表态 */
   MESSAGE_REACTION_REMOVE = 'MESSAGE_REACTION_REMOVE',
-  /** 当收到用户发给机器人的私信消息时 */
+  /** 当收到用户发给机器人的频道私信消息时 */
   DIRECT_MESSAGE_CREATE = 'DIRECT_MESSAGE_CREATE',
   /** 删除（撤回）消息事件 */
   DIRECT_MESSAGE_DELETE = 'DIRECT_MESSAGE_DELETE',
@@ -152,169 +129,5 @@ export interface Event {
   /** 序列号 */
   s: number,
   /** 事件类型 */
-  t: EventType
+  t: EventEnum
 }
-
-/**
- * 恢复登录状态子事件
- */
-export interface ResumedEvent extends Event {
-  /** 事件类型 */
-  t: EventType.RESUMED
-  /** 空值 */
-  d: string
-}
-
-/**
- * READY子事件
- */
-export interface ReadyEvent extends Event {
-  /** 事件类型 */
-  t: EventType.READY,
-  /** 事件内容 */
-  d: {
-    version: number,
-    session_id: string,
-    user: {
-      /** 机器人的user_id */
-      id: string,
-      /** 机器人的nickname */
-      username: string,
-      bot: boolean,
-      status: number
-    },
-    shard: Number[]
-  }
-}
-
-/**
- * C2C_MESSAGE_CREATE子事件
- */
-export interface C2CMessageCreateEvent extends Event {
-  /** 事件类型 */
-  t: EventType.C2C_MESSAGE_CREATE,
-  /** 平台方消息ID 格式: C2C_MESSAGE_CREATE:abc... */
-  id: string,
-  d: {
-    /** 富媒体消息 */
-    attachments?: Array<Attachment>,
-    /** 发送者信息 */
-    author: {
-      /** 发送者的id 目前版本和user_openid一致 */
-      id: string,
-      /** 发送者的user_openid */
-      user_openid: string
-    }
-    /** 消息内容 */
-    content: string,
-    /** 消息ID message_id */
-    id: string,
-    /** 消息发送时间 */
-    timestamp: string
-  }
-}
-
-/**
- * GROUP_AT_MESSAGE_CREATE子事件
- */
-export interface GroupAtMessageCreateEvent extends Event {
-  t: EventType.GROUP_AT_MESSAGE_CREATE,
-  /** 平台方消息ID 格式: GROUP_AT_MESSAGE_CREATE:abc... */
-  id: string,
-  d: {
-    /** 富媒体消息 */
-    attachments?: Array<Attachment>,
-    /** 发送者信息 */
-    author: {
-      /** 发送者的id 目前版本和user_openid一致 */
-      id: string,
-      /** 发送者的user_openid */
-      member_openid: string
-    }
-    /** 消息内容 */
-    content: string,
-    /** 群ID group_id 目前版本和group_openid一致 */
-    group_id: string,
-    /** 消息ID group_openid */
-    group_openid: string,
-    /** 消息ID message_id */
-    id: string,
-    /** 消息发送时间 */
-    timestamp: string
-  }
-}
-
-/**
- * 频道的user信息
- */
-export interface GuildUser {
-  /** 发送者的头像url */
-  avatar: string,
-  /** 发送者是否为bot */
-  bot: boolean,
-  /** 发送者的id */
-  id: string,
-  /** 发送者的nickname */
-  username: string
-}
-
-/**
- * 频道消息
- */
-export interface GuildMessageCreateEvent extends Event {
-  t: EventType.MESSAGE_CREATE | EventType.AT_MESSAGE_CREATE,
-  /** 序列号 */
-  s: number,
-  /** 平台方消息ID */
-  id: string,
-  /** 事件内容 */
-  d: {
-    /** 消息id */
-    id: string,
-    /** 发送者信息 */
-    author: GuildUser,
-    /** 子频道id */
-    channel_id: string,
-    /** 频道id */
-    guild_id: string,
-    /** 消息内容 */
-    content: string,
-    /** 消息创建时间 ISO8601 timestamp */
-    timestamp: string
-    /** 用于消息间的排序 */
-    seq: number
-    /** 子频道消息 seq */
-    seq_in_channel: number
-    /** 消息创建者的member信息 */
-    member: {
-      /** 用户加入频道的时间 ISO8601 timestamp */
-      joined_at: string,
-      /** 用户在频道内的昵称 */
-      nick: string,
-      /** 用户在频道内的身份组ID 1-全体成员 2-超级管理员 4-频道主 5-子频道管理员 */
-      roles: string[]
-    },
-    /** 引用消息对象 */
-    message_reference?: {
-      /** 引用回复的消息 id */
-      message_id: string,
-      /** 是否忽略获取引用消息详情错误，默认否 */
-      ignore_get_message_error: boolean
-    },
-    /** 消息中at的人 */
-    mentions: [GuildUser],
-    /** 是否at all */
-    mention_everyone?: boolean,
-    /** 附件 */
-    attachments?: [Attachment]
-  }
-}
-
-/**
- * 所有子事件
- */
-export type SubEvent = ReadyEvent
-  | C2CMessageCreateEvent
-  | GroupAtMessageCreateEvent
-  | GuildMessageCreateEvent
-  | ResumedEvent
