@@ -400,9 +400,9 @@ export class QQBotApi extends EventEmitter {
    * @param file_info 富媒体接口返回的file_info
    * @param id 消息id或者事件id
    */
-  buildMedia (file_info: string, id?: string, seq?: number): SendMessageOptions {
+  buildMedia (content: string, file_info: string, id?: string, seq?: number): SendMessageOptions {
     const options: SendMessageOptions = {
-      content: '',
+      content,
       msg_type: MessageType.Media,
       media: {
         file_info,
