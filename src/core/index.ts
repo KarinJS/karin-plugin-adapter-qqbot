@@ -240,6 +240,8 @@ export class AdapterQQBot implements KarinAdapter {
    * */
   async KarinConvertAdapter (data: Array<KarinElement>, type: PathType, openid: string, message_id?: string): Promise<ReplyReturn> {
     let seq = common.random(1, 999999)
+    /** 待排版的原始消息队列 */
+    let msg: string[] = []
     /** 待发送列表 */
     const send_list: SendMessageOptions[] = []
 
@@ -249,10 +251,10 @@ export class AdapterQQBot implements KarinAdapter {
       switch (i.type) {
         case 'text': {
           const qr = await Common.getQQBotText(i.text)
-          results.push({ index, options: this.super.buildText(qr.text, message_id, ++seq) })
+          results.push({ index, type: i.type, content: qr.text })
           if (qr.data) {
             const { file_info } = await this.super.uploadMedia(openid, type, qr.data.base64, FileType.Image)
-            results.push({ index, options: this.super.buildMedia(file_info, message_id, ++seq) })
+            results.push({ index, type: 'image', content: file_info })
           }
           break
         }
@@ -266,7 +268,7 @@ export class AdapterQQBot implements KarinAdapter {
           /** 上传 */
           const { file_info } = await this.super.uploadMedia(openid, type, file, FileType.Record)
           /** 构建发送参数 */
-          results.push({ index, options: this.super.buildMedia(file_info, message_id, ++seq) })
+          results.push({ index, type: i.type, content: file_info })
           break
         }
         case 'image':
@@ -281,7 +283,7 @@ export class AdapterQQBot implements KarinAdapter {
           /** 上传 */
           const { file_info } = await this.super.uploadMedia(openid, type, i.file, map[i.type])
           /** 构建发送参数 */
-          results.push({ index, options: this.super.buildMedia(file_info, message_id, ++seq) })
+          results.push({ index, type: i.type, content: file_info })
           break
         }
         // 不支持的消息类型
@@ -291,8 +293,30 @@ export class AdapterQQBot implements KarinAdapter {
       return results
     })).then((allResults) => {
       allResults.flat().sort((a, b) => a.index - b.index).forEach(result => {
-        send_list.push(result.options)
+        switch (result.type) {
+          case 'text': {
+            msg.push(result.content)
+            break
+          }
+          case 'image': {
+            const content = msg.length ? msg.join('\n\n') : ''
+            msg = []
+            send_list.push(this.super.buildMedia(content, result.content, message_id, seq++))
+            break
+          }
+          default: {
+            if (msg.length) {
+              send_list.push(this.super.buildText(msg.join('\n\n'), message_id, seq++))
+              msg = []
+            }
+            send_list.push(this.super.buildMedia('', result.content, message_id, seq++))
+            break
+          }
+        }
       })
+      if (msg.length) {
+        send_list.push(this.super.buildText(msg.join('\n\n'), message_id, seq++))
+      }
     })
 
     const result: ReplyReturn = {
