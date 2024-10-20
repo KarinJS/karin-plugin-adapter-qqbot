@@ -31,6 +31,7 @@ import {
   KarinAdapter,
   KarinElement,
   MessageSubType,
+  NodeElement,
   button,
 } from 'node-karin'
 
@@ -118,7 +119,7 @@ export class AdapterQQBot implements KarinAdapter {
         contact: {
           scene: Scene.Group as Scene.Group,
           peer: group_id,
-          sub_peer: '',
+          sub_peer: null,
         },
         group_id,
         raw_message: '',
@@ -155,7 +156,7 @@ export class AdapterQQBot implements KarinAdapter {
         contact: {
           scene: Scene.Private as Scene.Private,
           peer: user_id,
-          sub_peer: '',
+          sub_peer: null,
         },
         group_id: '',
         raw_message: '',
@@ -299,14 +300,14 @@ export class AdapterQQBot implements KarinAdapter {
             break
           }
           case 'image': {
-            const content = msg.length ? msg.join('\n\n') : ''
+            const content = msg.length ? msg.join('') : ''
             msg = []
             send_list.push(this.super.buildMedia(content, result.content, message_id, seq++))
             break
           }
           default: {
             if (msg.length) {
-              send_list.push(this.super.buildText(msg.join('\n\n'), message_id, seq++))
+              send_list.push(this.super.buildText(msg.join(''), message_id, seq++))
               msg = []
             }
             send_list.push(this.super.buildMedia('', result.content, message_id, seq++))
@@ -315,7 +316,7 @@ export class AdapterQQBot implements KarinAdapter {
         }
       })
       if (msg.length) {
-        send_list.push(this.super.buildText(msg.join('\n\n'), message_id, seq++))
+        send_list.push(this.super.buildText(msg.join(''), message_id, seq++))
       }
     })
 
@@ -337,28 +338,19 @@ export class AdapterQQBot implements KarinAdapter {
     return result
   }
 
-  async SendMessage (_contact: Contact, elements: Array<KarinElement>) {
-    const text = []
-    for (const v of elements) {
-      switch (v.type) {
-        case 'at':
-          text.push(`@${v.uid}`)
-          break
-        case 'face':
-          text.push(`[表情:${v.id}]`)
-          break
-        case 'text':
-          text.push(v.text)
-          break
-        case 'image':
-          // text.push(await this.#MsgToFile(v.type, v.file))
-          break
-        default:
-          text.push(`[未知消息类型:${JSON.stringify(v)}]`)
-      }
+  async SendMessage (contact: Contact, elements: Array<KarinElement>) {
+    return await this.KarinConvertAdapter(elements, contact.scene === 'group' ? PathType.Groups : PathType.Friends, contact.peer)
+  }
+
+  async sendForwardMessage (contact: Contact, elements: NodeElement[], reply_id: string) {
+    const contents = elements.flatMap((item, index) =>
+      index < elements.length - 1 ? [...(item.content as KarinElement[]), segment.text('\n')] : [...(item.content as KarinElement[])]
+    )
+    if (reply_id) {
+      return await this.KarinConvertAdapter(contents, contact.scene === 'group' ? PathType.Groups : PathType.Friends, contact.peer, reply_id)
+    } else {
+      return await this.SendMessage(contact, contents)
     }
-    this.logger('info', `${logger.green('Send private input: ')}${text.join('')}`)
-    return { message_id: 'input' }
   }
 
   getAvatarUrl (user_id: string, size = 0): string {
@@ -371,7 +363,7 @@ export class AdapterQQBot implements KarinAdapter {
   }
 
   async GetCurrentAccount () {
-    return { account_uid: 'input', account_uin: 'input', account_name: 'input' }
+    return { account_uid: this.account.uid, account_uin: this.account.uin, account_name: this.account.name }
   }
 
   async GetEssenceMessageList (): Promise<any> { throw new Error('Method not implemented.') }
@@ -385,7 +377,6 @@ export class AdapterQQBot implements KarinAdapter {
   async UploadPrivateFile (): Promise<any> { throw new Error('Method not implemented.') }
   async UploadGroupFile (): Promise<any> { throw new Error('Method not implemented.') }
   async UploadForwardMessage (): Promise<any> { throw new Error('Method not implemented.') }
-  async sendForwardMessage (): Promise<any> { throw new Error('Method not implemented.') }
   async SendMessageByResId (): Promise<any> { throw new Error('Method not implemented.') }
   async RecallMessage (): Promise<any> { throw new Error('Method not implemented.') }
   async GetMessage (): Promise<any> { throw new Error('Method not implemented.') }
