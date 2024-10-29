@@ -366,6 +366,10 @@ export class AdapterQQBot implements KarinAdapter {
     return { account_uid: this.account.uid, account_uin: this.account.uin, account_name: this.account.name }
   }
 
+  async RecallMessage (contact: Contact, message_id: string) {
+    return await this.super.recallMessage(contact.peer, contact.scene === 'group' ? PathType.Groups : PathType.Friends, message_id)
+  }
+
   async GetEssenceMessageList (): Promise<any> { throw new Error('Method not implemented.') }
   async DownloadForwardMessage (): Promise<any> { throw new Error('Method not implemented.') }
   async SetEssenceMessage (): Promise<any> { throw new Error('Method not implemented.') }
@@ -378,7 +382,6 @@ export class AdapterQQBot implements KarinAdapter {
   async UploadGroupFile (): Promise<any> { throw new Error('Method not implemented.') }
   async UploadForwardMessage (): Promise<any> { throw new Error('Method not implemented.') }
   async SendMessageByResId (): Promise<any> { throw new Error('Method not implemented.') }
-  async RecallMessage (): Promise<any> { throw new Error('Method not implemented.') }
   async GetMessage (): Promise<any> { throw new Error('Method not implemented.') }
   async GetHistoryMessage (): Promise<any> { throw new Error('Method not implemented.') }
   async VoteUser (): Promise<any> { throw new Error('Method not implemented.') }
