@@ -92,6 +92,19 @@ export class QQBotApi extends EventEmitter {
   }
 
   /**
+   * delete请求
+   * @param url 请求地址
+   * @param options 请求参数
+   */
+  async delete (url: string) {
+    try {
+      return await got.delete(url, { headers: this.headers })
+    } catch (error: any) {
+      logger.error(`[got] 请求错误: ${JSON.stringify(error.response.body)}`)
+    }
+  }
+
+  /**
    * 获取调用凭证
    * @param clientSecret 开发者的Secret
    * @param isRefresh 是否是刷新凭证
@@ -338,6 +351,18 @@ export class QQBotApi extends EventEmitter {
     const url = this.buildUrl(openid, type, V2ApiType.Message)
     const result = await this.post(url, options) as any
     return JSON.parse(result.body) as SendMessageResponse
+  }
+
+  /**
+   * 撤回消息
+   * @param openid 用户、群openid
+   * @param type 请求路径类型
+   * @param message_id 消息id
+   */
+  async recallMessage (openid: string, type: PathType, message_id: string) {
+    const url = this.buildUrl(openid, type, V2ApiType.Message)
+    const result = await this.delete(`${url}/${message_id}`) as any
+    return result.status === 200
   }
 
   /**
