@@ -68,7 +68,7 @@ export async function markdownTemplate (Opt: {
   const mediaFn = async (file: string, type: PathType, name: string, FileType: FileType) => {
     const { url } = await handler.call('qqbot.files', { file, type, name })
     const { file_info } = await bot.super.uploadMedia(openid, type, url, FileType)
-    const opt = bot.super.buildMedia(file_info, message_id, ++seq)
+    const opt = bot.super.buildMedia('', file_info, message_id, ++seq)
     const res = await bot.super.sendMessage(openid, type, opt)
     result.raw_data.push(res)
   }
@@ -218,7 +218,7 @@ export async function markdownRaw (Opt: {
   const mediaFn = async (file: string, type: PathType, name: string, FileType: FileType) => {
     const { url } = await handler.call('qqbot.files', { file, type, name })
     const { file_info } = await bot.super.uploadMedia(openid, type, url, FileType)
-    const opt = bot.super.buildMedia(file_info, message_id, ++seq)
+    const opt = bot.super.buildMedia('', file_info, message_id, ++seq)
     const res = await bot.super.sendMessage(openid, type, opt)
     result.raw_data.push(res)
   }

@@ -397,12 +397,13 @@ export class QQBotApi extends EventEmitter {
   /**
    * 构建发送富媒体请求参数
    * 富媒体消息只能单独发送 并且必须进行上传
+   * @param content 附带的文字信息，仅在file_type为1时有效，其余情况请传空字符串
    * @param file_info 富媒体接口返回的file_info
    * @param id 消息id或者事件id
    */
-  buildMedia (file_info: string, id?: string, seq?: number): SendMessageOptions {
+  buildMedia (content: string, file_info: string, id?: string, seq?: number): SendMessageOptions {
     const options: SendMessageOptions = {
-      content: '',
+      content,
       msg_type: MessageType.Media,
       media: {
         file_info,
