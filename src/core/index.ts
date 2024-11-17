@@ -53,7 +53,7 @@ export class AdapterQQBot implements KarinAdapter {
 
     this.markdown = restConfig
     this.account = { uid: appId, uin: appId, name: '' }
-    this.adapter = { id: 'QQ', name: 'QQBot', type: 'internal', sub_type: 'internal', start_time: Date.now(), connect: '', index: 0 }
+    this.adapter = { id: 'QQBot', name: 'QQBot', type: 'internal', sub_type: 'internal', start_time: Date.now(), connect: '', index: 0 }
     this.version = { name: 'QQBot', app_name: 'QQBot', version: Config.package.version }
 
     this.super = new QQBotApi(this.#config)
