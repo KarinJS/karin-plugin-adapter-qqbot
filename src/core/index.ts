@@ -118,7 +118,7 @@ export class AdapterQQBot implements KarinAdapter {
         contact: {
           scene: Scene.Group as Scene.Group,
           peer: group_id,
-          sub_peer: '',
+          sub_peer: null,
         },
         group_id,
         raw_message: '',
@@ -155,7 +155,7 @@ export class AdapterQQBot implements KarinAdapter {
         contact: {
           scene: Scene.Private as Scene.Private,
           peer: user_id,
-          sub_peer: '',
+          sub_peer: null,
         },
         group_id: '',
         raw_message: '',
