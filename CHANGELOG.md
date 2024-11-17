@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.9](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.8...v1.2.9) (2024-11-17)
+
+
+### Bug Fixes
+
+* 优化直接发送模式的图文混排 ([#32](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/32)) ([9aab4d0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/9aab4d051fe4a69ee9bce2cd3fab4a3ac1dfdbd7))
+* 修复构建 ([#33](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/33)) ([2dd9d4a](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/2dd9d4a95506656476639fe7a5d5b95e472f2eb5))
+* 修正adapter.id ([#29](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/29)) ([f3a52be](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/f3a52be8fb79a991cebdaacd38c65bf651305df8))
+* 支持撤回消息 ([#28](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/28)) ([03d5d4e](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/03d5d4eca59485b71651c933c60e27f9e238251b))
+
 ## [1.2.8](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.7...v1.2.8) (2024-09-15)
 
 
