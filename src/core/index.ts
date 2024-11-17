@@ -31,7 +31,6 @@ import {
   KarinAdapter,
   KarinElement,
   MessageSubType,
-  NodeElement,
   button,
 } from 'node-karin'
 
@@ -366,6 +365,7 @@ export class AdapterQQBot implements KarinAdapter {
   async UploadPrivateFile (): Promise<any> { throw new Error('Method not implemented.') }
   async UploadGroupFile (): Promise<any> { throw new Error('Method not implemented.') }
   async UploadForwardMessage (): Promise<any> { throw new Error('Method not implemented.') }
+  async sendForwardMessage (): Promise<any> { throw new Error('Method not implemented.') }
   async SendMessageByResId (): Promise<any> { throw new Error('Method not implemented.') }
   async RecallMessage (): Promise<any> { throw new Error('Method not implemented.') }
   async GetMessage (): Promise<any> { throw new Error('Method not implemented.') }
