@@ -342,17 +342,6 @@ export class AdapterQQBot implements KarinAdapter {
     return await this.KarinConvertAdapter(elements, contact.scene === 'group' ? PathType.Groups : PathType.Friends, contact.peer)
   }
 
-  async sendForwardMessage (contact: Contact, elements: NodeElement[], reply_id: string) {
-    const contents = elements.flatMap((item, index) =>
-      index < elements.length - 1 ? [...(item.content as KarinElement[]), segment.text('\n')] : [...(item.content as KarinElement[])]
-    )
-    if (reply_id) {
-      return await this.KarinConvertAdapter(contents, contact.scene === 'group' ? PathType.Groups : PathType.Friends, contact.peer, reply_id)
-    } else {
-      return await this.SendMessage(contact, contents)
-    }
-  }
-
   getAvatarUrl (user_id: string, size = 0): string {
     if (user_id === this.account.uid) return this.super.avatar
     return `https://q.qlogo.cn/qqapp/${this.account.uid}/${user_id}/${size}`
