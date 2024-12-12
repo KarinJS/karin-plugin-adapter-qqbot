@@ -167,7 +167,7 @@ export class QQBotApi {
     if (data.startsWith('http')) {
       options.url = data
     } else {
-      options.file_data = data
+      options.file_data = data.replace(/^data:image\/\w+;base64,|^base64:\/\//g, '')
     }
 
     return this.post(`/v2/${scene}/${targetId}/files`, options)

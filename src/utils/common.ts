@@ -1,15 +1,13 @@
+import qrcode from 'qrcode'
 import { logger } from 'node-karin'
 import lodash from 'node-karin/lodash'
-import moment from 'node-karin/moment'
 import EventEmitter from 'node:events'
+import GetUrls from '@karinjs/geturls'
 
 /**
- * 生成随机数
- * @param min - 最小值
- * @param max - 最大值
- * @returns
+ * 事件总线
  */
-export const random = (min: number, max: number) => lodash.random(min, max)
+export const event = new EventEmitter()
 
 /**
  * 睡眠函数
@@ -18,10 +16,11 @@ export const random = (min: number, max: number) => lodash.random(min, max)
 export const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 /**
- * 使用moment返回时间
- * @param format - 格式
+ * 生成随机数
+ * @param min - 最小值
+ * @param max - 最大值
  */
-export const time = (format = 'YYYY-MM-DD HH:mm:ss') => moment().format(format)
+export const random = (min: number, max: number) => lodash.random(min, max)
 
 /**
  * 调整express中间件和路由的顺序，将路由提升到中间件前面
@@ -74,6 +73,45 @@ export const fakeEvent = (log: string) => {
 }
 
 /**
- * 事件总线
+ * 处理url
+ * @param text - 文本
+ * @param exclude - 排除的URL
+ * @returns url列表
  */
-export const event = new EventEmitter()
+export const handleUrl = (text: string, exclude: string[] = []): string[] => {
+  /** 中文不符合url规范 */
+  text = text.replace(/[\u4e00-\u9fa5]/g, '|')
+  const urls = GetUrls.getUrls(text, {
+    exclude,
+    /** 去除 WWW */
+    stripWWW: false,
+    /** 规范化协议 */
+    normalizeProtocol: false,
+    /** 移除查询参数 */
+    removeQueryParameters: false,
+    /** 移除唯一斜杠 */
+    removeSingleSlash: false,
+    /** 查询参数排序 */
+    sortQueryParameters: false,
+    /** 去除认证信息 */
+    stripAuthentication: false,
+    /** 去除文本片段 */
+    stripTextFragment: false,
+    /** 移除末尾斜杠 */
+    removeTrailingSlash: false,
+    /** 不进行标准处理url */
+    normalize: false,
+  })
+
+  return urls
+}
+
+/**
+ * 生成二维码
+ * @param urls - url列表
+ * @returns 返回带`base64://`前缀的二维码列表
+ */
+export const qrs = async (urls: string[]) => {
+  const list = await Promise.all(urls.map((url) => qrcode.toDataURL(url)))
+  return list.map((item) => `base64://${item.split(',')[1]}`)
+}
