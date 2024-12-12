@@ -1,4 +1,27 @@
-import { Attachment } from './media'
+/**
+ * 需要注意 目前只有私聊可以收到file类型的消息
+ */
+export type Content_type = 'image/gif' | 'image/jpeg' | 'image/png' | 'file'
+
+/**
+ * 富媒体基类
+ */
+export interface Attachment {
+  /** 类型 */
+  content_type: Content_type
+  /** 未知作用 */
+  content?: string
+  /** 文件名 */
+  filename: string
+  /** 图片高度 */
+  height?: number
+  /** 图片宽度 */
+  width?: number
+  /** 文件大小 */
+  size: number
+  /** 文件url */
+  url: string
+}
 
 /**
  * opcode
@@ -25,7 +48,7 @@ export const enum Opcode {
   /** Heartbeat ACK [Receive/Reply] 当发送心跳成功之后，就会收到该消息 */
   HeartbeatACK = 11,
   /** HTTP Callback ACK [Reply] 仅用于 http 回调模式的回包，代表机器人收到了平台推送的数据 */
-  HTTPCallbackACK = 12
+  HTTPCallbackACK = 12,
 }
 
 /**
@@ -140,13 +163,13 @@ export const enum EventType {
   /** 当收到@机器人的消息时 */
   AT_MESSAGE_CREATE = 'AT_MESSAGE_CREATE',
   /** 当频道的消息被删除时 */
-  PUBLIC_MESSAGE_DELETE = 'PUBLIC_MESSAGE_DELETE'
+  PUBLIC_MESSAGE_DELETE = 'PUBLIC_MESSAGE_DELETE',
 }
 
 /**
  * 子事件基类
  */
-export interface Event {
+export interface BaseEvent {
   /** opcode */
   op: Opcode.Dispatch,
   /** 序列号 */
@@ -158,7 +181,7 @@ export interface Event {
 /**
  * READY子事件
  */
-export interface ReadyEvent extends Event {
+export interface ReadyEvent extends BaseEvent {
   /** 事件类型 */
   t: EventType.READY,
   /** 事件内容 */
@@ -180,7 +203,7 @@ export interface ReadyEvent extends Event {
 /**
  * C2C_MESSAGE_CREATE子事件
  */
-export interface C2CMessageCreateEvent extends Event {
+export interface C2CMsgEvent extends BaseEvent {
   /** 事件类型 */
   t: EventType.C2C_MESSAGE_CREATE,
   /** 平台方消息ID 格式: C2C_MESSAGE_CREATE:abc... */
@@ -207,7 +230,7 @@ export interface C2CMessageCreateEvent extends Event {
 /**
  * GROUP_AT_MESSAGE_CREATE子事件
  */
-export interface GroupAtMessageCreateEvent extends Event {
+export interface GroupMsgEvent extends BaseEvent {
   /** 事件类型 */
   t: EventType.GROUP_AT_MESSAGE_CREATE,
   /** 平台方消息ID 格式: GROUP_AT_MESSAGE_CREATE:abc... */
@@ -236,6 +259,6 @@ export interface GroupAtMessageCreateEvent extends Event {
 }
 
 /**
- * 所有子事件
+ * 所有事件
  */
-export type SubEvent = ReadyEvent | C2CMessageCreateEvent | GroupAtMessageCreateEvent
+export type Event = ReadyEvent | C2CMsgEvent | GroupMsgEvent

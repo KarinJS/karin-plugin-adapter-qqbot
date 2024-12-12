@@ -1,8 +1,6 @@
 {
   "name": "@karinjs/adapter-qqbot",
   "version": "1.2.9",
-  "author": "shijin",
-  "type": "module",
   "description": "karin plugin template",
   "homepage": "https://github.com/KarinJS/karin-plugin-adapter-qqbot",
   "bugs": {
@@ -12,44 +10,57 @@
     "type": "git",
     "url": "git+https://github.com/KarinJS/karin-plugin-adapter-qqbot.git"
   },
+  "author": "shijin",
+  "type": "module",
   "main": "lib/index.js",
-  "types": "lib/index.d.ts",
-  "scripts": {
-    "build": "tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
-    "pub": "npm publish --access public"
-  },
-  "dependencies": {
-    "@karinjs/geturls": "^1.0.2",
-    "got": "^14.4.1",
-    "jimp": "^0.22.12",
-    "qrcode": "^1.5.3",
-    "silk-wasm": "^3.6.1"
-  },
-  "devDependencies": {
-    "@types/qrcode": "^1.5.5",
-    "@types/express": "^4.17.21",
-    "@types/lodash": "^4.17.7",
-    "@types/node": "^20.14.11",
-    "@types/node-schedule": "^2.1.7",
-    "@types/ws": "^8.5.11",
-    "tsc-alias": "^1.8.10",
-    "typescript": "^5.5.3"
-  },
-  "karin": {
-    "apps": [],
-    "outDir": "lib",
-    "rootDir": "src"
-  },
   "files": [
     "/lib/**/*.js",
     "/lib/**/*.d.ts",
-    "/config/*.yaml",
+    "config",
+    "resources",
     "LICENSE",
     "package.json",
     "README.md"
   ],
+  "scripts": {
+    "build": "tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
+    "pub": "npm publish --access public",
+    "sort": "npx sort-package-json"
+  },
+  "dependencies": {
+    "@types/express": "4.17.21",
+    "tweetnacl": "^1.0.3",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.8",
+    "@types/ws": "^8.5.13",
+    "eslint": "^9.7.0",
+    "neostandard": "^0.11.9",
+    "node-karin": "0.12.25-beta.pr.206.1-1733935165",
+    "tsc-alias": "^1.8.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.5.3"
+  },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org"
+  },
+  "karin": {
+    "main": "src/index.ts",
+    "apps": [
+      "lib/apps"
+    ],
+    "ts-apps": [
+      "src/apps"
+    ],
+    "static": [
+      "resources"
+    ],
+    "files": [
+      "config",
+      "data",
+      "resources"
+    ]
   }
 }

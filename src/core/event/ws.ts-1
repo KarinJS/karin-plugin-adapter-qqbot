@@ -1,0 +1,49 @@
+import WebSocket from 'ws'
+import { logger } from 'node-karin'
+import { createGroupMsg } from './message'
+import { EventType, type Event } from './types'
+import type { AdapterQQBotText } from '../adapter'
+
+export const createWebSocket = (client: AdapterQQBotText, url: string, headers: Record<string, string>) => {
+  const socket = new WebSocket(url, { headers })
+  const appid = headers['x-bot-appid']
+
+  const close = (isClose = true) => {
+    /** 停止监听 */
+    socket.removeAllListeners()
+    isClose && socket?.close()
+    logger.error(`[QQBot][${appid}] WebSocket连接已断开，将在5秒后重连: ${url}`)
+    setTimeout(() => createWebSocket(client, url, headers), 5000)
+  }
+
+  socket.on('open', () => {
+    logger.info(`[QQBot][${appid}] WebSocket连接已打开: ${url}`)
+    socket.on('message', (data) => {
+      console.log('🚀 ~ socket.on ~ data:', data.toString())
+      createEvent(client, JSON.parse(data.toString()))
+    })
+  })
+
+  socket.on('close', () => close(false))
+  socket.on('error', (error) => {
+    logger.error(error)
+    close()
+  })
+}
+
+export const createEvent = (client: AdapterQQBotText, event: Event) => {
+  if (event.t === EventType.GROUP_AT_MESSAGE_CREATE) {
+    createGroupMsg({
+      bot: client,
+      elements: [],
+      eventId: event.id,
+      groupId: event.d.group_id,
+      messageId: event.d.id,
+      messageSeq: 0,
+      rawEvent: event,
+      subEvent: 'group',
+      time: Number(event.d.timestamp),
+      userId: event.d.author.member_openid
+    })
+  }
+}

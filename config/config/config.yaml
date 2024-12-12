@@ -1,0 +1,47 @@
+# 全局默认配置 以下所有配置均可在账号配置中单独配置
+default:
+  # QQ号
+  qq: 0
+  # 机器人ID
+  appId: string
+  # 机器人密钥
+  secret: string
+  # 正式环境api
+  prodApi: https://api.sgroup.qq.com
+  # 沙盒api
+  sandboxApi: https://sandbox.api.sgroup.qq.com
+  # 调用凭证的Api
+  tokenApi: https://bots.qq.com/app/getAppAccessToken
+  # 是否开启沙盒环境
+  sandbox: false
+  # 开启QQ场景能力
+  qqEnable: true
+  # 开启频道场景能力
+  guildEnable: true
+  # 频道场景模式 0-公域 1-私域
+  guildMode: 0
+  # 文本中的url转二维码白名单 配置后将不转换这些url为二维码
+  exclude: []
+  # 接受到消息后对文本进行表达式处理
+  regex: [
+      {
+        # 表达式
+        reg: "^#",
+        # 替换为
+        rep: "",
+      },
+    ]
+  # markdown配置
+  markdown:
+    # 发送模式 0-关闭MD 1-原生MD 3-旧图文模板MD 4-纯文模板MD 5-自定义处理
+    mode: 0
+  # 事件接收配置
+  event:
+    # 接收方式 0-关闭 1-webhook 2-http 3-ws
+    type: 0
+    # ws服务器地址
+    wsUrl: ws://example.com/webhook
+    # ws服务器token
+    wsToken: your_token
+    # http鉴权token
+    httpToken: your_token

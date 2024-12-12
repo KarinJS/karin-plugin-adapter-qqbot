@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
-    "module": "ESNext",
-    "target": "ESNext",
+    "module": "ES2022",
+    "target": "ES2022",
     "esModuleInterop": true,
     "moduleResolution": "Bundler",
-    "outDir": "lib",
+    "outDir": "./lib",
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
@@ -13,7 +13,10 @@
         "src/*"
       ],
     },
-    "rootDir": "src",
+    "types": [
+      "@types/node"
+    ],
+    "rootDir": "./src",
     "declaration": true,
     "noImplicitAny": true,
     "strict": true
