@@ -1,14 +1,14 @@
-import { AdapterQQBotText } from '../adapter/adapter'
-import { C2CMsgEvent, GroupMsgEvent } from './types'
-import { karin, createGroupMessage, SrcReply, createFriendMessage, segment } from 'node-karin'
 import { QQBotConvertKarin } from './conver'
+import { AdapterQQBot } from '@/core/adapter/adapter'
+import { karin, createGroupMessage, SrcReply, createFriendMessage, segment, createGuildMessage, createDirectMessage } from 'node-karin'
+import type { C2CMsgEvent, DirectMsgEvent, GroupMsgEvent, GuildMsgEvent } from './types'
 
 /**
  * 创建群消息事件
  * @param client 机器人实例
  * @param event 事件
  */
-export const createGroupMsg = (client: AdapterQQBotText, event: GroupMsgEvent) => {
+export const createGroupMsg = (client: AdapterQQBot, event: GroupMsgEvent) => {
   const selfId = client.selfId
   const userId = event.d.author.member_openid
   const contact = karin.contactGroup(event.d.group_id)
@@ -22,7 +22,6 @@ export const createGroupMsg = (client: AdapterQQBotText, event: GroupMsgEvent) =
     messageId: event.d.id,
     messageSeq: 0,
     rawEvent: event,
-    subEvent: 'group',
     time: Number(event.d.timestamp),
     userId,
     selfId,
@@ -37,7 +36,7 @@ export const createGroupMsg = (client: AdapterQQBotText, event: GroupMsgEvent) =
  * @param client 机器人实例
  * @param event 事件
  */
-export const createFriendMsg = (client: AdapterQQBotText, event: C2CMsgEvent) => {
+export const createFriendMsg = (client: AdapterQQBot, event: C2CMsgEvent) => {
   const selfId = client.selfId
   const userId = event.d.author.user_openid
   const contact = karin.contactFriend(userId)
@@ -51,12 +50,68 @@ export const createFriendMsg = (client: AdapterQQBotText, event: C2CMsgEvent) =>
     messageId: event.d.id,
     messageSeq: 0,
     rawEvent: event,
-    subEvent: 'friend',
     time: Number(event.d.timestamp),
     userId,
     selfId,
     contact,
     sender,
     srcReply
+  })
+}
+
+/**
+ * 创建频道消息事件
+ * @param client 机器人实例
+ * @param event 事件
+ */
+export const createChannelMsg = (client: AdapterQQBot, event: GuildMsgEvent) => {
+  const selfId = client.selfId
+  const userId = event.d.author.id
+  const contact = karin.contact('guild', event.d.guild_id, event.d.channel_id)
+  const sender = karin.groupSender(userId, '')
+  const srcReply: SrcReply = (elements) => client.sendMsg(contact, [...elements, segment.pasmsg(event.d.id)])
+
+  createGuildMessage({
+    bot: client,
+    elements: QQBotConvertKarin(selfId, event),
+    eventId: event.id,
+    messageId: event.d.id,
+    messageSeq: 0,
+    rawEvent: event,
+    time: Number(event.d.timestamp),
+    userId,
+    selfId,
+    contact,
+    sender,
+    srcReply
+  })
+}
+
+/**
+ * 创建频道私信事件
+ * @param client 机器人实例
+ * @param event 事件
+ */
+export const createDirectMsg = (client: AdapterQQBot, event: DirectMsgEvent) => {
+  const selfId = client.selfId
+  const userId = event.d.author.id
+  const contact = karin.contact('direct', userId, event.d.src_guild_id)
+  const sender = karin.friendSender(userId, '')
+  const srcReply: SrcReply = (elements) => client.sendMsg(contact, [...elements, segment.pasmsg(event.d.id)])
+
+  createDirectMessage({
+    bot: client,
+    elements: QQBotConvertKarin(selfId, event),
+    eventId: event.id,
+    messageId: event.d.id,
+    messageSeq: 0,
+    rawEvent: event,
+    time: Number(event.d.timestamp),
+    userId,
+    selfId,
+    contact,
+    sender,
+    srcReply,
+    srcGuildId: event.d.src_guild_id
   })
 }

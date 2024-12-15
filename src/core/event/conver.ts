@@ -1,7 +1,8 @@
 import { segment } from 'node-karin'
-import type { ElementTypes } from 'node-karin'
-import { EventType, type C2CMsgEvent, type GroupMsgEvent } from './types'
 import { config } from '@/utils/config'
+import { EventEnum } from '@/core/event/types'
+import type { ElementTypes } from 'node-karin'
+import type { DirectMsgEvent, GuildMsgEvent, C2CMsgEvent, GroupMsgEvent } from './types'
 
 /**
  * QQBot群、私聊转karin消息端
@@ -9,7 +10,10 @@ import { config } from '@/utils/config'
  * @param event 事件
  * @return karin格式消息
  */
-export const QQBotConvertKarin = (appid: string, event: C2CMsgEvent | GroupMsgEvent): Array<ElementTypes> => {
+export const QQBotConvertKarin = (
+  appid: string,
+  event: C2CMsgEvent | GroupMsgEvent | GuildMsgEvent | DirectMsgEvent
+): Array<ElementTypes> => {
   const elements: Array<ElementTypes> = []
 
   const data = event.d
@@ -40,7 +44,9 @@ export const QQBotConvertKarin = (appid: string, event: C2CMsgEvent | GroupMsgEv
     }
   })
 
-  event.t === EventType.GROUP_AT_MESSAGE_CREATE && elements.unshift(segment.at(appid))
+  if (event.t === EventEnum.GROUP_AT_MESSAGE_CREATE || event.t === EventEnum.AT_MESSAGE_CREATE) {
+    elements.unshift(segment.at(appid))
+  }
 
   return elements
 }

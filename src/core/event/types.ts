@@ -75,7 +75,7 @@ export interface HeartbeatACKEvent {
 /**
  * 子事件类型
  */
-export const enum EventType {
+export const enum EventEnum {
   /** 在鉴权成功后下发 代表建立连接成功 */
   READY = 'READY',
   /** 恢复登录状态后 不发遗漏事件完毕下发 */
@@ -175,7 +175,7 @@ export interface BaseEvent {
   /** 序列号 */
   s: number,
   /** 事件类型 */
-  t: EventType
+  t: EventEnum
 }
 
 /**
@@ -183,7 +183,7 @@ export interface BaseEvent {
  */
 export interface ReadyEvent extends BaseEvent {
   /** 事件类型 */
-  t: EventType.READY,
+  t: EventEnum.READY,
   /** 事件内容 */
   d: {
     version: number,
@@ -205,7 +205,7 @@ export interface ReadyEvent extends BaseEvent {
  */
 export interface C2CMsgEvent extends BaseEvent {
   /** 事件类型 */
-  t: EventType.C2C_MESSAGE_CREATE,
+  t: EventEnum.C2C_MESSAGE_CREATE,
   /** 平台方消息ID 格式: C2C_MESSAGE_CREATE:abc... */
   id: string,
   d: {
@@ -232,7 +232,7 @@ export interface C2CMsgEvent extends BaseEvent {
  */
 export interface GroupMsgEvent extends BaseEvent {
   /** 事件类型 */
-  t: EventType.GROUP_AT_MESSAGE_CREATE,
+  t: EventEnum.GROUP_AT_MESSAGE_CREATE,
   /** 平台方消息ID 格式: GROUP_AT_MESSAGE_CREATE:abc... */
   id: string,
   d: {
@@ -259,6 +259,103 @@ export interface GroupMsgEvent extends BaseEvent {
 }
 
 /**
+ * 频道的user信息
+ */
+export interface GuildUser {
+  /** 发送者的头像url */
+  avatar: string,
+  /** 发送者是否为bot */
+  bot: boolean,
+  /** 发送者的id */
+  id: string,
+  /** 发送者的nickname */
+  username: string
+}
+
+/** 基础消息事件 */
+export interface BaseMessageEvent {
+  /** 消息ID message_id */
+  id: string
+  /** 消息内容 */
+  content: string
+  /** 富媒体消息 */
+  attachments?: Array<Attachment>
+  /** 消息发送时间 */
+  timestamp: string
+}
+
+/** Guild 消息的通用结构 */
+export interface GuildMemberInfo {
+  /** 用户加入频道的时间 ISO8601 timestamp */
+  joined_at: string
+  /** 用户在频道内的昵称 */
+  nick: string
+  /** 用户在频道内的身份组ID */
+  roles: string[]
+}
+
+/** Guild 事件的公共部分 */
+export interface GuildBaseEvent extends BaseMessageEvent {
+  /** 发送者信息 */
+  author: GuildUser
+  /** 子频道id */
+  channel_id: string
+  /** 频道id */
+  guild_id: string
+  /** 用于消息间的排序 */
+  seq: number
+  /** 子频道消息 seq */
+  seq_in_channel: number
+  /** 消息创建者的member信息 */
+  member: GuildMemberInfo
+  /** 引用消息对象 */
+  message_reference?: {
+    /** 引用回复的消息 id */
+    message_id: string
+    /** 是否忽略获取引用消息详情错误，默认否 */
+    ignore_get_message_error: boolean
+  }
+  /** 附件 */
+  attachments?: [Attachment]
+}
+
+/**
+ * 频道文字子频道消息
+ */
+export interface GuildMsgEvent extends BaseEvent {
+  /** 事件类型 */
+  t: EventEnum.MESSAGE_CREATE | EventEnum.AT_MESSAGE_CREATE
+  /** 平台方消息ID */
+  id: string
+  /** 事件内容 */
+  d: GuildBaseEvent & {
+    /** 消息中at的人 */
+    mentions: [GuildUser]
+    /** 是否at all */
+    mention_everyone?: boolean
+  }
+}
+
+/**
+ * 频道私信消息
+ */
+export interface DirectMsgEvent extends BaseEvent {
+  /** 事件类型 */
+  t: EventEnum.DIRECT_MESSAGE_CREATE
+  /** 平台方消息ID */
+  id: string
+  /** 事件内容 */
+  d: GuildBaseEvent & {
+    /** 是否为私信 */
+    direct_message: boolean
+    /** 消息来源的频道id */
+    src_guild_id: string
+    /** 未知字段 */
+    seq_in_channel: string
+  }
+}
+
+/**
  * 所有事件
  */
-export type Event = ReadyEvent | C2CMsgEvent | GroupMsgEvent
+export type Event = ReadyEvent | C2CMsgEvent | GroupMsgEvent | GuildMsgEvent | DirectMsgEvent

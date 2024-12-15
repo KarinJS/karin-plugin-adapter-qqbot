@@ -2,13 +2,13 @@ import { logger } from 'node-karin'
 import { QQBotApi } from '@/core/api'
 import { event } from '@/utils/common'
 import { config } from '@/utils/config'
-import { AdapterQQBotText } from '@/core/adapter/adapter'
-import { EventType } from '@/core/event/types'
+import { EventEnum } from '@/core/event/types'
 import { createC2CWebhook } from '@/core/webhook/c2c'
 import { createHttpWebhook } from '@/core/webhook/http'
 import { createWebSocketWebhook } from '@/core/webhook/ws'
+import { AdapterQQBotNormal } from '@/core/adapter/normal'
+import { createChannelMsg, createDirectMsg, createFriendMsg, createGroupMsg } from '@/core/event/message'
 import { createAxiosInstance, getAccessToken } from '@/core/internal/axios'
-import { createFriendMsg, createGroupMsg } from '@/core/event/message'
 
 import type { Event } from '@/core/event/types'
 
@@ -24,7 +24,7 @@ for (const [key, value] of Object.entries(cfg)) {
 
   const api = new QQBotApi(axios)
   const { username, avatar } = await api.getMe()
-  const client = new AdapterQQBotText(api)
+  const client = new AdapterQQBotNormal(api)
   client.account.name = username
   client.account.avatar = avatar
   client.account.selfId = appId
@@ -41,14 +41,25 @@ for (const [key, value] of Object.entries(cfg)) {
  * @param client 机器人实例
  * @param event 事件
  */
-export const createEvent = (client: AdapterQQBotText, event: Event) => {
-  if (event.t === EventType.GROUP_AT_MESSAGE_CREATE) {
+export const createEvent = (
+  client: AdapterQQBotNormal,
+  event: Event
+) => {
+  if (event.t === EventEnum.GROUP_AT_MESSAGE_CREATE) {
     return createGroupMsg(client, event)
   }
 
-  if (event.t === EventType.C2C_MESSAGE_CREATE) {
+  if (event.t === EventEnum.C2C_MESSAGE_CREATE) {
     return createFriendMsg(client, event)
   }
 
-  logger.error(`未知事件类型: ${JSON}`)
+  if (event.t === EventEnum.MESSAGE_CREATE || event.t === EventEnum.AT_MESSAGE_CREATE) {
+    return createChannelMsg(client, event)
+  }
+
+  if (event.t === EventEnum.DIRECT_MESSAGE_CREATE) {
+    return createDirectMsg(client, event)
+  }
+
+  logger.error(`未知事件类型: ${JSON.stringify(event)}`)
 }
