@@ -1,8 +1,10 @@
+import fs from 'node:fs'
 import qrcode from 'qrcode'
-import { logger } from 'node-karin'
 import lodash from 'node-karin/lodash'
 import EventEmitter from 'node:events'
 import GetUrls from '@karinjs/geturls'
+import { encode, isSilk } from 'silk-wasm'
+import { common, ffmpeg, logger, tempPath } from 'node-karin'
 
 /**
  * 事件总线
@@ -115,3 +117,41 @@ export const qrs = async (urls: string[]) => {
   const list = await Promise.all(urls.map((url) => qrcode.toDataURL(url)))
   return list.map((item) => `base64://${item.split(',')[1]}`)
 }
+
+/**
+ * 语音文件转silk
+ * @param file 文件路径 base64 buffer
+ * @returns silk文件buffer
+ */
+export const silkEncode = async (file: string | Buffer): Promise<Buffer> => {
+  const buffer = await common.buffer(file)
+  if (isSilk(buffer)) return buffer
+
+  const start = Date.now()
+  const root = `${tempPath}/recordToSilk`
+  const temp = `${root}/${start}`
+  const src = `${temp}/${start}`
+  const pcm = `${temp}/${start}.pcm`
+  // const silk = `${temp}/${start}.silk`
+
+  fs.mkdirSync(temp, { recursive: true })
+  fs.writeFileSync(src, buffer)
+
+  const { status, error } = await ffmpeg(` -i ${src} -f s16le -ar 48000 -ac 1 ${pcm}`)
+  if (!status) throw error
+
+  const pamBuffer = await fs.promises.readFile(pcm)
+  const { data, duration } = await encode(pamBuffer, 48000)
+  setTimeout(() => {
+    // TODO: 缓存silk文件 提升性能
+    const ms = logger.yellow(duration + 'ms')
+    const end = logger.yellow((Date.now() - start) + 'ms')
+    logger.info(`[QQBot] silk文件转码成功 音频时长: ${ms} 转码耗时: ${end}`)
+    fs.rmSync(temp, { recursive: true, force: true })
+  }, 100)
+  return Buffer.from(data)
+}
+
+/**
+ * 文件转url
+ */

@@ -1,7 +1,7 @@
 import type { karinToQQBot } from 'node-karin'
 
 /** 上传富媒体文件场景 */
-export type Scene = 'users' | 'groups'
+export type Scene = 'user' | 'group'
 /** 上传富媒体文件类型 */
 export type MediaType = 'image' | 'video' | 'record' | 'file'
 
@@ -42,7 +42,7 @@ export type Markdown = {
   /** markdown 模版id，申请模版后获得 */
   custom_template_id: string
   /** 模版内变量与填充值的kv映射 */
-  params: { key: string, values: [string] }[]
+  params: { key: string, values: string[] }[]
 }
 
 /** 按钮消息结构 */
@@ -95,7 +95,9 @@ export interface SendQQMediaMessageRequest extends SendQQMessageRequest, QQMessa
   media: {
     /** 文件信息，用于发消息接口的 media 字段使用 */
     file_info: string
-  }
+  },
+  /** 当 msg_type = 7 时，content 字段需要填入一个值，譬如一个空格 “ ”，后续版本会修复该问题。 */
+  content: string
 }
 
 /** 发送QQ消息请求参数 */
@@ -117,7 +119,7 @@ export interface SendGuildMessageID {
 /** 发送频道引用消息参数 */
 export interface SendGuildQuoteMessage {
   /** 引用消息的ID */
-  message_id: string
+  message_id?: string
   /** 是否忽略获取引用消息详情错误，默认否 */
   ignore_get_message_error?: boolean
 }
@@ -125,7 +127,7 @@ export interface SendGuildQuoteMessage {
 /** 发送频道消息请求参数基类 */
 export interface SendGuildMessageRequest {
   /** 单独加一个类型 用于区分不同的消息类型 */
-  msg_type: 'text' | 'image' | 'embed' | 'ark' | 'markdown'
+  type: 'text' | 'image' | 'embed' | 'ark' | 'markdown'
 }
 
 /** 发送频道 文本 消息请求参数 */
@@ -202,6 +204,8 @@ export interface SendGuildMarkdownMessageRequest extends SendGuildMessageID, Sen
   type: 'markdown'
   /** markdown 消息内容 */
   markdown: Markdown
+  /** 按钮 */
+  keyboard?: Keyboard
 }
 
 /** 发送频道消息请求参数 */

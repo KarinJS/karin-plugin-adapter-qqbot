@@ -29,18 +29,22 @@
   },
   "dependencies": {
     "@karinjs/geturls": "^1.0.2",
+    "form-data": "^4.0.1",
+    "image-size": "^1.1.1",
     "qrcode": "^1.5.4",
+    "silk-wasm": "^3.6.3",
     "tweetnacl": "^1.0.3",
     "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/express": "4.17.21",
+    "@types/form-data": "^2.5.2",
     "@types/node": "^20.17.8",
     "@types/qrcode": "^1.5.5",
     "@types/ws": "^8.5.13",
     "eslint": "^9.7.0",
     "neostandard": "^0.11.9",
-    "node-karin": "0.12.25-beta.pr.206.1-1734013539",
+    "node-karin": "0.12.25-beta.pr.206.1-1734257729",
     "tsc-alias": "^1.8.10",
     "tsx": "^4.19.2",
     "typescript": "^5.5.3"

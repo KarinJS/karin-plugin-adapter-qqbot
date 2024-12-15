@@ -1,13 +1,21 @@
+import FormData from 'form-data'
 import type { createAxiosInstance } from '@/core/internal/axios'
 import type {
+  Ark,
   DmsResponse,
+  Embeds,
   GetMeResponse,
   Keyboard,
   Markdown,
   MediaType,
   Scene,
+  SendGuildArkMessageRequest,
+  SendGuildEmbedMessageRequest,
+  SendGuildMarkdownMessageRequest,
+  SendGuildMessageRequest,
   SendGuildMsg,
   SendGuildResponse,
+  SendGuildTextMessageRequest,
   SendQQArkMessageRequest,
   SendQQMarkdownMessageRequest,
   SendQQMediaMessageRequest,
@@ -18,6 +26,7 @@ import type {
 } from './types'
 
 import { AxiosError } from 'node-karin/axios'
+import lodash from 'node-karin/lodash'
 
 export class QQBotApi {
   /** axios 实例 */
@@ -45,10 +54,11 @@ export class QQBotApi {
    * 发送post请求
    * @param path 请求路径
    * @param options 请求数据
+   * @param headers 请求头
    */
-  async post<T> (path: string, options = {}): Promise<T> {
+  async post<T> (path: string, options = {}, headers?: Record<string, string>): Promise<T> {
     try {
-      const result = await this.axios.post(path, options)
+      const result = await this.axios.post(path, options, { headers })
       return result.data
     } catch (error) {
       this.handleError(path, options, error)
@@ -65,7 +75,7 @@ export class QQBotApi {
       throw new Error([
         '[axios] 请求失败',
         `请求路径: ${path}`,
-        `请求数据: ${JSON.stringify(options)}`,
+        `请求数据: ${lodash.truncate(JSON.stringify(options), { length: 500 })}`,
         `响应数据: ${JSON.stringify(error?.response?.data)}`
       ].join('\n'))
     }
@@ -93,28 +103,28 @@ export class QQBotApi {
   }
 
   /**
-   * 构建文本消息参数
+   * 构建QQBot文本消息参数
    * @param content 消息文本内容
    */
-  createQQSendMsgOptions (type: 'text', content: string): SendQQTextMessageRequest
+  QQdMsgOptions (type: 'text', content: string): SendQQTextMessageRequest
   /**
    * 构建Markdown消息参数
    * @param markdown Markdown文本内容
    * @param keyboard 按钮
    */
-  createQQSendMsgOptions (type: 'markdown', markdown: Markdown, keyboard?: Keyboard): SendQQMarkdownMessageRequest
+  QQdMsgOptions (type: 'markdown', markdown: Markdown, keyboard?: Keyboard): SendQQMarkdownMessageRequest
   /**
    * 构建Ark消息参数
    * @param ark Ark参数
    */
-  createQQSendMsgOptions (type: 'ark', ark: SendQQArkMessageRequest['ark']): SendQQArkMessageRequest
+  QQdMsgOptions (type: 'ark', ark: SendQQArkMessageRequest['ark']): SendQQArkMessageRequest
   /**
    * 构建Media消息参数
    * @param file 文件信息
    */
-  createQQSendMsgOptions (type: 'media', file: string): SendQQMediaMessageRequest
+  QQdMsgOptions (type: 'media', file: string): SendQQMediaMessageRequest
 
-  createQQSendMsgOptions (
+  QQdMsgOptions (
     type: 'text' | 'markdown' | 'ark' | 'media',
     data: any,
     keyboard?: Keyboard
@@ -127,7 +137,59 @@ export class QQBotApi {
       case 'ark':
         return { msg_type: 3, ark: data }
       case 'media':
-        return { msg_type: 7, media: { file_info: data } }
+        return { msg_type: 7, media: { file_info: data }, content: '' }
+      default:
+        throw new Error('未知的消息类型')
+    }
+  }
+
+  /**
+   * 构建频道文本、文本图片消息参数
+   * @param type 消息类型
+   * @param content 消息内容
+   * @param image 图片url
+   */
+  GuildMsgOptions (type: 'text', content: string, image?: string): SendGuildTextMessageRequest
+  /**
+   * 构建图片消息参数
+   * @param type 消息类型
+   * @param image 图片url
+   */
+  GuildMsgOptions (type: 'image', image: string): SendGuildTextMessageRequest
+  /**
+   * 构建Embed消息参数
+   * @param type 消息类型
+   * @param embed Embed参数
+   */
+  GuildMsgOptions (type: 'embed', embed: Embeds): SendGuildEmbedMessageRequest
+  /**
+   * 构建Ark消息参数
+   * @param type 消息类型
+   * @param ark Ark参数
+   */
+  GuildMsgOptions (type: 'ark', ark: Ark): SendGuildArkMessageRequest
+  /**
+   * 构建Markdown消息参数
+   * @param type 消息类型
+   * @param markdown Markdown文本
+   */
+  GuildMsgOptions (type: 'markdown', markdown: Markdown): SendGuildMarkdownMessageRequest
+  GuildMsgOptions (
+    type: SendGuildMessageRequest['type'],
+    data: any,
+    image?: string
+  ): SendGuildMsg {
+    switch (type) {
+      case 'text':
+        return { type: 'text', content: data, image }
+      case 'image':
+        return { type: 'image', image: data }
+      case 'embed':
+        return { type: 'embed', embed: data }
+      case 'ark':
+        return { type: 'ark', ark: data }
+      case 'markdown':
+        return { type: 'markdown', markdown: data }
       default:
         throw new Error('未知的消息类型')
     }
@@ -141,7 +203,7 @@ export class QQBotApi {
    * @param url 需要上传的文件的url
    * @param srvSendMsg 是否发送消息
    */
-  uploadMedia (scene: Scene, targetId: string, type: MediaType, url: string, srvSendMsg: boolean): Promise<UploadMediaResponse>
+  uploadMedia (scene: Scene, targetId: string, type: MediaType, url: string, srvSendMsg?: boolean): Promise<UploadMediaResponse>
   /**
    * 上传富媒体文件
    * @param scene 上传场景
@@ -150,7 +212,7 @@ export class QQBotApi {
    * @param base64 需要上传的文件的base64编码
    * @param srvSendMsg 是否发送消息
    */
-  uploadMedia (scene: Scene, targetId: string, type: MediaType, base64: string, srvSendMsg: boolean): Promise<UploadMediaResponse>
+  uploadMedia (scene: Scene, targetId: string, type: MediaType, base64: string, srvSendMsg?: boolean): Promise<UploadMediaResponse>
   uploadMedia (scene: Scene, targetId: string, type: MediaType, data: string, srvSendMsg = false): Promise<UploadMediaResponse> {
     const map = {
       image: 1,
@@ -170,7 +232,7 @@ export class QQBotApi {
       options.file_data = data.replace(/^data:image\/\w+;base64,|^base64:\/\//g, '')
     }
 
-    return this.post(`/v2/${scene}/${targetId}/files`, options)
+    return this.post(`/v2/${scene}s/${targetId}/files`, options)
   }
 
   /**
@@ -179,14 +241,14 @@ export class QQBotApi {
    * @param targetId 目标QQ用户的openid
    * @param messageId 消息id
    */
-  recallMsg (type: 'users', targetId: string, messageId: string): Promise<boolean>
+  recallMsg (type: 'user', targetId: string, messageId: string): Promise<boolean>
   /**
    * 群聊撤回消息
    * @param type 场景类型
    * @param targetId 目标QQ群的openid
    * @param messageId 消息id
    */
-  recallMsg (type: 'groups', targetId: string, messageId: string): Promise<boolean>
+  recallMsg (type: 'group', targetId: string, messageId: string): Promise<boolean>
   /**
    * 文字子频道撤回消息
    * @param type 场景类型
@@ -210,9 +272,9 @@ export class QQBotApi {
     hidetip = false
   ): Promise<boolean> {
     let url: string
-    if (type === 'users') {
+    if (type === 'user') {
       url = `/v2/users/${targetId}/messages/${messageId}`
-    } else if (type === 'groups') {
+    } else if (type === 'group') {
       url = `/v2/groups/${targetId}/messages/${messageId}`
     } else if (type === 'channels') {
       url = ` /channels/${targetId}/messages/${messageId}?hidetip=${hidetip}`
@@ -230,23 +292,25 @@ export class QQBotApi {
    * @param targetId 目标子频道的id
    * @param options 消息参数
    */
-  sendChannelMsg (targetId: string, options: SendGuildMsg): Promise<SendGuildResponse> {
-    return this.post(`/channels/${targetId}/messages`, options)
+  sendChannelMsg (targetId: string, options: SendGuildMsg | FormData): Promise<SendGuildResponse> {
+    const headers = options instanceof FormData ? options.getHeaders() : undefined
+    return this.post(`/channels/${targetId}/messages`, options, headers)
   }
 
   /**
    * 发送频道私信消息
-   * @param targetId 目标频道的id
+   * @param targetId 目标的id
    * @param srcGuildId 源频道的id
    * @param options 消息参数
    */
   async sendDmsMsg (
     targetId: string,
     srcGuildId: string,
-    options: SendGuildMsg
+    options: SendGuildMsg | FormData
   ): Promise<SendGuildResponse> {
     const { guild_id: guildId } = await this.dms(targetId, srcGuildId)
-    return this.post(`/dms/${guildId}/messages`, options)
+    const headers = options instanceof FormData ? options.getHeaders() : undefined
+    return this.post(`/dms/${guildId}/messages`, options, headers)
   }
 
   /**

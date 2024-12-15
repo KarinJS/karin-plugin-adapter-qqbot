@@ -29,3 +29,4 @@ pnpm-workspace.yaml
 @karinjs/
 1.js
 src/test.ts
+src/apps/
