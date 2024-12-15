@@ -22,6 +22,30 @@ import {
 } from 'node-karin'
 
 export type Pasmsg<T extends 'qq' | 'guild'> = { type: 'msg' | 'event', msg_id: string, msg_seq: T extends 'qq' ? number : never }
+export interface Grouping<T extends 'qq' | 'guild'> {
+  /** 文本 */
+  content: string[]
+  /** 图片 QQ专属 */
+  image: string[]
+  /** 单行按钮 */
+  button: ButtonElementType[]
+  /** 多行按钮 */
+  keyboard: KeyboardElementType[]
+  /** markdown */
+  markdown: MarkdownElementType[]
+  /** markdown模板 */
+  markdownTpl: MarkdownTplElementType[]
+  /** 频道专属 图片url */
+  imageUrls: string[]
+  /** 频道专属 图片file */
+  imageFiles: string[]
+  /** 引用回复 频道专属 */
+  reply: { message_id: string }
+  /** pasmsg */
+  pasmsg: Pasmsg<T>
+  /** 代发送列表 */
+  list: Array<T extends 'qq' ? SendQQMsg : SendGuildMsg | FormData>
+}
 
 export abstract class AdapterQQBot extends AdapterBase {
   public super: QQBotApi
@@ -67,30 +91,7 @@ export class AdapterQQBotText extends AdapterQQBot {
    * 初始化消息分类对象
    */
   initList<T extends 'qq' | 'guild'> (type: T) {
-    const list: {
-      /** 文本 */
-      content: string[]
-      /** 图片 QQ专属 */
-      image: string[]
-      /** 单行按钮 */
-      button: ButtonElementType[]
-      /** 多行按钮 */
-      keyboard: KeyboardElementType[]
-      /** markdown */
-      markdown: MarkdownElementType[]
-      /** markdown模板 */
-      markdownTpl: MarkdownTplElementType[]
-      /** 频道专属 图片url */
-      imageUrls: string[]
-      /** 频道专属 图片file */
-      imageFiles: string[]
-      /** 引用回复 频道专属 */
-      reply: { message_id: string }
-      /** pasmsg */
-      pasmsg: Pasmsg<T>
-      /** 代发送列表 */
-      list: Array<T extends 'qq' ? SendQQMsg : SendGuildMsg | FormData>
-    } = {
+    const list: Grouping<T> = {
       content: [],
       image: [],
       button: [],
@@ -217,53 +218,58 @@ export class AdapterQQBotText extends AdapterQQBot {
     const target = contact.scene === 'friend' ? 'user' : 'group'
 
     for (const v of elements) {
-      switch (v.type) {
-        case 'text': {
-          const { text, qr } = await this.hendleText(v.text)
-          list.content.push(text)
-          if (qr) list.image.push(qr)
-          break
-        }
-        case 'image': {
-          list.image.push(v.file)
-          break
-        }
-        case 'pasmsg': {
-          list.pasmsg.msg_id = v.id
-          break
-        }
-        case 'keyboard': {
-          list.keyboard.push(v)
-          break
-        }
-        case 'button': {
-          list.button.push(v)
-          break
-        }
-        case 'markdown':
-          list.markdown.push(v)
-          break
-        case 'markdownTpl':
-          list.markdownTpl.push(v)
-          break
-        case 'video':
-        case 'record': {
-          let url: string
-          if (v.file.startsWith('http')) {
-            url = v.file
-          } else {
-            const data = await fileToUrl(v.type, v.file, `${v.type}.${v.type === 'record' ? 'mp3' : 'mp4'}`)
-            url = data.url
-          }
-          const res = await this.super.uploadMedia(target, contact.peer, v.type, url, false)
-          list.list.push(this.super.QQdMsgOptions('media', res.file_info))
-          break
-        }
-        default: {
-          this.logger('debug', `[QQBot][${v.type}] 不支持发送的消息类型`)
-          break
-        }
+      if (v.type === 'text') {
+        const { text, qr } = await this.hendleText(v.text)
+        list.content.push(text)
+        if (qr) list.image.push(qr)
+        continue
       }
+
+      if (v.type === 'image') {
+        list.image.push(v.file)
+        continue
+      }
+
+      if (v.type === 'pasmsg') {
+        if (v.source === 'event') list.pasmsg.type = 'event'
+        list.pasmsg.msg_id = v.id
+        continue
+      }
+
+      if (v.type === 'keyboard') {
+        list.keyboard.push(v)
+        continue
+      }
+
+      if (v.type === 'button') {
+        list.button.push(v)
+        continue
+      }
+
+      if (v.type === 'markdown') {
+        list.markdown.push(v)
+        continue
+      }
+
+      if (v.type === 'markdownTpl') {
+        list.markdownTpl.push(v)
+        continue
+      }
+
+      if (v.type === 'video' || v.type === 'record') {
+        let url: string
+        if (v.file.startsWith('http')) {
+          url = v.file
+        } else {
+          const data = await fileToUrl(v.type, v.file, `${v.type}.${v.type === 'record' ? 'mp3' : 'mp4'}`)
+          url = data.url
+        }
+        const res = await this.super.uploadMedia(target, contact.peer, v.type, url, false)
+        list.list.push(this.super.QQdMsgOptions('media', res.file_info))
+        continue
+      }
+
+      this.logger('debug', `[QQBot][${v.type}] 不支持发送的消息类型`)
     }
 
     if (list.content.length) {
@@ -282,20 +288,31 @@ export class AdapterQQBotText extends AdapterQQBot {
     /** 返回值 */
     const rawData = this.initSendMsgResults()
 
-    for (const item of list.list) {
-      if (list.pasmsg.msg_id) {
-        list.pasmsg.msg_seq++
-        item.msg_seq = list.pasmsg.msg_seq
-        list.pasmsg.type === 'msg' ? item.msg_id = list.pasmsg.msg_id : item.event_id = list.pasmsg.msg_id
+    /** 处理被动消息 */
+    const pasmsg = (() => {
+      if (!list.pasmsg.msg_id) return () => ''
+
+      list.pasmsg.msg_seq++
+      if (list.pasmsg.type === 'msg') {
+        return (item: SendQQMsg) => {
+          item.msg_seq = list.pasmsg.msg_seq
+          item.msg_id = list.pasmsg.msg_id
+        }
       }
 
-      if (contact.scene === 'group') {
-        const res = await this.super.sendGroupMsg(contact.peer, item)
-        rawData.rawData.push(res)
-      } else if (contact.scene === 'friend') {
-        const res = await this.super.sendPrivateMsg(contact.peer, item)
-        rawData.rawData.push(res)
+      return (item: SendQQMsg) => {
+        item.msg_seq = list.pasmsg.msg_seq
+        item.event_id = list.pasmsg.msg_id
       }
+    })()
+
+    /** 发送消息 */
+    const send = contact.scene === 'group' ? this.super.sendGroupMsg : this.super.sendPrivateMsg
+
+    for (const item of list.list) {
+      pasmsg(item)
+      const res = await send(contact.peer, item)
+      rawData.rawData.push(res)
     }
 
     return this.handleResponse(rawData)
@@ -315,45 +332,60 @@ export class AdapterQQBotText extends AdapterQQBot {
     const list = this.initList('guild')
 
     for (const v of elements) {
-      switch (v.type) {
-        case 'text': {
-          const { text, qr } = await this.hendleText(v.text)
-          list.content.push(text)
-          if (qr) list.imageFiles.push(qr)
-          break
-        }
-        case 'image': v.file.startsWith('http') ? list.imageUrls.push(v.file) : list.imageFiles.push(v.file)
-          break
-        case 'at':
-          if (contact.scene === 'guild') list.content.push(v.targetId === 'all' ? '@everyone' : `<@${v.targetId}>`)
-          break
-        case 'pasmsg': {
-          list.pasmsg.msg_id = v.id
-          break
-        }
-        case 'reply': {
-          list.reply.message_id = v.messageId
-          break
-        }
-        case 'face': list.content.push(`<emoji:${v.id}>`)
-          break
-        case 'keyboard':
-          list.keyboard.push(v)
-          break
-        case 'button':
-          list.button.push(v)
-          break
-        case 'markdown':
-          list.markdown.push(v)
-          break
-        case 'markdownTpl':
-          list.markdownTpl.push(v)
-          break
-        default: {
-          this.logger('debug', `[QQBot][${v.type}] 不支持发送的消息类型`)
-          break
-        }
+      if (v.type === 'text') {
+        const { text, qr } = await this.hendleText(v.text)
+        list.content.push(text)
+        if (qr) list.image.push(qr)
+        continue
       }
+
+      if (v.type === 'image') {
+        list.image.push(v.file)
+        continue
+      }
+
+      if (v.type === 'at') {
+        if (contact.scene === 'guild') list.content.push(v.targetId === 'all' ? '@everyone' : `<@${v.targetId}>`)
+        continue
+      }
+
+      if (v.type === 'pasmsg') {
+        if (v.source === 'event') list.pasmsg.type = 'event'
+        list.pasmsg.msg_id = v.id
+        continue
+      }
+
+      if (v.type === 'reply') {
+        list.reply.message_id = v.messageId
+        continue
+      }
+
+      if (v.type === 'face') {
+        list.content.push(`<emoji:${v.id}>`)
+        continue
+      }
+
+      if (v.type === 'keyboard') {
+        list.keyboard.push(v)
+        continue
+      }
+
+      if (v.type === 'button') {
+        list.button.push(v)
+        continue
+      }
+
+      if (v.type === 'markdown') {
+        list.markdown.push(v)
+        continue
+      }
+
+      if (v.type === 'markdownTpl') {
+        list.markdownTpl.push(v)
+        continue
+      }
+
+      this.logger('debug', `[QQBot][${v.type}] 不支持发送的消息类型`)
     }
 
     /** 情况较为复杂... */
@@ -385,25 +417,44 @@ export class AdapterQQBotText extends AdapterQQBot {
 
     /** 处理Markdown、按钮 */
     list.list.push(...this.markdownToButton('guild', list.button, list.keyboard, list.markdown, list.markdownTpl))
-
     const rawData = this.initSendMsgResults()
 
-    for (const item of list.list) {
-      if (list.pasmsg.msg_id) {
-        if (item instanceof FormData) {
-          list.pasmsg.type === 'msg' ? item.append('msg_id', list.pasmsg.msg_id) : item.append('event_id', list.pasmsg.msg_id)
-        } else {
-          list.pasmsg.type === 'msg' ? item.msg_id = list.pasmsg.msg_id : item.event_id = list.pasmsg.msg_id
+    /** 发送消息 */
+    const send = (() => {
+      if (contact.scene === 'guild') {
+        return (peer: string, subPeer: string, item: SendGuildMsg | FormData) => this.super.sendChannelMsg(peer, item)
+      }
+
+      return (peer: string, subPeer: string, item: SendGuildMsg | FormData) => this.super.sendDmsMsg(peer, subPeer, item)
+    })()
+
+    /** 处理被动消息 */
+    const pasmsg = (() => {
+      if (!list.pasmsg.msg_id) return () => ''
+
+      if (list.pasmsg.type === 'msg') {
+        return (item: SendGuildMsg | FormData) => {
+          if (item instanceof FormData) {
+            return item.append('msg_id', list.pasmsg.msg_id)
+          }
+
+          item.msg_id = list.pasmsg.msg_id
         }
       }
 
-      if (contact.scene === 'guild') {
-        const res = await this.super.sendChannelMsg(contact.peer, item)
-        rawData.rawData.push(res)
-      } else if (contact.scene === 'direct') {
-        const res = await this.super.sendDmsMsg(contact.peer, contact.subPeer, item)
-        rawData.rawData.push(res)
+      return (item: SendGuildMsg | FormData) => {
+        if (item instanceof FormData) {
+          return item.append('event_id', list.pasmsg.msg_id)
+        }
+
+        item.event_id = list.pasmsg.msg_id
       }
+    })()
+
+    for (const item of list.list) {
+      pasmsg(item)
+      const res = await send(contact.peer, contact.subPeer, item)
+      rawData.rawData.push(res)
     }
 
     return this.handleResponse(rawData)
