@@ -89,7 +89,7 @@ export class QQBotApi {
    * @param targetId 目标QQ用户的 openid
    * @param options 消息参数
    */
-  sendPrivateMsg (targetId: string, options: SendQQMsg): Promise<SendQQMsgResponse> {
+  sendFriendMsg (targetId: string, options: SendQQMsg): Promise<SendQQMsgResponse> {
     return this.post(`/v2/users/${targetId}/messages`, options)
   }
 

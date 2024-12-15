@@ -307,7 +307,13 @@ export class AdapterQQBotText extends AdapterQQBot {
     })()
 
     /** 发送消息 */
-    const send = contact.scene === 'group' ? this.super.sendGroupMsg : this.super.sendPrivateMsg
+    const send = (() => {
+      if (contact.scene === 'friend') {
+        return (peer: string, item: SendQQMsg) => this.super.sendFriendMsg(peer, item)
+      }
+
+      return (peer: string, item: SendQQMsg) => this.super.sendGroupMsg(peer, item)
+    })()
 
     for (const item of list.list) {
       pasmsg(item)
