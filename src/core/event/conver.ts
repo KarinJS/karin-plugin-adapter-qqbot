@@ -2,38 +2,54 @@ import { segment } from 'node-karin'
 import { config } from '@/utils/config'
 import { EventEnum } from '@/core/event/types'
 import type { ElementTypes } from 'node-karin'
-import type { DirectMsgEvent, GuildMsgEvent, C2CMsgEvent, GroupMsgEvent } from './types'
+import type { DirectMsgEvent, GuildMsgEvent, C2CMsgEvent, GroupMsgEvent, GuildUser } from './types'
 
 /**
  * QQBot群、私聊转karin消息端
  * @param appid 应用ID
  * @param event 事件
+ * @param subBotID 机器人ID 也就是跟用户一样的ID 并非appid
  * @return karin格式消息
  */
 export const QQBotConvertKarin = (
   appid: string,
-  event: C2CMsgEvent | GroupMsgEvent | GuildMsgEvent | DirectMsgEvent
+  event: C2CMsgEvent | GroupMsgEvent | GuildMsgEvent | DirectMsgEvent,
+  subBotID: string
 ): Array<ElementTypes> => {
   const elements: Array<ElementTypes> = []
 
   const data = event.d
-  /** 检查是否存在图片 */
+  const mentions: Record<string, GuildUser> = {}
+  if (event.t === EventEnum.MESSAGE_CREATE || event.t === EventEnum.AT_MESSAGE_CREATE) {
+    event.d.mentions?.forEach(v => {
+      mentions[v.id] = v
+    })
+  }
+
   for (const v of data.attachments || []) {
-    elements.push(segment.image(v.url, {
+    if (v.content_type === 'file') {
+      console.log(v)
+      continue
+    }
+    const url = v.url.startsWith('http') ? v.url : `https://${v.url}`
+    elements.push(segment.image(url, {
+      subType: v.content_type.split('/')[1],
       name: v.filename,
-      // size: v.size,
-      height: v.height,
       width: v.width,
-      fileType: 'original',
+      height: v.height,
     }))
   }
 
-  const regex = /<faceType=\d+,faceId="\d+",ext="[^"]+">|[^<]+/g
-  const result = data.content.match(regex) || [data.content]
+  const regex = /<faceType=\d+,faceId="\d+",ext="[^"]+">|<@!\d+>|[^<]+/g
+  const result = data?.content?.match(regex) || []
   result.forEach(v => {
     if (v.startsWith('<faceType=')) {
       const Match = v.match(/faceId="(\d+)"/) as RegExpMatchArray
       elements.push(segment.face(Number(Match[1])))
+    } if (v.startsWith('<@!')) {
+      const id = v.replace(/^<@!|>$/g, '')
+      const name = mentions[id]?.username || ''
+      elements.push(segment.at(id === subBotID ? appid : id, name))
     } else {
       const regex = config()?.[appid]?.regex || []
       for (const r of regex) {
@@ -44,7 +60,7 @@ export const QQBotConvertKarin = (
     }
   })
 
-  if (event.t === EventEnum.GROUP_AT_MESSAGE_CREATE || event.t === EventEnum.AT_MESSAGE_CREATE) {
+  if (event.t === EventEnum.GROUP_AT_MESSAGE_CREATE) {
     elements.unshift(segment.at(appid))
   }
 

@@ -316,7 +316,7 @@ export interface GuildBaseEvent extends BaseMessageEvent {
     ignore_get_message_error: boolean
   }
   /** 附件 */
-  attachments?: [Attachment]
+  attachments?: Attachment[]
 }
 
 /**

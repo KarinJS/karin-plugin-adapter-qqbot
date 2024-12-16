@@ -1,7 +1,8 @@
-import { logger } from 'node-karin'
+import { URL } from 'url'
+import { logger, registerBot } from 'node-karin'
 import { QQBotApi } from '@/core/api'
 import { event } from '@/utils/common'
-import { config } from '@/utils/config'
+import { config, pkg } from '@/utils/config'
 import { EventEnum } from '@/core/event/types'
 import { createC2CWebhook } from '@/core/webhook/c2c'
 import { createHttpWebhook } from '@/core/webhook/http'
@@ -20,20 +21,35 @@ for (const [key, value] of Object.entries(cfg)) {
   const bot = Object.assign(cfg.default, value)
   const appId = String(bot.appId)
   await getAccessToken(bot.tokenApi, appId, bot.secret)
-  const axios = createAxiosInstance(bot.prodApi, appId)
+
+  const url = bot.sandbox ? bot.sandboxApi : bot.prodApi
+  const axios = createAxiosInstance(url, appId)
 
   const api = new QQBotApi(axios)
-  const { username, avatar } = await api.getMe()
+  const data = await api.getMe()
+  const { id, username, avatar } = data
   const client = new AdapterQQBotNormal(api)
   client.account.name = username
   client.account.avatar = avatar
   client.account.selfId = appId
+
+  const qq = new URL(data.share_url).searchParams.get('robot_uin')!
+  client.account.subId.id = id
+  client.account.subId.qq = qq
+  client.account.subId.appid = appId
+  client.account.subId.union_openid = data.union_openid
 
   event.on(appId, (event: Event) => createEvent(client, event))
 
   createC2CWebhook()
   createHttpWebhook()
   createWebSocketWebhook()
+
+  // 注册Bot
+  client.adapter.address = url
+  client.adapter.secret = bot.secret
+  client.adapter.version = pkg().version
+  client.adapter.index = registerBot('http', client)
 }
 
 /**

@@ -17,7 +17,7 @@ export const createGroupMsg = (client: AdapterQQBot, event: GroupMsgEvent) => {
 
   createGroupMessage({
     bot: client,
-    elements: QQBotConvertKarin(selfId, event),
+    elements: QQBotConvertKarin(selfId, event, client.selfSubId('id')),
     eventId: event.id,
     messageId: event.d.id,
     messageSeq: 0,
@@ -45,7 +45,7 @@ export const createFriendMsg = (client: AdapterQQBot, event: C2CMsgEvent) => {
 
   createFriendMessage({
     bot: client,
-    elements: QQBotConvertKarin(selfId, event),
+    elements: QQBotConvertKarin(selfId, event, client.selfSubId('id')),
     eventId: event.id,
     messageId: event.d.id,
     messageSeq: 0,
@@ -73,7 +73,7 @@ export const createChannelMsg = (client: AdapterQQBot, event: GuildMsgEvent) => 
 
   createGuildMessage({
     bot: client,
-    elements: QQBotConvertKarin(selfId, event),
+    elements: QQBotConvertKarin(selfId, event, client.selfSubId('id')),
     eventId: event.id,
     messageId: event.d.id,
     messageSeq: 0,
@@ -101,7 +101,7 @@ export const createDirectMsg = (client: AdapterQQBot, event: DirectMsgEvent) => 
 
   createDirectMessage({
     bot: client,
-    elements: QQBotConvertKarin(selfId, event),
+    elements: QQBotConvertKarin(selfId, event, client.selfSubId('id')),
     eventId: event.id,
     messageId: event.d.id,
     messageSeq: 0,
