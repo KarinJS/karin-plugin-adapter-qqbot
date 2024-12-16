@@ -34,16 +34,10 @@ export const config = (): Config => {
   if (cache) return cache
   const user = requireFileSync(`${dirConfig}/config.yaml`)
   const def = requireFileSync(`${defConfig}/config.yaml`)
-  const result: Config = {}
+  const result: Config = { default: Object.assign(def.default, user.default) }
   for (const key in user) {
-    result[key] = {
-      ...def[key],
-      ...user[key],
-      event: {
-        ...def.default.event,
-        ...user?.[key].event
-      }
-    }
+    if (key === 'default') continue
+    result[key] = { ...result.default, ...user[key], event: { ...result.default.event, ...user?.[key]?.event } }
   }
 
   cache = result

@@ -1,12 +1,12 @@
 import FormData from 'form-data'
-import { handleUrl, qrs } from '@/utils/common'
-import { common, fileToUrl, } from 'node-karin'
+import { getImageSize, handleUrl, qrs, textToButton } from '@/utils/common'
+import { common, fileToUrl, segment, } from 'node-karin'
 import { AdapterQQBot } from '@/core/adapter/adapter'
 import { SendGuildMsg, SendQQMsg } from '@/core/api/types'
 import type { Contact, ElementTypes, SendMsgResults, } from 'node-karin'
 
-/** 正常发送消息 */
-export class AdapterQQBotNormal extends AdapterQQBot {
+/** markdown */
+export class AdapterQQBotMarkdown extends AdapterQQBot {
   async sendMsg (contact: Contact, elements: Array<ElementTypes>, retryCount?: number): Promise<SendMsgResults> {
     if (contact.scene === 'direct' || contact.scene === 'guild') {
       return this.sendGuildMsg(contact, elements, retryCount)
@@ -55,10 +55,15 @@ export class AdapterQQBotNormal extends AdapterQQBot {
 
     for (const v of elements) {
       if (v.type === 'text') {
-        const { text, qr } = await this.hendleText(v.text)
+        const { text, buttons } = textToButton(v.text, contact.scene === 'friend')
         list.content.push(text)
-        if (qr) list.image.push(qr)
+        if (buttons) list.button.push(...buttons)
         continue
+      }
+
+      if (v.type === 'at') {
+        if (contact.scene === 'friend') continue
+        list.content.push(v.targetId === 'all' ? '<qqbot-at-everyone />' : `<qqbot-at-user id="${v.targetId}" />`)
       }
 
       if (v.type === 'image') {
@@ -112,11 +117,13 @@ export class AdapterQQBotNormal extends AdapterQQBot {
       list.list.unshift(this.super.QQdMsgOptions('text', list.content.join('')))
     }
 
-    for (const url of list.image) {
-      const base64 = await common.base64(url)
-      const result = await this.super.uploadMedia(target, contact.peer, 'image', base64, false)
-      list.list.push(this.super.QQdMsgOptions('media', result.file_info))
-    }
+    await Promise.all(list.image.map(async (file) => {
+      const { url, width, height } = await fileToUrl('image', file, 'image.jpg')
+      list.content.push(`![karin #${width}px #${height}px](${url})`)
+    }))
+
+    /** 转md */
+    list.markdown.push(segment.markdown(list.content.join('')))
 
     /** 处理Markdown、按钮 */
     list.list.push(...this.markdownToButton('qq', list.button, list.keyboard, list.markdown, list.markdownTpl))
@@ -179,9 +186,9 @@ export class AdapterQQBotNormal extends AdapterQQBot {
 
     for (const v of elements) {
       if (v.type === 'text') {
-        const { text, qr } = await this.hendleText(v.text)
+        const { text, buttons } = textToButton(v.text, contact.scene === 'direct')
         list.content.push(text)
-        if (qr) list.image.push(qr)
+        if (buttons) list.button.push(...buttons)
         continue
       }
 
@@ -191,7 +198,9 @@ export class AdapterQQBotNormal extends AdapterQQBot {
       }
 
       if (v.type === 'at') {
-        if (contact.scene === 'guild') list.content.push(v.targetId === 'all' ? '@everyone' : `<@${v.targetId}>`)
+        if (contact.scene === 'guild') {
+          list.content.push(v.targetId === 'all' ? '<qqbot-at-everyone />' : `<qqbot-at-user id="${v.targetId}" />`)
+        }
         continue
       }
 
@@ -234,32 +243,17 @@ export class AdapterQQBotNormal extends AdapterQQBot {
       this.logger('debug', `[QQBot][${v.type}] 不支持发送的消息类型`)
     }
 
-    /** 情况较为复杂... */
-    if (list.content.length) {
-      if (list.imageUrls.length) {
-        const url = list.imageUrls.shift()
-        list.list.unshift(this.super.GuildMsgOptions('text', list.content.join(''), url))
-      } if (list.imageFiles.length) {
-        const buffer = await common.buffer(list.imageFiles.shift()!)
-        const formData = new FormData()
-        formData.append('content', list.content.join(''))
-        formData.append('file_image', buffer)
-        list.list.unshift(formData)
-      } else {
-        list.list.unshift(this.super.GuildMsgOptions('text', list.content.join('')))
-      }
+    await Promise.all(list.imageFiles.map(async (file) => {
+      const { url: imageUrl, width, height } = await fileToUrl('image', file, 'image.jpg')
+      list.content.push(`![karin #${width}px #${height}px](${imageUrl})`)
+    }))
+
+    for (const url of list.imageFiles) {
+      const { width, height } = await getImageSize(url)
+      list.content.push(`![karin #${width}px #${height}px](${url})`)
     }
 
-    for (const url of list.imageUrls) {
-      list.list.push(this.super.GuildMsgOptions('image', url))
-    }
-
-    for (const file of list.imageFiles) {
-      const buffer = await common.buffer(file)
-      const formData = new FormData()
-      formData.append('file_image', buffer)
-      list.list.push(formData)
-    }
+    list.markdown.push(segment.markdown(list.content.join('')))
 
     /** 处理Markdown、按钮 */
     list.list.push(...this.markdownToButton('guild', list.button, list.keyboard, list.markdown, list.markdownTpl))

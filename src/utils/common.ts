@@ -1,10 +1,11 @@
 import fs from 'node:fs'
 import qrcode from 'qrcode'
+import size from 'image-size'
 import lodash from 'node-karin/lodash'
 import EventEmitter from 'node:events'
 import GetUrls from '@karinjs/geturls'
 import { encode, isSilk } from 'silk-wasm'
-import { common, ffmpeg, logger, tempPath } from 'node-karin'
+import { ButtonElementType, common, ffmpeg, logger, segment, tempPath } from 'node-karin'
 
 /**
  * 事件总线
@@ -153,5 +154,38 @@ export const silkEncode = async (file: string | Buffer): Promise<Buffer> => {
 }
 
 /**
- * 文件转url
+ * 处理文本 提取其中的url转为按钮
+ * @param text - 文本
+ * @param isC2C - 是否为C2C消息
  */
+export const textToButton = (text: string, isC2C = false): {
+  text: string,
+  buttons: ButtonElementType[]
+} => {
+  text = text.replace(/@everyone/g, 'everyone').replace(/\n/g, '\r')
+  if (isC2C) text = text.replace(/<qqbot-at-user id=".+" \/>/gm, '').replace(/<@.+>/gm, '')
+  const urls = handleUrl(text)
+  if (urls.length === 0) {
+    return { text, buttons: [] }
+  }
+
+  const buttons: ButtonElementType[] = []
+  urls.forEach((url, index) => {
+    text = text.replace(new RegExp(url, 'g'), `[请点击 按钮${index} 查看]`)
+    buttons.push(segment.button({ text: `${index}. ${url}`, link: url }))
+  })
+
+  // 最多只有5个长度
+  return { text, buttons: buttons.length > 5 ? buttons.slice(0, 5) : buttons }
+}
+
+/**
+ * 传入一个图片链接，获取图片的宽高
+ * @param url - 图片链接
+ * @returns 图片的宽高
+ */
+export const getImageSize = async (url: string): Promise<{ width: number, height: number }> => {
+  const buffer = await common.buffer(url)
+  const { width = 100, height = 100 } = size(buffer)
+  return { width, height }
+}

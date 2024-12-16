@@ -57,8 +57,6 @@ export interface CustomMarkdown extends Markdown {
 
 /** `config.yaml` 文件的类型定义 */
 export type Config = Record<string, {
-  /** QQ号 */
-  qq?: number
   /** 机器人ID */
   appId: string
   /** 机器人密钥 */

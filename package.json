@@ -44,7 +44,7 @@
     "@types/ws": "^8.5.13",
     "eslint": "^9.7.0",
     "neostandard": "^0.11.9",
-    "node-karin": "0.12.25-beta.pr.206.1-1734337664",
+    "node-karin": "0.12.25-beta.pr.206.1-1734343074",
     "tsc-alias": "^1.8.10",
     "tsx": "^4.19.2",
     "typescript": "^5.5.3"
