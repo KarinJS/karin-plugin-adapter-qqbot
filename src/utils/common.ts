@@ -189,3 +189,49 @@ export const getImageSize = async (url: string): Promise<{ width: number, height
   const { width = 100, height = 100 } = size(buffer)
   return { width, height }
 }
+
+/**
+ * 处理模板文本，对不能直接发送的 Markdown 语法进行转义
+ * @param text - 文本
+ * @returns 转义后的文本
+ */
+export const escapeMarkdown = (text: string): string => {
+  /**
+   * @example
+   * ```md
+   * # 标题
+   * **加粗**
+   * __下划线加粗__
+   * _斜体_
+   * *星号斜体*
+   * ***加粗斜体***
+   * ~~删除线~~
+   * ```
+   */
+
+  // 转义标题(仅行首的 #)
+  text = text.replace(/^(\s*)#(?!#)/gm, '$1\r#')
+
+  // 转义加粗斜体(排除已经转义的情况)
+  text = text.replace(/(?<!\\)\*\*\*(.+?)(?<!\\)\*\*\*/g, '\\*\\*\\*$1\\*\\*\\*')
+
+  // 转义加粗(星号加粗，排除已转义)
+  text = text.replace(/(?<!\\)\*\*(.+?)(?<!\\)\*\*/g, '\\*\\*$1\\*\\*')
+
+  // 转义下划线加粗(排除已转义)
+  text = text.replace(/(?<!\\)__(.+?)(?<!\\)__/g, '\\__\\__$1\\__\\__')
+
+  // 转义斜体(星号斜体，排除已转义)
+  text = text.replace(/(?<!\\)\*(.+?)(?<!\\)\*/g, '\\*$1\\*')
+
+  // 转义斜体(下划线斜体，排除已转义)
+  text = text.replace(/(?<!\\)_(.+?)(?<!\\)_/g, '\\_$1\\_')
+
+  // 转义删除线(排除已转义)
+  text = text.replace(/(?<!\\)~~(.+?)(?<!\\)~~/g, '\\~\\~$1\\~\\~')
+
+  // 转义其他特殊字符 这里先不管。
+  // text = text.replace(/(?<!\\)([\\`*_{}\[\]()#+\-.!])/g, '\\$1')
+
+  return text
+}

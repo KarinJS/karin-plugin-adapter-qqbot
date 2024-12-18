@@ -8,7 +8,7 @@ import type { C2CMsgEvent, DirectMsgEvent, GroupMsgEvent, GuildMsgEvent } from '
  * @param client 机器人实例
  * @param event 事件
  */
-export const createGroupMsg = (client: AdapterQQBot, event: GroupMsgEvent) => {
+export const onGroupMsg = (client: AdapterQQBot, event: GroupMsgEvent) => {
   const selfId = client.selfId
   const userId = event.d.author.member_openid
   const contact = karin.contactGroup(event.d.group_id)
@@ -36,7 +36,7 @@ export const createGroupMsg = (client: AdapterQQBot, event: GroupMsgEvent) => {
  * @param client 机器人实例
  * @param event 事件
  */
-export const createFriendMsg = (client: AdapterQQBot, event: C2CMsgEvent) => {
+export const onFriendMsg = (client: AdapterQQBot, event: C2CMsgEvent) => {
   const selfId = client.selfId
   const userId = event.d.author.user_openid
   const contact = karin.contactFriend(userId)
@@ -64,11 +64,11 @@ export const createFriendMsg = (client: AdapterQQBot, event: C2CMsgEvent) => {
  * @param client 机器人实例
  * @param event 事件
  */
-export const createChannelMsg = (client: AdapterQQBot, event: GuildMsgEvent) => {
+export const onChannelMsg = (client: AdapterQQBot, event: GuildMsgEvent) => {
   const selfId = client.selfId
   const userId = event.d.author.id
   const contact = karin.contact('guild', event.d.guild_id, event.d.channel_id)
-  const sender = karin.groupSender(userId, '')
+  const sender = karin.groupSender(userId, event.d.author.username)
   const srcReply: SrcReply = (elements) => client.sendMsg(contact, [...elements, segment.pasmsg(event.d.id)])
 
   createGuildMessage({
@@ -92,11 +92,11 @@ export const createChannelMsg = (client: AdapterQQBot, event: GuildMsgEvent) => 
  * @param client 机器人实例
  * @param event 事件
  */
-export const createDirectMsg = (client: AdapterQQBot, event: DirectMsgEvent) => {
+export const onDirectMsg = (client: AdapterQQBot, event: DirectMsgEvent) => {
   const selfId = client.selfId
   const userId = event.d.author.id
-  const contact = karin.contact('direct', userId, event.d.src_guild_id)
-  const sender = karin.friendSender(userId, '')
+  const contact = karin.contact('direct', event.d.guild_id, event.d.channel_id)
+  const sender = karin.friendSender(userId, event.d.author.username)
   const srcReply: SrcReply = (elements) => client.sendMsg(contact, [...elements, segment.pasmsg(event.d.id)])
 
   createDirectMessage({

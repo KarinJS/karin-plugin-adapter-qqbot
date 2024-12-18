@@ -119,7 +119,7 @@ export class AdapterQQBotNormal extends AdapterQQBot {
     }
 
     /** 处理Markdown、按钮 */
-    list.list.push(...this.markdownToButton('qq', list.button, list.keyboard, list.markdown, list.markdownTpl))
+    list.markdownToButton('qq', list)
 
     /** 返回值 */
     const rawData = this.initSendMsgResults()
@@ -262,16 +262,24 @@ export class AdapterQQBotNormal extends AdapterQQBot {
     }
 
     /** 处理Markdown、按钮 */
-    list.list.push(...this.markdownToButton('guild', list.button, list.keyboard, list.markdown, list.markdownTpl))
+    list.markdownToButton('guild', list)
     const rawData = this.initSendMsgResults()
 
     /** 发送消息 */
     const send = (() => {
       if (contact.scene === 'guild') {
-        return (peer: string, subPeer: string, item: SendGuildMsg | FormData) => this.super.sendChannelMsg(subPeer, item)
+        return (
+          peer: string,
+          subPeer: string,
+          item: SendGuildMsg | FormData
+        ) => this.super.sendChannelMsg(subPeer, item)
       }
 
-      return (peer: string, subPeer: string, item: SendGuildMsg | FormData) => this.super.sendDmsMsg(peer, subPeer, item)
+      return (
+        peer: string,
+        subPeer: string,
+        item: SendGuildMsg | FormData
+      ) => this.super.sendDmsMsg(peer, item)
     })()
 
     /** 处理被动消息 */

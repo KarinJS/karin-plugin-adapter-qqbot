@@ -33,6 +33,14 @@ default:
   markdown:
     # 发送模式 0-关闭MD 1-原生MD 3-旧图文模板MD 4-纯文模板MD 5-自定义处理
     mode: 0
+    # 模板ID
+    id: ""
+    kv:
+      - text_start
+      - img_dec
+      - img_url
+      - text_end
+
   # 事件接收配置
   event:
     # 接收方式 0-关闭 1-webhook 2-http 3-ws

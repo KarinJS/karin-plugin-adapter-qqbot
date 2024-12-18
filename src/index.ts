@@ -1,4 +1,4 @@
-import '@/core/event/base'
+import '@/core/event/index'
 import { logger } from 'node-karin'
 import { basename, config } from '@/utils'
 

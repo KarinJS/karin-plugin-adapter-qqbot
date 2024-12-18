@@ -37,7 +37,18 @@ export const config = (): Config => {
   const result: Config = { default: Object.assign(def.default, user.default) }
   for (const key in user) {
     if (key === 'default') continue
-    result[key] = { ...result.default, ...user[key], event: { ...result.default.event, ...user?.[key]?.event } }
+    result[key] = {
+      ...result.default,
+      ...user[key],
+      event: {
+        ...result.default.event,
+        ...user?.[key]?.event
+      },
+      markdown: {
+        ...result.default.markdown,
+        ...user?.[key]?.markdown
+      },
+    }
   }
 
   cache = result

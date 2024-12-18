@@ -1,8 +1,13 @@
 import FormData from 'form-data'
 import { QQBotApi } from '@/core/api'
 import { random } from '@/utils/common'
-import { SendGuildMsg, SendQQMsg } from '@/core/api/types'
 import { AdapterBase, logger, karinToQQBot } from 'node-karin'
+import type {
+  SendGuildMsg,
+  SendGuildResponse,
+  SendQQMsg,
+  SendQQMsgResponse
+} from '@/core/api/types'
 import type {
   LoggerLevel,
   ButtonElementType,
@@ -10,9 +15,29 @@ import type {
   MarkdownElementType,
   MarkdownTplElementType,
   SendMsgResults,
+  Contact,
 } from 'node-karin'
 
-export type Pasmsg<T extends 'qq' | 'guild'> = { type: 'msg' | 'event', msg_id: string, msg_seq: T extends 'qq' ? number : never }
+/** 发送函数所需参数 */
+export type Options<T extends 'qq' | 'guild'> = T extends 'qq' ? SendQQMsg : SendGuildMsg | FormData
+
+/** QQ发送消息函数类型 */
+export type QQSend = (
+  peer: string,
+  item: SendQQMsg
+) => Promise<SendQQMsgResponse>
+
+/** 频道发送消息函数类型 */
+export type GuildSend = (peer: string,
+  subPeer: string,
+  item: SendGuildMsg | FormData
+) => Promise<SendGuildResponse>
+
+export type Pasmsg<T extends 'qq' | 'guild'> = {
+  type: 'msg' | 'event',
+  msg_id: string,
+  msg_seq: T extends 'qq' ? number : never
+}
 export interface Grouping<T extends 'qq' | 'guild'> {
   /** 文本 */
   content: string[]
@@ -35,7 +60,15 @@ export interface Grouping<T extends 'qq' | 'guild'> {
   /** pasmsg */
   pasmsg: Pasmsg<T>
   /** 代发送列表 */
-  list: Array<T extends 'qq' ? SendQQMsg : SendGuildMsg | FormData>
+  list: Array<Options<T>>
+  /**
+   * 处理按钮、markdown
+   * 统一格式后推入待发送消息列表
+   * @param type 构建类型
+   * @param list 分类列表
+   * @returns
+   */
+  markdownToButton: (type: T, list: Grouping<T>) => void
 }
 
 export abstract class AdapterQQBot extends AdapterBase {
@@ -66,6 +99,40 @@ export abstract class AdapterQQBot extends AdapterBase {
   }
 
   /**
+   * 撤回消息
+   * @param contact 联系人
+   * @param messageId 消息id
+   * @returns 撤回结果
+   */
+  async recallMsg (contact: Contact, messageId: string) {
+    try {
+      if (contact.scene === 'friend') {
+        await this.super.recallMsg('user', contact.peer, messageId)
+        return true
+      }
+
+      if (contact.scene === 'group') {
+        await this.super.recallMsg('group', contact.peer, messageId)
+        return true
+      }
+
+      if (contact.scene === 'direct') {
+        await this.super.recallMsg('dms', contact.peer, messageId)
+        return true
+      }
+
+      if (contact.scene === 'guild') {
+        await this.super.recallMsg('channels', contact.peer, messageId)
+        return true
+      }
+
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
    * 初始化消息分类对象
    */
   initList<T extends 'qq' | 'guild'> (type: T) {
@@ -80,8 +147,13 @@ export abstract class AdapterQQBot extends AdapterBase {
       imageFiles: [],
       reply: { message_id: '' },
       pasmsg: this.pasmsg(type),
-      list: []
+      list: [],
+      markdownToButton: (
+        type: T,
+        list: Grouping<T>
+      ) => this.markdownToButton(type, list)
     }
+
     return list
   }
 
@@ -111,7 +183,8 @@ export abstract class AdapterQQBot extends AdapterBase {
   }
 
   /**
-   * 处理按钮、markdown
+   * - 处理按钮、markdown
+   * - 统一格式后推入待发送消息列表
    * @param type 消息类型
    * @param button 按钮
    * @param keyboard 键盘
@@ -121,41 +194,35 @@ export abstract class AdapterQQBot extends AdapterBase {
    */
   markdownToButton<T extends 'qq' | 'guild'> (
     type: T,
-    button: ButtonElementType[],
-    keyboard: KeyboardElementType[],
-    markdown: MarkdownElementType[],
-    markdownTpl: MarkdownTplElementType[]
-  ): Array<T extends 'qq' ? SendQQMsg : SendGuildMsg> {
-    const list: Array<SendGuildMsg | SendQQMsg> = []
+    list: Grouping<T>
+  ) {
     /** 统一按钮 */
     const rows: ReturnType<typeof karinToQQBot> = []
-    if (button.length) {
-      button.forEach((v) => {
+    if (list.button.length) {
+      list.button.forEach((v) => {
         rows.push(...karinToQQBot(v))
       })
     }
 
-    if (keyboard.length) {
-      keyboard.forEach((v) => {
+    if (list.keyboard.length) {
+      list.keyboard.forEach((v) => {
         rows.push(...karinToQQBot(v))
       })
     }
 
-    markdown.forEach((v) => {
+    list.markdown.forEach((v) => {
       const item = this.super.GuildMsgOptions('markdown', { content: v.markdown })
       if (rows.length) item.keyboard = { content: { rows } }
-      list.push(item)
+      list.list.push(item as T extends 'qq' ? SendQQMsg : FormData | SendGuildMsg)
     })
 
-    markdownTpl.forEach((v) => {
+    list.markdownTpl.forEach((v) => {
       const item = this.super.GuildMsgOptions('markdown', {
         custom_template_id: v.templateId,
         params: v.params
       })
       if (rows.length) item.keyboard = { content: { rows } }
-      list.push(item)
+      list.list.push(item as T extends 'qq' ? SendQQMsg : FormData | SendGuildMsg)
     })
-
-    return list as Array<T extends 'qq' ? SendQQMsg : SendGuildMsg>
   }
 }

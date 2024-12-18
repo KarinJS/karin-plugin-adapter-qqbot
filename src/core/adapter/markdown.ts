@@ -1,12 +1,25 @@
 import FormData from 'form-data'
-import { getImageSize, handleUrl, qrs, textToButton } from '@/utils/common'
-import { common, fileToUrl, segment, } from 'node-karin'
+import { handleUrl, qrs, textToButton } from '@/utils/common'
+import { common, fileToUrl } from 'node-karin'
 import { AdapterQQBot } from '@/core/adapter/adapter'
 import { SendGuildMsg, SendQQMsg } from '@/core/api/types'
+import type { QQBotApi } from '@/core/api'
 import type { Contact, ElementTypes, SendMsgResults, } from 'node-karin'
+import type { RawMarkdown } from '@/core/adapter/handler'
+import type { Config } from '@/types/config'
+
+type Cfg = Config[string]
 
 /** markdown */
 export class AdapterQQBotMarkdown extends AdapterQQBot {
+  _config: Cfg
+  markdown: RawMarkdown
+  constructor (QQBot: QQBotApi, markdown: RawMarkdown, config: Cfg) {
+    super(QQBot)
+    this.markdown = markdown
+    this._config = config
+  }
+
   async sendMsg (contact: Contact, elements: Array<ElementTypes>, retryCount?: number): Promise<SendMsgResults> {
     if (contact.scene === 'direct' || contact.scene === 'guild') {
       return this.sendGuildMsg(contact, elements, retryCount)
@@ -113,24 +126,6 @@ export class AdapterQQBotMarkdown extends AdapterQQBot {
       this.logger('debug', `[QQBot][${v.type}] 不支持发送的消息类型`)
     }
 
-    if (list.content.length) {
-      list.list.unshift(this.super.QQdMsgOptions('text', list.content.join('')))
-    }
-
-    await Promise.all(list.image.map(async (file) => {
-      const { url, width, height } = await fileToUrl('image', file, 'image.jpg')
-      list.content.push(`![karin #${width}px #${height}px](${url})`)
-    }))
-
-    /** 转md */
-    list.markdown.push(segment.markdown(list.content.join('')))
-
-    /** 处理Markdown、按钮 */
-    list.list.push(...this.markdownToButton('qq', list.button, list.keyboard, list.markdown, list.markdownTpl))
-
-    /** 返回值 */
-    const rawData = this.initSendMsgResults()
-
     /** 处理被动消息 */
     const pasmsg = (() => {
       if (!list.pasmsg.msg_id) return () => ''
@@ -158,17 +153,7 @@ export class AdapterQQBotMarkdown extends AdapterQQBot {
       return (peer: string, item: SendQQMsg) => this.super.sendGroupMsg(peer, item)
     })()
 
-    if (!list.list.length) {
-      list.list.push(this.super.QQdMsgOptions('text', '不支持发送的消息类型'))
-    }
-
-    for (const item of list.list) {
-      pasmsg(item)
-      const res = await send(contact.peer, item)
-      rawData.rawData.push(res)
-    }
-
-    return this.handleResponse(rawData)
+    return this.markdown('qq', this, list, contact, pasmsg, send)
   }
 
   /**
@@ -193,7 +178,7 @@ export class AdapterQQBotMarkdown extends AdapterQQBot {
       }
 
       if (v.type === 'image') {
-        v.file.startsWith('http') ? list.imageUrls.push(v.file) : list.imageFiles.push(v.file)
+        list.image.push(v.file)
         continue
       }
 
@@ -243,29 +228,21 @@ export class AdapterQQBotMarkdown extends AdapterQQBot {
       this.logger('debug', `[QQBot][${v.type}] 不支持发送的消息类型`)
     }
 
-    await Promise.all(list.imageFiles.map(async (file) => {
-      const { url: imageUrl, width, height } = await fileToUrl('image', file, 'image.jpg')
-      list.content.push(`![karin #${width}px #${height}px](${imageUrl})`)
-    }))
-
-    for (const url of list.imageFiles) {
-      const { width, height } = await getImageSize(url)
-      list.content.push(`![karin #${width}px #${height}px](${url})`)
-    }
-
-    list.markdown.push(segment.markdown(list.content.join('')))
-
-    /** 处理Markdown、按钮 */
-    list.list.push(...this.markdownToButton('guild', list.button, list.keyboard, list.markdown, list.markdownTpl))
-    const rawData = this.initSendMsgResults()
-
     /** 发送消息 */
     const send = (() => {
       if (contact.scene === 'guild') {
-        return (peer: string, subPeer: string, item: SendGuildMsg | FormData) => this.super.sendChannelMsg(subPeer, item)
+        return (
+          peer: string,
+          subPeer: string,
+          item: SendGuildMsg | FormData
+        ) => this.super.sendChannelMsg(subPeer, item)
       }
 
-      return (peer: string, subPeer: string, item: SendGuildMsg | FormData) => this.super.sendDmsMsg(peer, subPeer, item)
+      return (
+        peer: string,
+        subPeer: string,
+        item: SendGuildMsg | FormData
+      ) => this.super.sendDmsMsg(peer, item)
     })()
 
     /** 处理被动消息 */
@@ -291,16 +268,6 @@ export class AdapterQQBotMarkdown extends AdapterQQBot {
       }
     })()
 
-    if (!list.list.length) {
-      list.list.push(this.super.GuildMsgOptions('text', '不支持发送的消息类型'))
-    }
-
-    for (const item of list.list) {
-      pasmsg(item)
-      const res = await send(contact.peer, contact.subPeer, item)
-      rawData.rawData.push(res)
-    }
-
-    return this.handleResponse(rawData)
+    return this.markdown('guild', this, list, contact, pasmsg, send)
   }
 }

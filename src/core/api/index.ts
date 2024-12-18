@@ -1,4 +1,6 @@
 import FormData from 'form-data'
+import lodash from 'node-karin/lodash'
+import { AxiosError } from 'node-karin/axios'
 import type { createAxiosInstance } from '@/core/internal/axios'
 import type {
   Ark,
@@ -24,9 +26,6 @@ import type {
   SendQQTextMessageRequest,
   UploadMediaResponse
 } from './types'
-
-import { AxiosError } from 'node-karin/axios'
-import lodash from 'node-karin/lodash'
 
 export class QQBotApi {
   /** axios 实例 */
@@ -298,19 +297,38 @@ export class QQBotApi {
   }
 
   /**
+   * 直接发送频道消息
+   * @param guildID 频道的id
+   * @param options 消息参数
+   */
+  sendDmsMsg (guildID: string, options: SendGuildMsg | FormData): Promise<SendGuildResponse>
+  /**
    * 发送频道私信消息
    * @param targetId 目标的id
    * @param srcGuildId 源频道的id
    * @param options 消息参数
    */
+  sendDmsMsg (targetId: string, srcGuildId: string, options: SendGuildMsg | FormData): Promise<SendGuildResponse>
+
+  /**
+   * 发送频道私信消息
+   * @param targetId 目标的id
+   * @param data 源频道的id
+   * @param options 消息参数
+   */
   async sendDmsMsg (
     targetId: string,
-    srcGuildId: string,
-    options: SendGuildMsg | FormData
+    data: string | SendGuildMsg | FormData,
+    options?: SendGuildMsg | FormData
   ): Promise<SendGuildResponse> {
-    const { guild_id: guildId } = await this.dms(targetId, srcGuildId)
-    const headers = options instanceof FormData ? options.getHeaders() : undefined
-    return this.post(`/dms/${guildId}/messages`, options, headers)
+    if (typeof data === 'string') {
+      const { guild_id: guildId } = await this.dms(targetId, data)
+      const headers = options instanceof FormData ? options.getHeaders() : undefined
+      return this.post(`/dms/${guildId}/messages`, options, headers)
+    }
+
+    const headers = data instanceof FormData ? data.getHeaders() : undefined
+    return this.post(`/dms/${targetId}/messages`, data, headers)
   }
 
   /**

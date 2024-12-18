@@ -206,7 +206,7 @@ export interface ReadyEvent extends BaseEvent {
 export interface C2CMsgEvent extends BaseEvent {
   /** 事件类型 */
   t: EventEnum.C2C_MESSAGE_CREATE,
-  /** 平台方消息ID 格式: C2C_MESSAGE_CREATE:abc... */
+  /** 平台方事件ID 格式: C2C_MESSAGE_CREATE:abc... */
   id: string,
   d: {
     /** 富媒体消息 */
@@ -233,7 +233,7 @@ export interface C2CMsgEvent extends BaseEvent {
 export interface GroupMsgEvent extends BaseEvent {
   /** 事件类型 */
   t: EventEnum.GROUP_AT_MESSAGE_CREATE,
-  /** 平台方消息ID 格式: GROUP_AT_MESSAGE_CREATE:abc... */
+  /** 平台方事件ID 格式: GROUP_AT_MESSAGE_CREATE:abc... */
   id: string,
   d: {
     /** 富媒体消息 */
@@ -325,7 +325,7 @@ export interface GuildBaseEvent extends BaseMessageEvent {
 export interface GuildMsgEvent extends BaseEvent {
   /** 事件类型 */
   t: EventEnum.MESSAGE_CREATE | EventEnum.AT_MESSAGE_CREATE
-  /** 平台方消息ID */
+  /** 平台方事件ID */
   id: string
   /** 事件内容 */
   d: GuildBaseEvent & {
@@ -342,7 +342,7 @@ export interface GuildMsgEvent extends BaseEvent {
 export interface DirectMsgEvent extends BaseEvent {
   /** 事件类型 */
   t: EventEnum.DIRECT_MESSAGE_CREATE
-  /** 平台方消息ID */
+  /** 平台方事件ID */
   id: string
   /** 事件内容 */
   d: GuildBaseEvent & {
@@ -356,6 +356,154 @@ export interface DirectMsgEvent extends BaseEvent {
 }
 
 /**
+ * 机器人加入群聊事件
+ */
+export interface GroupAddRobotEvent extends BaseEvent {
+  t: EventEnum.GROUP_ADD_ROBOT
+  op: 0,
+  /** 平台方消息ID */
+  id: string,
+  d: {
+    /** 加入的时间戳 */
+    timestamp: number,
+    /** 加入群的群openid */
+    group_openid: string,
+    /** 操作添加机器人进群的群成员openid */
+    op_member_openid: '0337369D1F67F72EA9EEB6287B600488'
+  },
+}
+
+/**
+ * 机器人被移出群聊事件
+ */
+export interface GroupDelRobotEvent extends BaseEvent {
+  t: EventEnum.GROUP_DEL_ROBOT
+  op: 0,
+  /** 平台方消息ID */
+  id: string,
+  d: {
+    /** 移出的时间戳 */
+    timestamp: number,
+    /** 移出群的群openid */
+    group_openid: string,
+    /** 操作移出机器人的群成员openid */
+    op_member_openid: '0337369D1F67F72EA9EEB6287B600488'
+  },
+}
+
+/**
+ * 群聊拒绝机器人主动消息
+ */
+export interface GroupMsgRejectEvent extends BaseEvent {
+  t: EventEnum.GROUP_MSG_REJECT
+  op: 0,
+  /** 平台方消息ID */
+  id: string,
+  d: {
+    /** 操作时间戳 */
+    timestamp: number,
+    /** 操作群的群openid */
+    group_openid: string,
+    /** 操作拒绝机器人主动消息的群成员openid */
+    op_member_openid: '0337369D1F67F72EA9EEB6287B600488'
+  },
+}
+
+/**
+ * 群聊接受机器人主动消息
+ */
+export interface GroupMsgReceiveEvent extends BaseEvent {
+  t: EventEnum.GROUP_MSG_RECEIVE
+  op: 0,
+  /** 平台方消息ID */
+  id: string,
+  d: {
+    /** 操作时间戳 */
+    timestamp: number,
+    /** 操作群的群openid */
+    group_openid: string,
+    /** 操作接受机器人主动消息的群成员openid */
+    op_member_openid: '0337369D1F67F72EA9EEB6287B600488'
+  },
+}
+
+/**
+ * 用户添加机器人事件
+ */
+export interface FriendAddEvent extends BaseEvent {
+  t: EventEnum.FRIEND_ADD
+  op: 0,
+  /** 平台方消息ID */
+  id: string,
+  d: {
+    /** 添加时间戳 */
+    timestamp: number,
+    /** 添加机器人的用户openid */
+    openid: string,
+  },
+}
+
+/**
+ * 用户删除机器人事件
+ */
+export interface FriendDelEvent extends BaseEvent {
+  t: EventEnum.FRIEND_DEL
+  op: 0,
+  /** 平台方消息ID */
+  id: string,
+  d: {
+    /** 删除时间戳 */
+    timestamp: number,
+    /** 删除机器人的用户openid */
+    openid: string,
+  },
+}
+
+/**
+ * 用户在机器人资料卡手动关闭"主动消息"推送
+ */
+export interface C2CMsgRejectEvent extends BaseEvent {
+  t: EventEnum.C2C_MSG_REJECT
+  op: 0,
+  /** 平台方消息ID */
+  id: string,
+  d: {
+    /** 操作时间戳 */
+    timestamp: number,
+    /** 操作关闭主动消息推送的用户openid */
+    openid: string,
+  },
+}
+
+/**
+ * 用户在机器人资料卡手动开启"主动消息"推送开关
+ */
+export interface C2CMsgReceiveEvent extends BaseEvent {
+  t: EventEnum.C2C_MSG_RECEIVE
+  op: 0,
+  /** 平台方消息ID */
+  id: string,
+  d: {
+    /** 操作时间戳 */
+    timestamp: number,
+    /** 操作开启主动消息推送的用户openid */
+    openid: string,
+  },
+}
+
+/**
  * 所有事件
  */
-export type Event = ReadyEvent | C2CMsgEvent | GroupMsgEvent | GuildMsgEvent | DirectMsgEvent
+export type Event = ReadyEvent
+  | C2CMsgEvent
+  | GroupMsgEvent
+  | GuildMsgEvent
+  | DirectMsgEvent
+  | GroupAddRobotEvent
+  | GroupDelRobotEvent
+  | GroupMsgRejectEvent
+  | GroupMsgReceiveEvent
+  | FriendAddEvent
+  | FriendDelEvent
+  | C2CMsgRejectEvent
+  | C2CMsgReceiveEvent

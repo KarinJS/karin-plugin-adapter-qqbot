@@ -36,6 +36,7 @@ export const webhook = async (req: Request, res: Response, fnc: Function) => {
     }
 
     const signature = sign(api.secret, eventTs, plainToken)
+    logger.mark(`[signature][${data.appid}] ${signature}`)
     res.setHeader('Content-Type', 'application/json')
     res.status(200).end(JSON.stringify({ plain_token: plainToken, signature }))
     return
