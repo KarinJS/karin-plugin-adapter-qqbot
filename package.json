@@ -1,7 +1,7 @@
 {
   "name": "@karinjs/adapter-qqbot",
   "version": "1.2.9",
-  "description": "karin plugin template",
+  "description": "karin plugin adapter for qqbot",
   "homepage": "https://github.com/KarinJS/karin-plugin-adapter-qqbot",
   "bugs": {
     "url": "https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues"
@@ -24,6 +24,7 @@
   ],
   "scripts": {
     "build": "tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
+    "pr": "node lib/cli/pr.js",
     "pub": "npm publish --access public",
     "sort": "npx sort-package-json"
   },
@@ -44,7 +45,7 @@
     "@types/ws": "^8.5.13",
     "eslint": "^9.7.0",
     "neostandard": "^0.12.0",
-    "node-karin": "0.12.25-beta.pr.206.1-1734530821",
+    "node-karin": "0.12.25-beta.pr.206.1-1734533431",
     "tsc-alias": "^1.8.10",
     "tsx": "^4.19.2",
     "typescript": "^5.5.3"
@@ -68,6 +69,13 @@
       "config",
       "data",
       "resources"
+    ],
+    "include": [
+      "src/**/*"
+    ],
+    "exclude": [
+      "lib/**/*",
+      "@karinjs/**/*"
     ]
   }
 }
