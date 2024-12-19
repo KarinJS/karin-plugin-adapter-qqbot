@@ -8,7 +8,7 @@ import {
 } from 'node-karin'
 import type { Config } from '@/types/config'
 
-let cache: Config
+let cache: Config | undefined
 
 /**
  * @description package.json
@@ -61,6 +61,6 @@ export const config = (): Config => {
 setTimeout(() => {
   const list = filesByExt(dirConfig, '.yaml', 'abs')
   list.forEach(file => watch(file, (old, now) => {
-    cache = {}
+    cache = undefined
   }))
 }, 2000)
