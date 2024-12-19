@@ -1,9 +1,6 @@
-import './core/index'
-import Jimp from 'jimp'
-import { logger, common } from 'node-karin'
-import { basename, dirPath } from './utils/dir'
+import '@/core/event/index'
+import { logger } from 'node-karin'
+import { basename, config } from '@/utils'
 
-const pkg = common.readJson(dirPath + '/package.json')
-logger.info(`${logger.violet(`[插件:${pkg.version}]`)} ${logger.green(basename)} 初始化完成~`)
-
-export default Jimp
+/** 请不要在这编写插件 不会有任何效果~ */
+logger.info(`${logger.violet(`[插件:${config.pkg().version}]`)} ${logger.green(basename)} 初始化完成~`)

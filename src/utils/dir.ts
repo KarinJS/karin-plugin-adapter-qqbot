@@ -1,4 +1,3 @@
-import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -7,6 +6,6 @@ const filePath = fileURLToPath(import.meta.url).replace(/\\/g, '/')
 /** 插件包绝对路径 */
 const dirPath = path.resolve(filePath, '../../../')
 /** 插件包的名称 */
-const basename = JSON.parse(fs.readFileSync(`${dirPath}/package.json`, 'utf-8')).name
+const basename = path.basename(dirPath)
 
 export { dirPath, basename }

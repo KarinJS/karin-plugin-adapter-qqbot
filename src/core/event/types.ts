@@ -1,4 +1,27 @@
-import { Attachment } from './media'
+/**
+ * 需要注意 目前只有私聊可以收到file类型的消息
+ */
+export type Content_type = 'image/gif' | 'image/jpeg' | 'image/png' | 'file'
+
+/**
+ * 富媒体基类
+ */
+export interface Attachment {
+  /** 类型 */
+  content_type: Content_type
+  /** 未知作用 */
+  content?: string
+  /** 文件名 */
+  filename: string
+  /** 图片高度 */
+  height?: number
+  /** 图片宽度 */
+  width?: number
+  /** 文件大小 */
+  size: number
+  /** 文件url */
+  url: string
+}
 
 /**
  * opcode
@@ -25,7 +48,7 @@ export const enum Opcode {
   /** Heartbeat ACK [Receive/Reply] 当发送心跳成功之后，就会收到该消息 */
   HeartbeatACK = 11,
   /** HTTP Callback ACK [Reply] 仅用于 http 回调模式的回包，代表机器人收到了平台推送的数据 */
-  HTTPCallbackACK = 12
+  HTTPCallbackACK = 12,
 }
 
 /**
@@ -52,7 +75,7 @@ export interface HeartbeatACKEvent {
 /**
  * 子事件类型
  */
-export const enum EventType {
+export const enum EventEnum {
   /** 在鉴权成功后下发 代表建立连接成功 */
   READY = 'READY',
   /** 恢复登录状态后 不发遗漏事件完毕下发 */
@@ -140,27 +163,27 @@ export const enum EventType {
   /** 当收到@机器人的消息时 */
   AT_MESSAGE_CREATE = 'AT_MESSAGE_CREATE',
   /** 当频道的消息被删除时 */
-  PUBLIC_MESSAGE_DELETE = 'PUBLIC_MESSAGE_DELETE'
+  PUBLIC_MESSAGE_DELETE = 'PUBLIC_MESSAGE_DELETE',
 }
 
 /**
  * 子事件基类
  */
-export interface Event {
+export interface BaseEvent {
   /** opcode */
   op: Opcode.Dispatch,
   /** 序列号 */
   s: number,
   /** 事件类型 */
-  t: EventType
+  t: EventEnum
 }
 
 /**
  * READY子事件
  */
-export interface ReadyEvent extends Event {
+export interface ReadyEvent extends BaseEvent {
   /** 事件类型 */
-  t: EventType.READY,
+  t: EventEnum.READY,
   /** 事件内容 */
   d: {
     version: number,
@@ -180,10 +203,10 @@ export interface ReadyEvent extends Event {
 /**
  * C2C_MESSAGE_CREATE子事件
  */
-export interface C2CMessageCreateEvent extends Event {
+export interface C2CMsgEvent extends BaseEvent {
   /** 事件类型 */
-  t: EventType.C2C_MESSAGE_CREATE,
-  /** 平台方消息ID 格式: C2C_MESSAGE_CREATE:abc... */
+  t: EventEnum.C2C_MESSAGE_CREATE,
+  /** 平台方事件ID 格式: C2C_MESSAGE_CREATE:abc... */
   id: string,
   d: {
     /** 富媒体消息 */
@@ -207,10 +230,10 @@ export interface C2CMessageCreateEvent extends Event {
 /**
  * GROUP_AT_MESSAGE_CREATE子事件
  */
-export interface GroupAtMessageCreateEvent extends Event {
+export interface GroupMsgEvent extends BaseEvent {
   /** 事件类型 */
-  t: EventType.GROUP_AT_MESSAGE_CREATE,
-  /** 平台方消息ID 格式: GROUP_AT_MESSAGE_CREATE:abc... */
+  t: EventEnum.GROUP_AT_MESSAGE_CREATE,
+  /** 平台方事件ID 格式: GROUP_AT_MESSAGE_CREATE:abc... */
   id: string,
   d: {
     /** 富媒体消息 */
@@ -236,6 +259,251 @@ export interface GroupAtMessageCreateEvent extends Event {
 }
 
 /**
- * 所有子事件
+ * 频道的user信息
  */
-export type SubEvent = ReadyEvent | C2CMessageCreateEvent | GroupAtMessageCreateEvent
+export interface GuildUser {
+  /** 发送者的头像url */
+  avatar: string,
+  /** 发送者是否为bot */
+  bot: boolean,
+  /** 发送者的id */
+  id: string,
+  /** 发送者的nickname */
+  username: string
+}
+
+/** 基础消息事件 */
+export interface BaseMessageEvent {
+  /** 消息ID message_id */
+  id: string
+  /** 消息内容 */
+  content: string
+  /** 富媒体消息 */
+  attachments?: Array<Attachment>
+  /** 消息发送时间 */
+  timestamp: string
+}
+
+/** Guild 消息的通用结构 */
+export interface GuildMemberInfo {
+  /** 用户加入频道的时间 ISO8601 timestamp */
+  joined_at: string
+  /** 用户在频道内的昵称 */
+  nick: string
+  /** 用户在频道内的身份组ID */
+  roles: string[]
+}
+
+/** Guild 事件的公共部分 */
+export interface GuildBaseEvent extends BaseMessageEvent {
+  /** 发送者信息 */
+  author: GuildUser
+  /** 子频道id */
+  channel_id: string
+  /** 频道id */
+  guild_id: string
+  /** 用于消息间的排序 */
+  seq: number
+  /** 子频道消息 seq */
+  seq_in_channel: number
+  /** 消息创建者的member信息 */
+  member: GuildMemberInfo
+  /** 引用消息对象 */
+  message_reference?: {
+    /** 引用回复的消息 id */
+    message_id: string
+    /** 是否忽略获取引用消息详情错误，默认否 */
+    ignore_get_message_error: boolean
+  }
+  /** 附件 */
+  attachments?: Attachment[]
+}
+
+/**
+ * 频道文字子频道消息
+ */
+export interface GuildMsgEvent extends BaseEvent {
+  /** 事件类型 */
+  t: EventEnum.MESSAGE_CREATE | EventEnum.AT_MESSAGE_CREATE
+  /** 平台方事件ID */
+  id: string
+  /** 事件内容 */
+  d: GuildBaseEvent & {
+    /** 消息中at的人 */
+    mentions: [GuildUser]
+    /** 是否at all */
+    mention_everyone?: boolean
+  }
+}
+
+/**
+ * 频道私信消息
+ */
+export interface DirectMsgEvent extends BaseEvent {
+  /** 事件类型 */
+  t: EventEnum.DIRECT_MESSAGE_CREATE
+  /** 平台方事件ID */
+  id: string
+  /** 事件内容 */
+  d: GuildBaseEvent & {
+    /** 是否为私信 */
+    direct_message: boolean
+    /** 消息来源的频道id */
+    src_guild_id: string
+    /** 未知字段 */
+    seq_in_channel: string
+  }
+}
+
+/**
+ * 机器人加入群聊事件
+ */
+export interface GroupAddRobotEvent extends BaseEvent {
+  t: EventEnum.GROUP_ADD_ROBOT
+  op: 0,
+  /** 平台方消息ID */
+  id: string,
+  d: {
+    /** 加入的时间戳 */
+    timestamp: number,
+    /** 加入群的群openid */
+    group_openid: string,
+    /** 操作添加机器人进群的群成员openid */
+    op_member_openid: '0337369D1F67F72EA9EEB6287B600488'
+  },
+}
+
+/**
+ * 机器人被移出群聊事件
+ */
+export interface GroupDelRobotEvent extends BaseEvent {
+  t: EventEnum.GROUP_DEL_ROBOT
+  op: 0,
+  /** 平台方消息ID */
+  id: string,
+  d: {
+    /** 移出的时间戳 */
+    timestamp: number,
+    /** 移出群的群openid */
+    group_openid: string,
+    /** 操作移出机器人的群成员openid */
+    op_member_openid: '0337369D1F67F72EA9EEB6287B600488'
+  },
+}
+
+/**
+ * 群聊拒绝机器人主动消息
+ */
+export interface GroupMsgRejectEvent extends BaseEvent {
+  t: EventEnum.GROUP_MSG_REJECT
+  op: 0,
+  /** 平台方消息ID */
+  id: string,
+  d: {
+    /** 操作时间戳 */
+    timestamp: number,
+    /** 操作群的群openid */
+    group_openid: string,
+    /** 操作拒绝机器人主动消息的群成员openid */
+    op_member_openid: '0337369D1F67F72EA9EEB6287B600488'
+  },
+}
+
+/**
+ * 群聊接受机器人主动消息
+ */
+export interface GroupMsgReceiveEvent extends BaseEvent {
+  t: EventEnum.GROUP_MSG_RECEIVE
+  op: 0,
+  /** 平台方消息ID */
+  id: string,
+  d: {
+    /** 操作时间戳 */
+    timestamp: number,
+    /** 操作群的群openid */
+    group_openid: string,
+    /** 操作接受机器人主动消息的群成员openid */
+    op_member_openid: '0337369D1F67F72EA9EEB6287B600488'
+  },
+}
+
+/**
+ * 用户添加机器人事件
+ */
+export interface FriendAddEvent extends BaseEvent {
+  t: EventEnum.FRIEND_ADD
+  op: 0,
+  /** 平台方消息ID */
+  id: string,
+  d: {
+    /** 添加时间戳 */
+    timestamp: number,
+    /** 添加机器人的用户openid */
+    openid: string,
+  },
+}
+
+/**
+ * 用户删除机器人事件
+ */
+export interface FriendDelEvent extends BaseEvent {
+  t: EventEnum.FRIEND_DEL
+  op: 0,
+  /** 平台方消息ID */
+  id: string,
+  d: {
+    /** 删除时间戳 */
+    timestamp: number,
+    /** 删除机器人的用户openid */
+    openid: string,
+  },
+}
+
+/**
+ * 用户在机器人资料卡手动关闭"主动消息"推送
+ */
+export interface C2CMsgRejectEvent extends BaseEvent {
+  t: EventEnum.C2C_MSG_REJECT
+  op: 0,
+  /** 平台方消息ID */
+  id: string,
+  d: {
+    /** 操作时间戳 */
+    timestamp: number,
+    /** 操作关闭主动消息推送的用户openid */
+    openid: string,
+  },
+}
+
+/**
+ * 用户在机器人资料卡手动开启"主动消息"推送开关
+ */
+export interface C2CMsgReceiveEvent extends BaseEvent {
+  t: EventEnum.C2C_MSG_RECEIVE
+  op: 0,
+  /** 平台方消息ID */
+  id: string,
+  d: {
+    /** 操作时间戳 */
+    timestamp: number,
+    /** 操作开启主动消息推送的用户openid */
+    openid: string,
+  },
+}
+
+/**
+ * 所有事件
+ */
+export type Event = ReadyEvent
+  | C2CMsgEvent
+  | GroupMsgEvent
+  | GuildMsgEvent
+  | DirectMsgEvent
+  | GroupAddRobotEvent
+  | GroupDelRobotEvent
+  | GroupMsgRejectEvent
+  | GroupMsgReceiveEvent
+  | FriendAddEvent
+  | FriendDelEvent
+  | C2CMsgRejectEvent
+  | C2CMsgReceiveEvent
