@@ -3,10 +3,14 @@ import { handleUrl, qrs } from '@/utils/common'
 import { common, fileToUrl, } from 'node-karin'
 import { AdapterQQBot } from '@/core/adapter/adapter'
 import { SendGuildMsg, SendQQMsg } from '@/core/api/types'
-import type { Contact, ElementTypes, SendMsgResults, } from 'node-karin'
+import type { Contact, ElementTypes, Message, SendMsgResults, } from 'node-karin'
 
 /** 正常发送消息 */
 export class AdapterQQBotNormal extends AdapterQQBot {
+  async srcReply (e: Message, elements: ElementTypes[]) {
+    return this.sendMsg(e.contact, elements)
+  }
+
   async sendMsg (contact: Contact, elements: Array<ElementTypes>, retryCount?: number): Promise<SendMsgResults> {
     if (contact.scene === 'direct' || contact.scene === 'guild') {
       return this.sendGuildMsg(contact, elements, retryCount)

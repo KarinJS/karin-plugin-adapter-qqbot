@@ -16,7 +16,6 @@ import { onGroupAddRobot, onGroupDelRobot } from '@/core/event/notice'
 
 import type { Config } from '@/types/config'
 import type { Event } from '@/core/event/types'
-import type { AdapterQQBot } from '@/core/adapter/adapter'
 
 const main = async () => {
   const cfg = config()
@@ -65,7 +64,7 @@ const main = async () => {
  * @param bot 机器人配置
  * @param api 机器人API
  */
-const createClient = (bot: Config[string], api: QQBotApi): AdapterQQBot => {
+const createClient = (bot: Config[string], api: QQBotApi): AdapterQQBotNormal | AdapterQQBotMarkdown => {
   if (Number(bot.markdown?.mode) === 0) {
     return new AdapterQQBotNormal(api)
   }
@@ -96,7 +95,7 @@ const createClient = (bot: Config[string], api: QQBotApi): AdapterQQBot => {
  * @param event 事件
  */
 export const createEvent = (
-  client: AdapterQQBot,
+  client: AdapterQQBotNormal | AdapterQQBotMarkdown,
   event: Event
 ) => {
   if (event.t === EventEnum.GROUP_AT_MESSAGE_CREATE) {

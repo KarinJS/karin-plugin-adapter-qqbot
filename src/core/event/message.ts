@@ -1,6 +1,13 @@
 import { QQBotConvertKarin } from './conver'
-import { AdapterQQBot } from '@/core/adapter/adapter'
-import { karin, createGroupMessage, SrcReply, createFriendMessage, segment, createGuildMessage, createDirectMessage } from 'node-karin'
+import {
+  karin,
+  createGroupMessage,
+  createFriendMessage,
+  segment, createGuildMessage, createDirectMessage
+} from 'node-karin'
+
+import type { AdapterQQBotNormal } from '../adapter/normal'
+import type { AdapterQQBotMarkdown } from '../adapter/markdown'
 import type { C2CMsgEvent, DirectMsgEvent, GroupMsgEvent, GuildMsgEvent } from './types'
 
 /**
@@ -8,14 +15,13 @@ import type { C2CMsgEvent, DirectMsgEvent, GroupMsgEvent, GuildMsgEvent } from '
  * @param client 机器人实例
  * @param event 事件
  */
-export const onGroupMsg = (client: AdapterQQBot, event: GroupMsgEvent) => {
+export const onGroupMsg = (client: AdapterQQBotMarkdown | AdapterQQBotNormal, event: GroupMsgEvent) => {
   const selfId = client.selfId
   const userId = event.d.author.member_openid
   const contact = karin.contactGroup(event.d.group_id)
   const sender = karin.groupSender(userId, '')
-  const srcReply: SrcReply = (elements) => client.sendMsg(contact, [...elements, segment.pasmsg(event.d.id)])
 
-  createGroupMessage({
+  const e = createGroupMessage({
     bot: client,
     elements: QQBotConvertKarin(selfId, event, client.selfSubId('id')),
     eventId: event.id,
@@ -27,7 +33,7 @@ export const onGroupMsg = (client: AdapterQQBot, event: GroupMsgEvent) => {
     selfId,
     contact,
     sender,
-    srcReply
+    srcReply: (elements) => client.srcReply(e, [...elements, segment.pasmsg(event.d.id)])
   })
 }
 
@@ -36,14 +42,13 @@ export const onGroupMsg = (client: AdapterQQBot, event: GroupMsgEvent) => {
  * @param client 机器人实例
  * @param event 事件
  */
-export const onFriendMsg = (client: AdapterQQBot, event: C2CMsgEvent) => {
+export const onFriendMsg = (client: AdapterQQBotMarkdown | AdapterQQBotNormal, event: C2CMsgEvent) => {
   const selfId = client.selfId
   const userId = event.d.author.user_openid
   const contact = karin.contactFriend(userId)
   const sender = karin.friendSender(userId, '')
-  const srcReply: SrcReply = (elements) => client.sendMsg(contact, [...elements, segment.pasmsg(event.d.id)])
 
-  createFriendMessage({
+  const e = createFriendMessage({
     bot: client,
     elements: QQBotConvertKarin(selfId, event, client.selfSubId('id')),
     eventId: event.id,
@@ -55,7 +60,7 @@ export const onFriendMsg = (client: AdapterQQBot, event: C2CMsgEvent) => {
     selfId,
     contact,
     sender,
-    srcReply
+    srcReply: (elements) => client.srcReply(e, [...elements, segment.pasmsg(event.d.id)])
   })
 }
 
@@ -64,14 +69,13 @@ export const onFriendMsg = (client: AdapterQQBot, event: C2CMsgEvent) => {
  * @param client 机器人实例
  * @param event 事件
  */
-export const onChannelMsg = (client: AdapterQQBot, event: GuildMsgEvent) => {
+export const onChannelMsg = (client: AdapterQQBotMarkdown | AdapterQQBotNormal, event: GuildMsgEvent) => {
   const selfId = client.selfId
   const userId = event.d.author.id
   const contact = karin.contact('guild', event.d.guild_id, event.d.channel_id)
   const sender = karin.groupSender(userId, event.d.author.username)
-  const srcReply: SrcReply = (elements) => client.sendMsg(contact, [...elements, segment.pasmsg(event.d.id)])
 
-  createGuildMessage({
+  const e = createGuildMessage({
     bot: client,
     elements: QQBotConvertKarin(selfId, event, client.selfSubId('id')),
     eventId: event.id,
@@ -83,7 +87,7 @@ export const onChannelMsg = (client: AdapterQQBot, event: GuildMsgEvent) => {
     selfId,
     contact,
     sender,
-    srcReply
+    srcReply: (elements) => client.srcReply(e, [...elements, segment.pasmsg(event.d.id)])
   })
 }
 
@@ -92,14 +96,13 @@ export const onChannelMsg = (client: AdapterQQBot, event: GuildMsgEvent) => {
  * @param client 机器人实例
  * @param event 事件
  */
-export const onDirectMsg = (client: AdapterQQBot, event: DirectMsgEvent) => {
+export const onDirectMsg = (client: AdapterQQBotMarkdown | AdapterQQBotNormal, event: DirectMsgEvent) => {
   const selfId = client.selfId
   const userId = event.d.author.id
   const contact = karin.contact('direct', event.d.guild_id, event.d.channel_id)
   const sender = karin.friendSender(userId, event.d.author.username)
-  const srcReply: SrcReply = (elements) => client.sendMsg(contact, [...elements, segment.pasmsg(event.d.id)])
 
-  createDirectMessage({
+  const e = createDirectMessage({
     bot: client,
     elements: QQBotConvertKarin(selfId, event, client.selfSubId('id')),
     eventId: event.id,
@@ -111,7 +114,7 @@ export const onDirectMsg = (client: AdapterQQBot, event: DirectMsgEvent) => {
     selfId,
     contact,
     sender,
-    srcReply,
-    srcGuildId: event.d.src_guild_id
+    srcGuildId: event.d.src_guild_id,
+    srcReply: (elements) => client.srcReply(e, [...elements, segment.pasmsg(event.d.id)]),
   })
 }

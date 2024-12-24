@@ -1,10 +1,10 @@
 import FormData from 'form-data'
 import { handleUrl, qrs, textToButton } from '@/utils/common'
-import { common, fileToUrl } from 'node-karin'
+import { common, fileToUrl, buttonHandle } from 'node-karin'
 import { AdapterQQBot } from '@/core/adapter/adapter'
 import { SendGuildMsg, SendQQMsg } from '@/core/api/types'
 import type { QQBotApi } from '@/core/api'
-import type { Contact, ElementTypes, SendMsgResults, } from 'node-karin'
+import type { Contact, ElementTypes, Message, SendMsgResults } from 'node-karin'
 import type { RawMarkdown } from '@/core/adapter/handler'
 import type { Config } from '@/types/config'
 
@@ -18,6 +18,11 @@ export class AdapterQQBotMarkdown extends AdapterQQBot {
     super(QQBot)
     this.markdown = markdown
     this._config = config
+  }
+
+  async srcReply (e: Message, elements: ElementTypes[]) {
+    const list = await buttonHandle(e.msg, { e })
+    return this.sendMsg(e.contact, [...elements, ...list])
   }
 
   async sendMsg (contact: Contact, elements: Array<ElementTypes>, retryCount?: number): Promise<SendMsgResults> {
