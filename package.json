@@ -26,7 +26,8 @@
     "build": "tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
     "pr": "node lib/cli/pr.js",
     "pub": "npm publish --access public",
-    "sort": "npx sort-package-json"
+    "sort": "npx sort-package-json",
+    "dev": "karin ts"
   },
   "dependencies": {
     "@karinjs/geturls": "^1.0.2",

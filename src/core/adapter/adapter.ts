@@ -211,16 +211,21 @@ export abstract class AdapterQQBot extends AdapterBase {
     }
 
     list.markdown.forEach((v) => {
-      const item = this.super.GuildMsgOptions('markdown', { content: v.markdown })
+      const item = type === 'guild' ? this.super.GuildMsgOptions('markdown', { content: v.markdown }) : this.super.QQdMsgOptions('markdown', { content: v.markdown })
       if (rows.length) item.keyboard = { content: { rows } }
       list.list.push(item as T extends 'qq' ? SendQQMsg : FormData | SendGuildMsg)
     })
 
     list.markdownTpl.forEach((v) => {
-      const item = this.super.GuildMsgOptions('markdown', {
-        custom_template_id: v.templateId,
-        params: v.params
-      })
+      const item = type === 'guild'
+        ? this.super.GuildMsgOptions('markdown', {
+          custom_template_id: v.templateId,
+          params: v.params
+        })
+        : this.super.QQdMsgOptions('markdown', {
+          custom_template_id: v.templateId,
+          params: v.params
+        })
       if (rows.length) item.keyboard = { content: { rows } }
       list.list.push(item as T extends 'qq' ? SendQQMsg : FormData | SendGuildMsg)
     })
