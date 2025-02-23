@@ -29,21 +29,20 @@ export const onGroupAddRobot = (client: AdapterQQBot, event: GroupAddRobotEvent)
   const userId = event.d.op_member_openid
   const groupId = event.d.group_openid
   const contact = karin.contactGroup(groupId)
-  const sender = karin.groupSender(userId, '')
+  const sender = karin.groupSender(userId, 'unknown')
   const eventId = event.id
   const srcReply: SrcReply = (elements) => client.sendMsg(contact, [...elements, segment.pasmsg(eventId, 'event')])
 
   createGroupMemberAddNotice({
     contact,
     eventId,
-    userId,
-    selfId,
     sender,
     srcReply,
     bot: client,
     rawEvent: event,
-    time: event.d.timestamp
-  }, { operatorId: userId, targetId: selfId, type: 'invite' })
+    time: event.d.timestamp,
+    content: { operatorId: userId, targetId: selfId, type: 'invite' }
+  })
 }
 
 /**
@@ -56,21 +55,20 @@ export const onGroupDelRobot = (client: AdapterQQBot, event: GroupDelRobotEvent)
   const userId = event.d.op_member_openid
   const groupId = event.d.group_openid
   const contact = karin.contactGroup(groupId)
-  const sender = karin.groupSender(userId, '')
+  const sender = karin.groupSender(userId, 'unknown')
   const eventId = event.id
   const srcReply: SrcReply = (elements) => client.sendMsg(contact, [...elements, segment.pasmsg(eventId, 'event')])
 
   createGroupMemberDelNotice({
     contact,
     eventId,
-    userId,
-    selfId,
     sender,
     srcReply,
     bot: client,
     rawEvent: event,
-    time: event.d.timestamp
-  }, { operatorId: userId, targetId: selfId, type: 'kick' })
+    time: event.d.timestamp,
+    content: { operatorId: userId, targetId: selfId, type: 'kick' }
+  })
 }
 
 /**
@@ -111,14 +109,13 @@ export const onFriendAdd = (client: AdapterQQBot, event: FriendAddEvent) => {
   createFriendIncreaseNotice({
     contact,
     eventId,
-    userId,
-    selfId,
     sender,
     srcReply,
     bot: client,
     rawEvent: event,
-    time: event.d.timestamp
-  }, { targetId: selfId })
+    time: event.d.timestamp,
+    content: { targetId: selfId }
+  })
 }
 
 /**
@@ -137,14 +134,13 @@ export const onFriendDel = (client: AdapterQQBot, event: FriendDelEvent) => {
   createFriendDecreaseNotice({
     contact,
     eventId,
-    userId,
-    selfId,
     sender,
     srcReply,
     bot: client,
     rawEvent: event,
-    time: event.d.timestamp
-  }, { targetId: selfId })
+    time: event.d.timestamp,
+    content: { targetId: selfId }
+  })
 }
 
 /**

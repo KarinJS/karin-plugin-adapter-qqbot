@@ -10,10 +10,10 @@ import type {
 } from '@/core/api/types'
 import type {
   LoggerLevel,
-  ButtonElementType,
-  KeyboardElementType,
-  MarkdownElementType,
-  MarkdownTplElementType,
+  ButtonElement,
+  KeyboardElement,
+  MarkdownElement,
+  MarkdownTplElement,
   SendMsgResults,
   Contact,
 } from 'node-karin'
@@ -44,13 +44,13 @@ export interface Grouping<T extends 'qq' | 'guild'> {
   /** 图片 QQ专属 */
   image: string[]
   /** 单行按钮 */
-  button: ButtonElementType[]
+  button: ButtonElement[]
   /** 多行按钮 */
-  keyboard: KeyboardElementType[]
+  keyboard: KeyboardElement[]
   /** markdown */
-  markdown: MarkdownElementType[]
+  markdown: MarkdownElement[]
   /** markdown模板 */
-  markdownTpl: MarkdownTplElementType[]
+  markdownTpl: MarkdownTplElement[]
   /** 频道专属 图片url */
   imageUrls: string[]
   /** 频道专属 图片file */
@@ -79,7 +79,7 @@ export abstract class AdapterQQBot extends AdapterBase {
     this.adapter.name = '@karinjs/qqbot'
     this.adapter.protocol = 'qqbot'
     this.adapter.platform = 'qq'
-    this.adapter.standard = 'unknown'
+    this.adapter.standard = 'other'
   }
 
   logger (level: LoggerLevel, ...args: any[]) {
@@ -164,6 +164,7 @@ export abstract class AdapterQQBot extends AdapterBase {
     return {
       messageId: '',
       message_id: '',
+      time: 0,
       messageTime: 0,
       rawData: []
     }

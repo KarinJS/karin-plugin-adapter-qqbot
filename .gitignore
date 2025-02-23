@@ -30,3 +30,5 @@ pnpm-workspace.yaml
 1.js
 src/test.ts
 src/apps/
+test.js
+dist

@@ -2,7 +2,7 @@ import { escapeMarkdown, getImageSize } from '@/utils/common'
 import { common, fileToUrl, segment } from 'node-karin'
 import type {
   Contact,
-  MarkdownTplElementType,
+  MarkdownTplElement,
   SendMsgResults
 } from 'node-karin'
 import type {
@@ -27,7 +27,7 @@ export interface RawMarkdown {
     type: 'guild',
     ctx: AdapterQQBotMarkdown,
     list: Grouping<'guild'>,
-    contact: Contact<'guild'>,
+    contact: Contact<'guild' | 'direct'>,
     pasmsg: (item: Options<'guild'>) => void,
     send: GuildSend
   ): Promise<SendMsgResults>
@@ -45,7 +45,7 @@ export interface RawMarkdown {
     type: 'qq',
     ctx: AdapterQQBotMarkdown,
     list: Grouping<'qq'>,
-    contact: Contact,
+    contact: Contact<'friend' | 'group'>,
     pasmsg: (item: Options<'qq'>) => void,
     send: QQSend
   ): Promise<SendMsgResults>
@@ -63,7 +63,7 @@ export const rawMarkdown: RawMarkdown = async <T extends 'qq' | 'guild'> (
   type: T,
   ctx: AdapterQQBotMarkdown,
   list: Grouping<T>,
-  contact: Contact<T extends 'qq' ? 'friend' | 'group' : 'guild'>,
+  contact: T extends 'qq' ? Contact<'friend' | 'group'> : Contact<'guild' | 'direct'>,
   pasmsg: (item: any) => void,
   send: T extends 'qq' ? QQSend : T extends 'guild' ? GuildSend : never
 ): Promise<SendMsgResults> => {
@@ -126,7 +126,7 @@ export const GraphicTemplateMarkdown: RawMarkdown = async <T extends 'qq' | 'gui
   type: T,
   ctx: AdapterQQBotMarkdown,
   list: Grouping<T>,
-  contact: Contact<T extends 'qq' ? 'friend' | 'group' : 'guild'>,
+  contact: T extends 'qq' ? Contact<'friend' | 'group'> : Contact<'guild' | 'direct'>,
   pasmsg: (item: any) => void,
   send: T extends 'qq' ? QQSend : T extends 'guild' ? GuildSend : never
 ): Promise<SendMsgResults> => {
@@ -144,18 +144,18 @@ export const GraphicTemplateMarkdown: RawMarkdown = async <T extends 'qq' | 'gui
     /**
      * @param content 文本内容
      */
-    (content: string): MarkdownTplElementType
+    (content: string): MarkdownTplElement
     /**
      * @param desc 图片描述
      * @param url 图片链接
      */
-    (desc: string, url: string): MarkdownTplElementType
+    (desc: string, url: string): MarkdownTplElement
     /**
      * @param content 文本内容
      * @param desc 图片描述
      * @param url 图片链接
      */
-    (content: string, desc: string, url: string): MarkdownTplElementType
+    (content: string, desc: string, url: string): MarkdownTplElement
   } = (content: string, desc?: string, url?: string) => {
     if (desc && url) {
       return segment.markdownTpl(id, [KV(0, content), KV(1, desc), KV(2, url)])

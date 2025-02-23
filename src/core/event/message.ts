@@ -19,7 +19,7 @@ export const onGroupMsg = (client: AdapterQQBotMarkdown | AdapterQQBotNormal, ev
   const selfId = client.selfId
   const userId = event.d.author.member_openid
   const contact = karin.contactGroup(event.d.group_id)
-  const sender = karin.groupSender(userId, '')
+  const sender = karin.groupSender(userId, 'unknown')
 
   const e = createGroupMessage({
     bot: client,
@@ -29,8 +29,6 @@ export const onGroupMsg = (client: AdapterQQBotMarkdown | AdapterQQBotNormal, ev
     messageSeq: 0,
     rawEvent: event,
     time: Number(event.d.timestamp),
-    userId,
-    selfId,
     contact,
     sender,
     srcReply: (elements) => client.srcReply(e, [...elements, segment.pasmsg(event.d.id)])
@@ -56,8 +54,6 @@ export const onFriendMsg = (client: AdapterQQBotMarkdown | AdapterQQBotNormal, e
     messageSeq: 0,
     rawEvent: event,
     time: Number(event.d.timestamp),
-    userId,
-    selfId,
     contact,
     sender,
     srcReply: (elements) => client.srcReply(e, [...elements, segment.pasmsg(event.d.id)])
@@ -73,7 +69,7 @@ export const onChannelMsg = (client: AdapterQQBotMarkdown | AdapterQQBotNormal, 
   const selfId = client.selfId
   const userId = event.d.author.id
   const contact = karin.contact('guild', event.d.guild_id, event.d.channel_id)
-  const sender = karin.groupSender(userId, event.d.author.username)
+  const sender = karin.groupSender(userId, 'unknown', event.d.author.username)
 
   const e = createGuildMessage({
     bot: client,
@@ -83,8 +79,6 @@ export const onChannelMsg = (client: AdapterQQBotMarkdown | AdapterQQBotNormal, 
     messageSeq: 0,
     rawEvent: event,
     time: Number(event.d.timestamp),
-    userId,
-    selfId,
     contact,
     sender,
     srcReply: (elements) => client.srcReply(e, [...elements, segment.pasmsg(event.d.id)])
@@ -110,8 +104,6 @@ export const onDirectMsg = (client: AdapterQQBotMarkdown | AdapterQQBotNormal, e
     messageSeq: 0,
     rawEvent: event,
     time: Number(event.d.timestamp),
-    userId,
-    selfId,
     contact,
     sender,
     srcGuildId: event.d.src_guild_id,

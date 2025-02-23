@@ -1,4 +1,4 @@
-import WebSocket from 'ws'
+import WebSocket from 'node-karin/ws'
 import { config } from '@/utils/config'
 import { logger } from 'node-karin'
 import { sign } from '../api/sign'

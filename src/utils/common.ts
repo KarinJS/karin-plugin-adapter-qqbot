@@ -5,7 +5,7 @@ import lodash from 'node-karin/lodash'
 import EventEmitter from 'node:events'
 import GetUrls from '@karinjs/geturls'
 import { encode, isSilk } from 'silk-wasm'
-import { ButtonElementType, common, ffmpeg, logger, segment, tempPath } from 'node-karin'
+import { ButtonElement, common, ffmpeg, logger, segment, tempPath } from 'node-karin'
 
 /**
  * 事件总线
@@ -160,7 +160,7 @@ export const silkEncode = async (file: string | Buffer): Promise<Buffer> => {
  */
 export const textToButton = (text: string, isC2C = false): {
   text: string,
-  buttons: ButtonElementType[]
+  buttons: ButtonElement[]
 } => {
   text = text.replace(/@everyone/g, 'everyone').replace(/\n/g, '\r')
   if (isC2C) text = text.replace(/<qqbot-at-user id=".+" \/>/gm, '').replace(/<@.+>/gm, '')
@@ -169,7 +169,7 @@ export const textToButton = (text: string, isC2C = false): {
     return { text, buttons: [] }
   }
 
-  const buttons: ButtonElementType[] = []
+  const buttons: ButtonElement[] = []
   urls.forEach((url, index) => {
     text = text.replace(new RegExp(url, 'g'), `[请点击 按钮${index} 查看]`)
     buttons.push(segment.button({ text: `${index}. ${url}`, link: url }))
