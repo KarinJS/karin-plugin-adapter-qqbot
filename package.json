@@ -26,7 +26,7 @@
     "build": "tsc && tsup",
     "pr": "node lib/cli/pr.js",
     "pub": "npm publish --access public",
-    "pub-beta": "",
+    "pub-beta": "npm publish --tag beta",
     "sort": "npx sort-package-json",
     "dev": "tsx src/index.ts",
     "karin": "karin"
