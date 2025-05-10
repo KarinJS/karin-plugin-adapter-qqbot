@@ -1,9 +1,9 @@
 import FormData from 'form-data'
 import { handleUrl, qrs } from '@/utils/common'
-import { common, fileToUrl, } from 'node-karin'
+import { common, fileToUrl } from 'node-karin'
 import { AdapterQQBot } from '@/core/adapter/adapter'
 import { SendGuildMsg, SendQQMsg } from '@/core/api/types'
-import type { Contact, ElementTypes, Message, SendMsgResults, } from 'node-karin'
+import type { Contact, ElementTypes, Message, SendMsgResults } from 'node-karin'
 
 /** 正常发送消息 */
 export class AdapterQQBotNormal extends AdapterQQBot {

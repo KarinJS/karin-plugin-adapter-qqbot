@@ -6,15 +6,13 @@ import { SendGuildMsg, SendQQMsg } from '@/core/api/types'
 import type { QQBotApi } from '@/core/api'
 import type { Contact, ElementTypes, Message, SendMsgResults } from 'node-karin'
 import type { RawMarkdown } from '@/core/adapter/handler'
-import type { Config } from '@/types/config'
-
-type Cfg = Config[string]
+import type { QQBotConfig } from '@/types/config'
 
 /** markdown */
 export class AdapterQQBotMarkdown extends AdapterQQBot {
-  _config: Cfg
+  _config: QQBotConfig
   markdown: RawMarkdown
-  constructor (QQBot: QQBotApi, markdown: RawMarkdown, config: Cfg) {
+  constructor (QQBot: QQBotApi, markdown: RawMarkdown, config: QQBotConfig) {
     super(QQBot)
     this.markdown = markdown
     this._config = config

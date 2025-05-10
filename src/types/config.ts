@@ -1,5 +1,5 @@
 /** markdown */
-type Markdown = {
+interface Markdown {
   /** markdown模式 */
   mode: 0 | 1 | 3 | 4 | 5
   /** 模板ID */
@@ -8,8 +8,10 @@ type Markdown = {
   kv: string[]
 }
 
-/** `config.yaml` 文件的类型定义 */
-export type Config = Record<string, {
+/**
+ * 单个qqbot配置
+ */
+export interface QQBotConfig {
   /** 机器人ID */
   appId: string
   /** 机器人密钥 */
@@ -41,13 +43,14 @@ export type Config = Record<string, {
   }[]
   /** 事件接收配置 */
   event: {
-    /** 接收方式 0-关闭 1-webhook 2-http 3-ws */
-    type: 0 | 1 | 2 | 3
+    /** 接收方式 0-关闭 1-webhook 2-ws */
+    type: 0 | 1 | 2
     /** ws服务器地址 */
     wsUrl: string
     /** ws服务器鉴权token */
     wsToken: string
-    /** http鉴权token */
-    httpToken: string
   }
-}>
+}
+
+/** `config.json` 文件的类型定义 */
+export type Config = QQBotConfig[]

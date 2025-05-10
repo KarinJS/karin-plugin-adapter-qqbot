@@ -1,26 +1,27 @@
-import { sign } from '../api/sign'
+import { sign } from '@/core/api/sign'
 import { logger } from 'node-karin'
-import { config } from '@/utils/config'
-import { Request, Response } from 'express'
+import { getConfig } from '@/utils/config'
 import { event, fakeEvent } from '@/utils/common'
+import { RequestHandler } from 'node-karin/express'
+
+import type { Request, Response } from 'express'
 
 /**
- * webhook
+ * 端到端webhook路由
  * @param req 请求
  * @param res 响应
  */
-export const webhook = async (req: Request, res: Response, fnc: Function) => {
+export const webhookRouting: RequestHandler = async (req, res) => {
   const data = await checkAppid(req, res)
   if (!data) return
-  if (!fnc(req)) return
 
-  const api = config()[data.appid]
-  if (!api) {
+  const cfg = getConfig(data.appid)
+  if (!cfg) {
     logger.error(`[配置错误][${data.appid}] 配置文件中未找到对应的appid，请检查配置文件`)
     return
   }
 
-  if (api.event.type !== 1) {
+  if (cfg.event.type !== 1) {
     logger.error(`[配置错误][${data.appid}] webhook未启用，请检查配置文件`)
     return
   }
@@ -35,7 +36,7 @@ export const webhook = async (req: Request, res: Response, fnc: Function) => {
       return
     }
 
-    const signature = sign(api.secret, eventTs, plainToken)
+    const signature = sign(cfg.secret, eventTs, plainToken)
     logger.mark(`[signature][${data.appid}] ${signature}`)
     res.setHeader('Content-Type', 'application/json')
     res.status(200).end(JSON.stringify({ plain_token: plainToken, signature }))
@@ -44,7 +45,7 @@ export const webhook = async (req: Request, res: Response, fnc: Function) => {
 
   /** 非回调事件 进行鉴权验证 */
   const ed25519 = req.headers['x-signature-ed25519']
-  const signature = sign(api.secret, req.headers['x-signature-timestamp'] as string, data.rawBody)
+  const signature = sign(cfg.secret, req.headers['x-signature-timestamp'] as string, data.rawBody)
   if (ed25519 !== signature) {
     fakeEvent(`签名验证失败:\nappid: ${data.appid}\ned25519: ${ed25519}\n实际签名: ${signature}\nbody: ${data.rawBody}`)
     return

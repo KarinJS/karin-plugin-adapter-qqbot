@@ -1,8 +1,8 @@
 import { segment } from 'node-karin'
-import { config } from '@/utils/config'
-import { EventEnum } from '@/core/event/types'
+import { getConfig } from '@/utils/config'
+import { EventEnum } from '@/types/event'
 import type { ElementTypes } from 'node-karin'
-import type { DirectMsgEvent, GuildMsgEvent, C2CMsgEvent, GroupMsgEvent, GuildUser } from './types'
+import type { DirectMsgEvent, GuildMsgEvent, C2CMsgEvent, GroupMsgEvent, GuildUser } from '../../types/event'
 
 /**
  * QQBot群、私聊转karin消息端
@@ -51,10 +51,12 @@ export const QQBotConvertKarin = (
       const name = mentions[id]?.username || ''
       elements.push(segment.at(id === subBotID ? appid : id, name))
     } else {
-      const regex = config()?.[appid]?.regex || []
-      for (const r of regex) {
-        const reg = r.reg instanceof RegExp ? r.reg : new RegExp(r.reg)
-        v = v.trim().replace(reg, r.rep)
+      const cfg = getConfig(appid)
+      if (cfg?.regex) {
+        for (const r of cfg.regex) {
+          const reg = r.reg instanceof RegExp ? r.reg : new RegExp(r.reg)
+          v = v.trim().replace(reg, r.rep)
+        }
       }
       elements.push(segment.text(v))
     }

@@ -3,7 +3,7 @@ import { common, fileToUrl, segment } from 'node-karin'
 import type {
   Contact,
   MarkdownTplElement,
-  SendMsgResults
+  SendMsgResults,
 } from 'node-karin'
 import type {
   QQSend,

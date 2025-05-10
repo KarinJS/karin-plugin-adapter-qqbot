@@ -6,7 +6,7 @@ import {
   createGroupMemberAddNotice,
   createGroupMemberDelNotice,
   createFriendIncreaseNotice,
-  createFriendDecreaseNotice
+  createFriendDecreaseNotice,
 } from 'node-karin'
 import type {
   GroupAddRobotEvent,
@@ -17,7 +17,7 @@ import type {
   FriendDelEvent,
   C2CMsgRejectEvent,
   C2CMsgReceiveEvent,
-} from './types'
+} from '../../types/event'
 
 /**
  * 机器人加入群聊事件
@@ -41,7 +41,7 @@ export const onGroupAddRobot = (client: AdapterQQBot, event: GroupAddRobotEvent)
     bot: client,
     rawEvent: event,
     time: event.d.timestamp,
-    content: { operatorId: userId, targetId: selfId, type: 'invite' }
+    content: { operatorId: userId, targetId: selfId, type: 'invite' },
   })
 }
 
@@ -67,7 +67,7 @@ export const onGroupDelRobot = (client: AdapterQQBot, event: GroupDelRobotEvent)
     bot: client,
     rawEvent: event,
     time: event.d.timestamp,
-    content: { operatorId: userId, targetId: selfId, type: 'kick' }
+    content: { operatorId: userId, targetId: selfId, type: 'kick' },
   })
 }
 
@@ -114,7 +114,7 @@ export const onFriendAdd = (client: AdapterQQBot, event: FriendAddEvent) => {
     bot: client,
     rawEvent: event,
     time: event.d.timestamp,
-    content: { targetId: selfId }
+    content: { targetId: selfId },
   })
 }
 
@@ -139,7 +139,7 @@ export const onFriendDel = (client: AdapterQQBot, event: FriendDelEvent) => {
     bot: client,
     rawEvent: event,
     time: event.d.timestamp,
-    content: { targetId: selfId }
+    content: { targetId: selfId },
   })
 }
 

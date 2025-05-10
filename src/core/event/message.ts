@@ -8,7 +8,7 @@ import {
 
 import type { AdapterQQBotNormal } from '../adapter/normal'
 import type { AdapterQQBotMarkdown } from '../adapter/markdown'
-import type { C2CMsgEvent, DirectMsgEvent, GroupMsgEvent, GuildMsgEvent } from './types'
+import type { C2CMsgEvent, DirectMsgEvent, GroupMsgEvent, GuildMsgEvent } from '../../types/event'
 
 /**
  * 创建群消息事件

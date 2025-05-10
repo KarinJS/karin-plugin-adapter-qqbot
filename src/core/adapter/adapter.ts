@@ -6,10 +6,10 @@ import type {
   SendGuildMsg,
   SendGuildResponse,
   SendQQMsg,
-  SendQQMsgResponse
+  SendQQMsgResponse,
 } from '@/core/api/types'
 import type {
-  LoggerLevel,
+  LogMethodNames,
   ButtonElement,
   KeyboardElement,
   MarkdownElement,
@@ -71,6 +71,10 @@ export interface Grouping<T extends 'qq' | 'guild'> {
   markdownToButton: (type: T, list: Grouping<T>) => void
 }
 
+/**
+ * @adaoter QQBot
+ * @version 1.8.0
+ */
 export abstract class AdapterQQBot extends AdapterBase {
   public super: QQBotApi
   constructor (QQBot: QQBotApi) {
@@ -82,7 +86,7 @@ export abstract class AdapterQQBot extends AdapterBase {
     this.adapter.standard = 'other'
   }
 
-  logger (level: LoggerLevel, ...args: any[]) {
+  logger (level: LogMethodNames, ...args: any[]) {
     logger.bot(level, this.selfId, ...args)
   }
 
@@ -151,7 +155,7 @@ export abstract class AdapterQQBot extends AdapterBase {
       markdownToButton: (
         type: T,
         list: Grouping<T>
-      ) => this.markdownToButton(type, list)
+      ) => this.markdownToButton(type, list),
     }
 
     return list
@@ -166,7 +170,7 @@ export abstract class AdapterQQBot extends AdapterBase {
       message_id: '',
       time: 0,
       messageTime: 0,
-      rawData: []
+      rawData: [],
     }
   }
 
@@ -221,11 +225,11 @@ export abstract class AdapterQQBot extends AdapterBase {
       const item = type === 'guild'
         ? this.super.GuildMsgOptions('markdown', {
           custom_template_id: v.templateId,
-          params: v.params
+          params: v.params,
         })
         : this.super.QQdMsgOptions('markdown', {
           custom_template_id: v.templateId,
-          params: v.params
+          params: v.params,
         })
       if (rows.length) item.keyboard = { content: { rows } }
       list.list.push(item as T extends 'qq' ? SendQQMsg : FormData | SendGuildMsg)
