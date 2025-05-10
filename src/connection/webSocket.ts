@@ -20,7 +20,7 @@ export const createWebSocketConnection = (
 
   const appid = config.appId
   const url = config.event.wsUrl
-  const headers = { 'x-bot-appid': appid, authorization: config.secret }
+  const headers = { 'x-bot-appid': appid, authorization: config.event.wsToken }
   const socket = new WebSocket(url, { headers })
 
   /**

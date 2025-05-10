@@ -7,6 +7,7 @@
     "outDir": "./lib",
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
+    "noEmit": true,
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
@@ -15,7 +16,7 @@
       ],
     },
     "types": [
-      "@types/node"
+      "node"
     ],
     "rootDir": "./src",
     "declaration": true,

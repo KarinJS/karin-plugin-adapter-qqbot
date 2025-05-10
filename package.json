@@ -51,7 +51,7 @@
   "karin": {
     "main": "src/index.ts",
     "apps": [
-      "lib/apps"
+      "dist/apps"
     ],
     "ts-apps": [
       "src/apps"
@@ -63,6 +63,8 @@
       "config",
       "data",
       "resources"
-    ]
+    ],
+    "ts-web": "src/web.config.ts",
+    "web": "dist/web.config.js"
   }
 }

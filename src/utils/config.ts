@@ -22,8 +22,10 @@ export const pkg = () => requireFileSync(`${dirPath}/package.json`)
 const pluginName = pkg().name.replace(/\//g, '-')
 /** 用户配置 */
 const dirConfig = `${basePath}/${pluginName}/config`
-fs.mkdirSync(dirConfig, { recursive: true })
-fs.writeFileSync(`${dirConfig}/config.json`, JSON.stringify([], null, 2))
+if (!fs.existsSync(dirConfig)) {
+  fs.mkdirSync(dirConfig, { recursive: true })
+  fs.writeFileSync(`${dirConfig}/config.json`, JSON.stringify([], null, 2))
+}
 
 /**
  * @description 配置文件
@@ -46,6 +48,14 @@ export const config = (): Config => {
  */
 export const getConfig = (appid: string) => {
   return cacheMap[appid]
+}
+
+/**
+ * 写入配置
+ * @param config 配置
+ */
+export const writeConfig = (config: Config) => {
+  fs.writeFileSync(`${dirConfig}/config.json`, JSON.stringify(config, null, 2))
 }
 
 /**
@@ -80,8 +90,8 @@ export const getDefaultConfig = (): Config => [
   {
     appId: '',
     secret: '',
-    prodApi: '',
-    sandboxApi: '',
+    prodApi: 'https://api.sgroup.qq.com',
+    sandboxApi: 'https://sandbox.api.sgroup.qq.com',
     tokenApi: '',
     sandbox: false,
     qqEnable: true,
@@ -91,7 +101,7 @@ export const getDefaultConfig = (): Config => [
     regex: [
       {
         reg: '^/',
-        rep: '',
+        rep: '#',
       },
     ],
     markdown: {
