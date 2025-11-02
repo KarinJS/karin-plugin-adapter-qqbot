@@ -13,6 +13,9 @@ const logMethods = {
 
 /** 
  * QQBot日志函数
+ * 支持两种调用方式：
+ * 1. log('info', '消息') - 传入日志级别和参数
+ * 2. log.info('消息') - 直接调用方法
  * @param level 日志级别
  * @param args 日志参数
  */

@@ -105,7 +105,7 @@ const createClient = (cfg: QQBotConfig, api: QQBotApi): AdapterQQBotNormal | Ada
 export const createEvent = (
   client: AdapterQQBotNormal | AdapterQQBotMarkdown,
   event: Event
-) => {
+): void => {
   switch (event.t) {
     case EventEnum.GROUP_AT_MESSAGE_CREATE:
       return onGroupMsg(client, event)
@@ -122,5 +122,6 @@ export const createEvent = (
       return onGroupDelRobot(client, event)
     default:
       logger.error(`未知事件类型: ${JSON.stringify(event)}`)
+      return
   }
 }
