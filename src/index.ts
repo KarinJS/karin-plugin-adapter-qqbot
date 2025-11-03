@@ -1,7 +1,6 @@
-import '@/core/index'
 import { logger } from 'node-karin'
 import { basename, config } from '@/utils'
-import { initQQBotAdapter } from '@/core'
+import { initQQBotAdapter } from '@/core/index'
 import { createRouting } from '@/connection/routing'
 import type { AdapterQQBot } from '@/core/adapter/adapter'
 

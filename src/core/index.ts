@@ -77,22 +77,22 @@ export const createBot = async (bot: QQBotConfig) => {
  */
 const createClient = (cfg: QQBotConfig, api: QQBotApi): AdapterQQBotNormal | AdapterQQBotMarkdown => {
   const mode = Number(cfg.markdown?.mode) || 0
-  
+
   // 模式 0: 正常模式
   if (mode === 0) {
     return new AdapterQQBotNormal(api)
   }
-  
+
   // 模式 1: 原生Markdown
   if (mode === 1) {
     return new AdapterQQBotMarkdown(api, rawMarkdown, cfg)
   }
-  
+
   // 模式 3/4/5: 图文模板Markdown
   if (mode >= 3 && mode <= 5) {
     return new AdapterQQBotMarkdown(api, GraphicTemplateMarkdown, cfg)
   }
-  
+
   // 默认返回正常模式
   return new AdapterQQBotNormal(api)
 }
@@ -122,6 +122,5 @@ export const createEvent = (
       return onGroupDelRobot(client, event)
     default:
       logger.error(`未知事件类型: ${JSON.stringify(event)}`)
-      return
   }
 }

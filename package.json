@@ -33,13 +33,13 @@
     "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
-    "@types/express": "5.0.1",
+    "@types/express": "5.0.5",
     "@types/form-data": "^2.5.2",
     "@types/node": "^20.17.19",
     "@types/qrcode": "^1.5.5",
     "eslint": "^9.21.0",
     "neostandard": "^0.12.1",
-    "node-karin": "^1.8.13",
+    "node-karin": "^1.12.2",
     "tsup": "^8.3.6",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3"

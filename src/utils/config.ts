@@ -22,17 +22,17 @@ export const pkg = () => requireFileSync(`${dirPath}/package.json`)
 const pluginName = pkg().name.replace(/\//g, '-')
 /** 用户配置 */
 const dirConfig = `${basePath}/${pluginName}/config`
-if (!fs.existsSync(dirConfig)) {
-  fs.mkdirSync(dirConfig, { recursive: true })
-  fs.writeFileSync(`${dirConfig}/config.json`, JSON.stringify([], null, 2))
-}
 
 /**
  * @description 配置文件
- */
+*/
 export const config = (): Config => {
+  const cfgPath = `${dirConfig}/config.json`
+  if (!fs.existsSync(cfgPath)) {
+    fs.writeFileSync(cfgPath, JSON.stringify([], null, 2))
+  }
   if (cache) return cache
-  const user = requireFileSync<Config>(`${dirConfig}/config.json`)
+  const user = requireFileSync<Config>(cfgPath)
   const result = formatConfig(user)
   cache = result
   result.forEach(v => {

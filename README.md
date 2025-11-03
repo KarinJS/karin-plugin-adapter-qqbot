@@ -167,18 +167,23 @@ accounts:
 ### 发送模式说明
 
 #### 模式 0：直接发送（推荐）
+
 最简单的模式，直接发送纯文本和图片消息。
 
 #### 模式 1：原生 Markdown
+
 使用 QQ 官方的原生 Markdown 格式发送消息。
 
 #### 模式 3：旧图文模板 Markdown
+
 使用旧版图文混排模板，适合需要复杂排版的场景。
 
 #### 模式 4：纯文模板 Markdown
+
 使用纯文本模板，支持多个文本字段。
 
 #### 模式 5：自定义处理
+
 完全自定义消息处理逻辑。
 
 ## 开发指南
@@ -282,6 +287,7 @@ await bot.recallMsg(e.contact, messageId)
 ### Q: Webhook 地址配置后没有收到消息？
 
 A: 请检查：
+
 1. 服务器防火墙是否开放对应端口
 2. QQ 开放平台的 Webhook 地址是否配置正确
 3. 查看日志是否有签名验证失败的错误
@@ -315,5 +321,6 @@ A: 前往 [QQ 开放平台](https://bot.q.qq.com/) 创建机器人后即可获�
 ## 技术支持
 
 如有问题，请通过以下方式获取帮助：
+
 - 提交 [GitHub Issue](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues)
 - 加入 Karin 开发者社群
