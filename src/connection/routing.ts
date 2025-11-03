@@ -4,18 +4,10 @@ import { webhookRouting } from './webhook'
 
 /**
  * 初始化路由
+ * 创建 /qqbot/webhook 路由用于接收QQ机器人事件
  */
 export const createRouting = () => {
-  /** 基本路由 */
-  const BASE_ROUTES = '/qqbot'
-  /**
-   * webhook 路由
-   * - tx -> bot/webhook
-   */
-  const WEBHOOK_ROUTES = '/webhook'
-
-  /** 创建路由 */
   const router = express.Router()
-  router.use(WEBHOOK_ROUTES, webhookRouting)
-  app.use(BASE_ROUTES, router)
+  router.use('/webhook', webhookRouting)
+  app.use('/qqbot', router)
 }

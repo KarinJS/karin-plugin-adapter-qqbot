@@ -106,33 +106,30 @@ export abstract class AdapterQQBot extends AdapterBase {
    * 撤回消息
    * @param contact 联系人
    * @param messageId 消息id
-   * @returns 撤回结果
    */
-  async recallMsg (contact: Contact, messageId: string) {
+  async recallMsg (contact: Contact, messageId: string): Promise<void> {
     try {
       if (contact.scene === 'friend') {
         await this.super.recallMsg('user', contact.peer, messageId)
-        return true
+        return
       }
 
       if (contact.scene === 'group') {
         await this.super.recallMsg('group', contact.peer, messageId)
-        return true
+        return
       }
 
       if (contact.scene === 'direct') {
         await this.super.recallMsg('dms', contact.peer, messageId)
-        return true
+        return
       }
 
       if (contact.scene === 'guild') {
         await this.super.recallMsg('channels', contact.peer, messageId)
-        return true
+        return
       }
-
-      return true
-    } catch {
-      return false
+    } catch (error) {
+      logger.error('撤回消息失败:', error)
     }
   }
 
