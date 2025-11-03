@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.3.0...v1.3.1) (2025-11-03)
+
+
+### Bug Fixes
+
+* 更新ci ([40738e4](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/40738e415ee81a18b87773cb33675585eac6765f))
+
 ## [1.3.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.10...v1.3.0) (2025-11-03)
 
 
