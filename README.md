@@ -875,6 +875,77 @@ proxy_request_buffering off;
 }
 ```
 
+#### 问题5：LC Webhook-Proxy 连接失败
+
+**症状**：日志显示 "lc webhook-proxy WebSocket连接已断开"
+
+**检查清单：**
+- [ ] `apiUrl` 配置正确（不要包含 `/qqbot/` 路径）
+- [ ] `accessToken` 正确（从 webhook-proxy CLI 获取）
+- [ ] webhook-proxy 服务正常运行
+- [ ] 网络可以访问 webhook-proxy
+
+**排查命令：**
+```bash
+# 测试 webhook-proxy 服务
+curl https://your-webhook-proxy.workers.dev/health
+
+# 查看 proxy 状态
+webhook-proxy list
+
+# 检查配置
+webhook-proxy config show
+```
+
+**常见错误：**
+1. **apiUrl 配置错误**：
+   ```json
+   // ❌ 错误
+   "apiUrl": "https://webhook-proxy.workers.dev/qqbot"
+   
+   // ✅ 正确
+   "apiUrl": "https://webhook-proxy.workers.dev"
+   ```
+
+2. **accessToken 过期或错误**：
+   - 重新运行 `webhook-proxy proxy create` 获取新的 token
+   - 确保复制了完整的 token（以 `proxy_` 开头）
+
+3. **WebSocket 协议错误**：
+   - 适配器会自动将 `https://` 转换为 `wss://`
+   - 确保 webhook-proxy 支持 WebSocket 连接
+
+**详细故障排查**：请查看 [LC_WEBHOOK_PROXY.md](./LC_WEBHOOK_PROXY.md#故障排查)
+
+#### 问题6：LC Webhook-Proxy 签名验证失败
+
+**症状**：日志显示 "lc webhook-proxy 签名验证失败"
+
+**可能原因：**
+- Karin 配置的 `secret` 与 webhook-proxy proxy 的 `webhook_secret` 不一致
+- webhook-proxy 未启用签名验证
+
+**解决方案：**
+```bash
+# 1. 查看当前 proxy 配置
+webhook-proxy list
+
+# 2. 确认 webhook_secret 与 Karin 的 secret 一致
+# 如果不一致，需要重新创建 proxy：
+webhook-proxy proxy delete <proxy-id>
+webhook-proxy proxy create
+# 创建时确保填入正确的 secret
+
+# 3. 更新 Karin 配置
+# 确保 config.json 中的 secret 与 webhook-proxy 一致
+```
+```json
+{
+  "guildEnable": true,
+  "guildMode": 1  // 私域机器人使用1
+}
+```
+
 ### 第十二步：进阶配置
 
 #### 多机器人配置
@@ -950,6 +1021,7 @@ proxy_request_buffering off;
 - [Karin 框架](https://github.com/KarinJS/Karin)
 - [QQ 机器人开放平台](https://bot.q.qq.com/)
 - [QQ 机器人开发文档](https://bot.q.qq.com/wiki/)
+- [LC Webhook-Proxy 项目](https://github.com/lc-cn/webhook-proxy) - 用于实现 type: 3 中转功能
 
 ## 技术支持
 
