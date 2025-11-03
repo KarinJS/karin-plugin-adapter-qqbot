@@ -33,118 +33,522 @@ npm install @karinjs/adapter-qqbot
 yarn add @karinjs/adapter-qqbot
 ```
 
-## 配置指南
+## 快速开始
 
-### 1. 创建配置文件
+### 前置要求
 
-在 `config/plugin/@karinjs/adapter-qqbot/` 目录下创建 `config.yaml` 文件。
+- 已安装并配置好 [Karin 框架](https://github.com/KarinJS/Karin)
+- Node.js >= 16
+- 有QQ开放平台的机器人应用
 
-### 2. 基本配置示例
+### 5分钟快速配置
 
-```yaml
-# 全局默认配置 - 以下所有配置均可在账号配置中单独覆盖
-default:
-  # 获取调用凭证的API地址
-  accessTokenApi: https://bots.qq.com/app/getAppAccessToken
-  # 沙盒环境API地址
-  sandBoxApi: https://sandbox.api.sgroup.qq.com
-  # 正式环境API地址
-  qqBotApi: https://api.sgroup.qq.com
-  # 机器人发送模式
-  # 0 - 直接发送（默认）
-  # 1 - 原生Markdown
-  # 3 - 旧图文模板Markdown
-  # 4 - 纯文模板Markdown
-  # 5 - 自定义处理
-  sendMode: 0
-  # 是否开启沙盒环境（开发测试用）
-  sandBox: false
-  # 是否启用频道机器人（暂未完全适配）
-  guild: false
-  # 频道机器人模式
-  # 0 - 公域机器人
-  # 1 - 私域机器人
-  guildMode: 0
+1. **安装插件**
+   ```bash
+   pnpm add @karinjs/adapter-qqbot -w
+   ```
 
-  # Markdown模板ID（仅在sendMode为3或4时有效）
-  templateId: ""
+2. **获取机器人信息**
+   - 访问 [QQ开放平台](https://bot.q.qq.com/)
+   - 创建机器人应用，获取 AppID 和 Secret
 
-  # 旧图文模板Markdown配置
-  oldTemplate:
-    textStartKey: text_start  # 开头文字键名
-    imgDescKey: img_dec       # 图片描述键名
-    imgUrlKey: img_url        # 图片地址键名
-    textEndKey: text_end      # 结尾文字键名
+3. **创建配置**
+   ```json
+   [
+     {
+       "appId": "你的AppID",
+       "secret": "你的Secret",
+       "event": { "type": 1 }
+     }
+   ]
+   ```
 
-  # 纯文模板Markdown配置（可配置的文本字段）
-  textTemplate:
-    - text_0
-    - text_1
-    - text_2
-    - text_3
-    - text_4
-    - text_5
-    - text_6
-    - text_7
-    - text_8
-    - text_9
+4. **配置回调地址**
+   - 在QQ开放平台设置**统一**回调地址：`https://你的域名/qqbot/webhook`
+   - **必须使用HTTPS协议**，端口必须为443（默认HTTPS端口）
+   - 该地址接收所有事件：群聊、C2C私聊、频道消息等
 
-  # URL转二维码白名单
-  # 配置后这些URL将不会被转换为二维码
-  exclude: []
-  
-  # 消息文本正则表达式处理
-  # 接收到消息后对文本进行处理
-  regex:
-    - reg: "^#"    # 正则表达式
-      rep: ""      # 替换为的内容
+5. **启动服务**
+   ```bash
+   npm start
+   ```
 
-# 账号配置列表
-accounts:
-  # 账号配置示例（可以配置多个账号）
-  default:
-    # 机器人ID（必填，必须为字符串）
-    appId: "123456789"
-    # 机器人密钥（必填）
-    secret: "your_bot_secret_here"
-    # 机器人发送模式（可选，会覆盖全局配置）
-    sendMode: 0
-    # URL转二维码白名单（可选，优先级高于全局配置）
-    exclude: []
-    # 消息文本正则处理（可选，优先级高于全局配置）
-    regex: []
+完成！现在可以邀请机器人到群聊测试了。
+
+## 详细配置指南
+
+### 第一步：获取机器人凭证
+
+1. 访问 [QQ开放平台](https://bot.q.qq.com/)
+2. 登录并创建新的机器人应用
+3. 获取 `AppID` 和 `Secret`
+4. 记录这些信息，后续配置需要用到
+
+### 第二步：创建配置文件
+
+配置文件位置：`@karinjs/@karinjs-adapter-qqbot/config/config.json`
+
+如果文件不存在，插件会自动创建一个空的配置文件。
+
+### 第三步：基本配置
+
+#### 最简配置示例
+
+```json
+[
+  {
+    "appId": "你的机器人AppID",
+    "secret": "你的机器人Secret"
+  }
+]
 ```
 
-### 3. Webhook 配置示例
+#### 完整配置示例
 
-如果使用 Webhook 方式接收事件：
-
-```yaml
-accounts:
-  bot1:
-    appId: "123456789"
-    secret: "your_secret"
-    # 事件配置
-    event:
-      type: 1  # 1表示使用Webhook
+```json
+[
+  {
+    "appId": "你的机器人AppID",
+    "secret": "你的机器人Secret",
+    "prodApi": "https://api.sgroup.qq.com",
+    "sandboxApi": "https://sandbox.api.sgroup.qq.com",
+    "tokenApi": "",
+    "sandbox": false,
+    "qqEnable": true,
+    "guildEnable": true,
+    "guildMode": 0,
+    "exclude": [],
+    "regex": [
+      {
+        "reg": "^/",
+        "rep": "#"
+      }
+    ],
+    "markdown": {
+      "mode": 0,
+      "id": "",
+      "kv": [
+        "text_start",
+        "img_dec", 
+        "img_url",
+        "text_end"
+      ]
+    },
+    "event": {
+      "type": 1,
+      "wsUrl": "",
+      "wsToken": ""
+    }
+  }
+]
 ```
 
-Webhook 地址为：`http://你的服务器地址:端口/qqbot/webhook`
+### 第四步：选择事件接收方式
 
-### 4. WebSocket 配置示例
+#### 方式一：Webhook（推荐）
 
-如果使用 WebSocket 方式（需要中转服务）：
+**适用场景：** 有公网IP或域名的服务器
 
-```yaml
-accounts:
-  bot1:
-    appId: "123456789"
-    secret: "your_secret"
-    event:
-      type: 2  # 2表示使用WebSocket
-      wsUrl: "wss://your-websocket-server/ws"
-      wsToken: "your_ws_token"
+1. 在配置文件中设置：
+```json
+{
+  "event": {
+    "type": 1
+  }
+}
 ```
+
+2. 在QQ开放平台配置回调地址：
+   - 回调地址格式：`https://你的域名/qqbot/webhook`
+   - 例如：`https://your-domain.com/qqbot/webhook`
+   - **⚠️ 重要限制：**
+     - 必须使用 **HTTPS** 协议
+     - 端口必须为 **443**（标准HTTPS端口）
+     - 不支持自定义端口（如:8080、:3000等）
+   
+> **重要说明：** 这是**统一的回调地址**，QQ开放平台会将所有配置的事件类型（群聊、C2C私聊、频道消息等）都发送到这个地址。您不需要为不同的消息类型配置不同的回调地址。
+
+#### 方式二：WebSocket
+
+**适用场景：** 内网环境，需要通过中转服务连接
+
+1. 在配置文件中设置：
+```json
+{
+  "event": {
+    "type": 2,
+    "wsUrl": "wss://your-websocket-server/ws",
+    "wsToken": "你的ws认证token"
+  }
+}
+```
+
+### 第五步：反向代理配置（重要）
+
+> **为什么需要反向代理？**
+> 
+> QQ开放平台对Webhook回调地址有严格要求：
+> - **必须使用HTTPS协议**（不支持HTTP）
+> - **端口必须为443**（标准HTTPS端口，不支持自定义端口）
+> - 必须有有效的SSL证书
+> 
+> 如果你的Karin服务运行在：
+> - 内网服务器（如家用电脑、局域网服务器）
+> - 云服务器的内网端口（如3000端口）
+> - Docker容器内部
+> 
+> 就需要通过反向代理将内网服务暴露到公网的443端口，并配置SSL证书。
+
+#### 反向代理的目标
+
+**反向代理要代理的地址：** `http://127.0.0.1:3000/qqbot/webhook`
+
+这是Karin QQBot适配器监听的统一webhook接收地址，用于接收**所有类型**的QQ机器人事件，包括：
+- 群聊消息（GROUP_AT_MESSAGE_CREATE）
+- C2C私聊消息（C2C_MESSAGE_CREATE）
+- 频道消息（GUILD_MESSAGE_CREATE）
+- 频道私信（DIRECT_MESSAGE_CREATE）
+- 其他机器人事件
+
+QQ开放平台会将所有配置的事件都发送到这个统一的回调地址，然后由适配器内部根据事件类型进行分发处理。
+
+#### 方案一：Nginx 反向代理（推荐）
+
+**1. 安装Nginx**
+```bash
+# Ubuntu/Debian
+sudo apt update && sudo apt install nginx
+
+# CentOS/RHEL
+sudo yum install nginx
+```
+
+**2. 创建配置文件**
+
+创建 `/etc/nginx/sites-available/karin-qqbot`：
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;  # 替换为你的域名或公网IP
+    
+    # QQ机器人webhook接收地址
+    location /qqbot/webhook {
+        # 代理到本地Karin服务
+        proxy_pass http://127.0.0.1:3000/qqbot/webhook;
+        
+        # 必要的代理头设置
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # 关键配置：保持原始请求体用于签名验证
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+        proxy_send_timeout 300;
+    }
+    
+    # 可选：为Karin的其他功能添加代理
+    location /karin/ {
+        proxy_pass http://127.0.0.1:3000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+**获取免费SSL证书（Let's Encrypt）：**
+
+```bash
+# 1. 安装certbot
+sudo apt update
+sudo apt install certbot python3-certbot-nginx
+
+# 2. 获取SSL证书（自动配置Nginx）
+sudo certbot --nginx -d your-domain.com
+
+# 3. 测试自动续期
+sudo certbot renew --dry-run
+
+# 4. 设置自动续期（可选）
+sudo crontab -e
+# 添加以下行：
+# 0 12 * * * /usr/bin/certbot renew --quiet
+```
+
+**手动配置SSL证书：**
+
+如果你有其他SSL证书提供商的证书，按以下格式配置：
+
+```nginx
+ssl_certificate /path/to/your/certificate.crt;      # 证书文件
+ssl_certificate_key /path/to/your/private.key;     # 私钥文件
+```
+
+**3. 启用配置**
+```bash
+# 创建软链接启用站点
+sudo ln -s /etc/nginx/sites-available/karin-qqbot /etc/nginx/sites-enabled/
+
+# 测试配置文件语法
+sudo nginx -t
+
+# 重载配置
+sudo systemctl reload nginx
+
+# 确保Nginx开机自启
+sudo systemctl enable nginx
+```
+
+**4. 配置HTTPS（必需）**
+
+> **⚠️ 重要：** QQ开放平台**强制要求**使用HTTPS协议和443端口，以下配置是**必需的**，不是可选的。
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+    
+    # SSL证书配置（使用Let's Encrypt免费证书）
+    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+    
+    # 如果没有SSL证书，可以使用以下命令获取Let's Encrypt免费证书：
+    # sudo apt install certbot python3-certbot-nginx
+    # sudo certbot --nginx -d your-domain.com
+    
+    # SSL优化配置
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers EECDH+AESGCM:EDH+AESGCM;
+    ssl_prefer_server_ciphers on;
+    
+    location /qqbot/webhook {
+        proxy_pass http://127.0.0.1:3000/qqbot/webhook;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # 保持原始请求体
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+}
+
+# HTTP自动跳转HTTPS（推荐配置）
+server {
+    listen 80;
+    server_name your-domain.com;
+    return 301 https://$server_name$request_uri;
+}
+```
+
+#### 方案二：宝塔面板配置
+
+**1. 创建网站**
+- 域名：填写你的域名
+- 根目录：可以是任意目录（不会用到）
+
+**2. 配置SSL证书（必需）**
+- 进入网站设置 → SSL
+- 申请Let's Encrypt免费证书或上传自有证书
+- 开启"强制HTTPS"
+
+**3. 添加反向代理**
+
+有两种配置方式，选择其一：
+
+**方式一：代理整个域名到Karin服务**
+- **代理名称：** Karin Service
+- **目标URL：** `http://127.0.0.1:3000`
+- **发送域名：** `$host`
+- **代理目录：** `/`
+
+**方式二：只代理webhook路径（推荐）**
+- **代理名称：** QQBot Webhook
+- **目标URL：** `http://127.0.0.1:3000/qqbot/webhook`
+- **发送域名：** `$host`
+- **代理目录：** `/qqbot/webhook`
+
+> **推荐使用方式一**，这样整个域名都会指向您的Karin服务，QQ开放平台访问 `https://your-domain.com/qqbot/webhook` 时会被代理到 `http://127.0.0.1:3000/qqbot/webhook`。
+
+**4. 高级设置**
+添加以下配置到反向代理的配置文件中：
+```nginx
+proxy_buffering off;
+proxy_request_buffering off;
+```
+
+> **重要提醒：** 确保网站已启用HTTPS并强制跳转，QQ开放平台只接受HTTPS协议的回调地址。
+
+#### 方案三：Caddy 服务器
+
+**1. 安装Caddy**
+```bash
+# 参考官方文档安装Caddy
+```
+
+**2. 创建Caddyfile**
+```caddy
+your-domain.com {
+    reverse_proxy /qqbot/webhook/* 127.0.0.1:3000
+    
+    # 自动HTTPS
+    tls {
+        on_demand
+    }
+}
+```
+
+#### 方案四：Cloudflare Tunnel（内网穿透）
+
+**适用场景：** 没有公网IP，通过Cloudflare暴露服务
+
+**1. 安装cloudflared**
+```bash
+# 下载并安装cloudflared
+wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i cloudflared-linux-amd64.deb
+```
+
+**2. 登录Cloudflare**
+```bash
+cloudflared tunnel login
+```
+
+**3. 创建隧道**
+```bash
+cloudflared tunnel create karin-qqbot
+```
+
+**4. 配置DNS**
+```bash
+cloudflared tunnel route dns karin-qqbot your-subdomain.your-domain.com
+```
+
+**5. 运行隧道**
+```bash
+cloudflared tunnel run --url http://localhost:3000 karin-qqbot
+```
+
+#### 方案五：frp 内网穿透
+
+**适用场景：** 使用自建或第三方frp服务
+
+**客户端配置 (frpc.ini):**
+```ini
+[common]
+server_addr = your-frp-server.com
+server_port = 7000
+token = your_token
+
+[karin-qqbot]
+type = http
+local_ip = 127.0.0.1
+local_port = 3000
+custom_domains = your-domain.com
+```
+
+### 第六步：QQ开放平台回调地址要求
+
+#### 官方限制条件
+
+QQ开放平台对Webhook回调地址有以下**强制要求**：
+
+| 要求项 | 限制 | 说明 |
+|--------|------|------|
+| **协议** | 必须HTTPS | 不支持HTTP协议 |
+| **端口** | 必须443 | 不支持自定义端口（如:8080、:3000等） |
+| **SSL证书** | 必须有效 | 需要被浏览器信任的证书 |
+| **域名** | 必须有域名 | 不支持IP地址直接访问 |
+| **响应时间** | 3秒内 | 超时会重试 |
+
+#### 正确的回调地址格式
+
+✅ **正确格式：**
+- `https://your-domain.com/qqbot/webhook`
+- `https://bot.your-company.com/qqbot/webhook`
+
+❌ **错误格式：**
+- `http://your-domain.com/qqbot/webhook` （不支持HTTP）
+- `https://your-domain.com:3000/qqbot/webhook` （不支持自定义端口）
+- `https://123.456.789.10/qqbot/webhook` （不支持IP地址）
+
+### 第七步：域名和防火墙配置
+
+#### 域名解析配置
+
+确保域名正确解析到你的服务器：
+```bash
+# 检查域名解析
+nslookup your-domain.com
+dig your-domain.com
+```
+
+#### 防火墙配置
+
+**Ubuntu/Debian (ufw):**
+```bash
+# 开放HTTP和HTTPS端口
+sudo ufw allow 80
+sudo ufw allow 443
+
+# 如果直接暴露端口
+sudo ufw allow 3000
+```
+
+**CentOS/RHEL (firewalld):**
+```bash
+# 开放端口
+sudo firewall-cmd --permanent --add-port=80/tcp
+sudo firewall-cmd --permanent --add-port=443/tcp
+sudo firewall-cmd --reload
+```
+
+**云服务器安全组：**
+- 阿里云：安全组规则添加入方向 80、443 端口
+- 腾讯云：防火墙规则添加入站 80、443 端口
+- AWS：Security Group 添加 HTTP、HTTPS 规则
+
+### 第九步：配置参数说明
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `appId` | 机器人ID（必填） | "" |
+| `secret` | 机器人密钥（必填） | "" |
+| `sandbox` | 是否使用沙盒环境 | false |
+| `qqEnable` | 是否启用QQ场景 | true |
+| `guildEnable` | 是否启用频道场景 | true |
+| `guildMode` | 频道模式（0公域，1私域） | 0 |
+| `event.type` | 事件接收方式（0关闭，1webhook，2ws） | 0 |
+
+#### Markdown 模式说明
+
+| 模式 | 说明 | 适用场景 |
+|------|------|----------|
+| 0 | 直接发送 | 简单文本和图片消息 |
+| 1 | 原生Markdown | 需要富文本格式 |
+| 3 | 旧图文模板 | 复杂图文混排 |
+| 4 | 纯文模板 | 多段文本消息 |
+| 5 | 自定义处理 | 完全自定义逻辑 |
+
+#### 支持的事件类型
+
+QQ机器人适配器通过统一的webhook地址接收以下事件类型：
+
+| 事件类型 | 说明 | 处理函数 |
+|---------|------|---------|
+| `GROUP_AT_MESSAGE_CREATE` | 群聊@机器人消息 | `onGroupMsg` |
+| `C2C_MESSAGE_CREATE` | C2C私聊消息 | `onFriendMsg` |
+| `GUILD_MESSAGE_CREATE` | 频道消息 | `onChannelMsg` |
+| `DIRECT_MESSAGE_CREATE` | 频道私信 | `onDirectMsg` |
+
+所有这些事件都通过同一个回调地址 `/qqbot/webhook` 接收，适配器内部会根据事件类型自动分发到对应的处理函数。
 
 ## 使用说明
 
@@ -284,21 +688,161 @@ await bot.recallMsg(e.contact, messageId)
 
 ## 常见问题
 
-### Q: Webhook 地址配置后没有收到消息？
+### 第十步：验证配置
 
-A: 请检查：
+#### 1. 检查配置文件
 
-1. 服务器防火墙是否开放对应端口
-2. QQ 开放平台的 Webhook 地址是否配置正确
-3. 查看日志是否有签名验证失败的错误
+确保配置文件格式正确：
 
-### Q: 编译报错找不到类型定义？
+```bash
+# 查看配置文件
+cat @karinjs/@karinjs-adapter-qqbot/config/config.json
+```
 
-A: 运行 `npm install` 确保所有依赖已安装。
+#### 2. 启动服务
 
-### Q: 如何获取机器人的 AppID 和 Secret？
+```bash
+# 启动 Karin 服务
+npm start
+# 或者
+node app.js
+```
 
-A: 前往 [QQ 开放平台](https://bot.q.qq.com/) 创建机器人后即可获取。
+#### 3. 查看日志
+
+检查日志文件，确认机器人连接成功：
+
+```bash
+# 查看最新日志
+tail -f logs/error/*.log
+```
+
+正常情况下应该看到类似信息：
+- `QQBot [AppID] 连接成功`
+- `Webhook服务已启动，端口: 3000`
+
+#### 4. 测试机器人
+
+1. 将机器人邀请到测试群
+2. 发送消息测试机器人响应
+3. 检查日志确认消息接收正常
+
+### 第十一步：常见问题排查
+
+#### 问题1：Webhook接收不到消息
+
+**检查清单：**
+- [ ] QQ开放平台回调地址配置正确
+- [ ] 服务器防火墙开放对应端口
+- [ ] Nginx反向代理配置正确
+- [ ] 域名解析正确指向服务器IP
+
+**排查命令：**
+```bash
+# 检查端口是否监听
+netstat -tlnp | grep :3000
+
+# 检查防火墙状态
+sudo ufw status
+
+# 测试本地接口
+curl -X POST http://localhost:3000/qqbot/webhook
+```
+
+#### 问题2：签名验证失败
+
+**可能原因：**
+- Secret配置错误
+- 反向代理修改了请求体
+- 时间戳差异过大
+
+**解决方案：**
+```nginx
+# Nginx配置中添加
+proxy_buffering off;
+proxy_request_buffering off;
+```
+
+#### 问题3：消息发送失败
+
+**检查清单：**
+- [ ] AppID和Secret正确
+- [ ] 机器人有发送消息权限
+- [ ] API地址配置正确
+- [ ] 网络连接正常
+
+#### 问题4：频道消息收不到
+
+**可能原因：**
+- 频道机器人权限不足
+- guildEnable配置为false
+- 私域机器人未正确配置
+
+**解决方案：**
+```json
+{
+  "guildEnable": true,
+  "guildMode": 1  // 私域机器人使用1
+}
+```
+
+### 第十二步：进阶配置
+
+#### 多机器人配置
+
+```json
+[
+  {
+    "appId": "机器人1的AppID",
+    "secret": "机器人1的Secret",
+    "event": { "type": 1 }
+  },
+  {
+    "appId": "机器人2的AppID", 
+    "secret": "机器人2的Secret",
+    "event": { "type": 1 }
+  }
+]
+```
+
+#### 环境分离配置
+
+开发环境使用沙盒：
+```json
+{
+  "sandbox": true,
+  "sandboxApi": "https://sandbox.api.sgroup.qq.com"
+}
+```
+
+生产环境使用正式API：
+```json
+{
+  "sandbox": false,
+  "prodApi": "https://api.sgroup.qq.com"
+}
+```
+
+#### 消息过滤配置
+
+```json
+{
+  "exclude": [
+    "https://example.com",
+    "https://trusted-site.com"
+  ],
+  "regex": [
+    {
+      "reg": "^/",
+      "rep": "#"
+    },
+    {
+      "reg": "\\[图片\\]",
+      "rep": ""
+    }
+  ]
+}
+```
 
 ## 更新日志
 
