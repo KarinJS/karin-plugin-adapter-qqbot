@@ -1,0 +1,34 @@
+[
+  {
+    "appId": "your-bot-appid",
+    "secret": "your-bot-secret",
+    "prodApi": "https://api.sgroup.qq.com",
+    "sandboxApi": "https://sandbox.api.sgroup.qq.com",
+    "tokenApi": "",
+    "sandbox": false,
+    "qqEnable": true,
+    "guildEnable": true,
+    "guildMode": 0,
+    "exclude": [],
+    "regex": [
+      {
+        "reg": "^/",
+        "rep": "#"
+      }
+    ],
+    "markdown": {
+      "mode": 0,
+      "id": "",
+      "kv": []
+    },
+    "event": {
+      "type": 3,
+      "wsUrl": "",
+      "wsToken": "",
+      "lcProxy": {
+        "apiUrl": "https://your-webhook-proxy.workers.dev",
+        "accessToken": "proxy_xxxxxxxxxxxxxx"
+      }
+    }
+  }
+]

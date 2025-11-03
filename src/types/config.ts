@@ -43,12 +43,19 @@ export interface QQBotConfig {
   }[]
   /** 事件接收配置 */
   event: {
-    /** 接收方式 0-关闭 1-webhook 2-ws */
-    type: 0 | 1 | 2
+    /** 接收方式 0-关闭 1-webhook 2-ws 3-lc中转 */
+    type: 0 | 1 | 2 | 3
     /** ws服务器地址 */
     wsUrl: string
     /** ws服务器鉴权token */
     wsToken: string
+    /** lc webhook-proxy 配置 */
+    lcProxy?: {
+      /** webhook-proxy 服务器地址 (例如: https://webhook-proxy.example.com) */
+      apiUrl: string
+      /** 访问令牌 (从 webhook-proxy 登录后获取) */
+      accessToken: string
+    }
   }
 }
 

@@ -7,7 +7,8 @@ QQ机器人适配器插件，为 Karin 框架提供 QQ 机器人支持。
 - ✅ 支持 QQ 群聊消息收发
 - ✅ 支持 QQ 好友消息收发
 - ✅ 支持 QQ 频道消息收发
-- ✅ 支持 WebSocket 和 Webhook 两种连接方式
+- ✅ 支持 Webhook、WebSocket 和 LC Webhook-Proxy 三种连接方式
+- ✅ 支持无公网IP环境部署（通过 LC Webhook-Proxy）
 - ✅ 支持多种 Markdown 模板（原生、图文模板、纯文模板）
 - ✅ 支持沙盒环境和正式环境
 - ✅ 完整的 TypeScript 类型定义
@@ -182,6 +183,62 @@ yarn add @karinjs/adapter-qqbot
   }
 }
 ```
+
+#### 方式三：LC Webhook-Proxy 中转（推荐新手）
+
+**适用场景：** 没有公网IP，无法配置HTTPS，需要快速部署
+
+**特点**：
+- ✅ 无需公网IP或域名
+- ✅ 无需配置HTTPS证书
+- ✅ 配置简单，5分钟即可完成
+- ✅ 支持内网环境
+- ✅ 基于开源项目 [lc-cn/webhook-proxy](https://github.com/lc-cn/webhook-proxy)
+
+**快速配置**：
+
+1. 安装 webhook-proxy CLI 工具：
+```bash
+npm install -g webhook-proxy-cli
+```
+
+2. 配置并登录：
+```bash
+# 配置 API 地址（使用公共服务或自己部署的服务）
+webhook-proxy config set-api https://your-webhook-proxy.workers.dev
+
+# 登录（支持GitHub OAuth、GitLab OAuth、用户名密码等多种方式）
+webhook-proxy login
+```
+
+3. 创建 QQBot Proxy：
+```bash
+webhook-proxy proxy create
+# 选择平台: qqbot
+# 输入你的机器人 AppID 和 Secret
+# 获取 access_token（请妥善保存！）
+```
+
+4. 在 Karin 配置文件中添加：
+```json
+{
+  "event": {
+    "type": 3,
+    "lcProxy": {
+      "apiUrl": "https://your-webhook-proxy.workers.dev",
+      "accessToken": "从 CLI 获取的 access_token"
+    }
+  }
+}
+```
+
+5. 在 QQ 开放平台配置 webhook URL（从 CLI 获取）：
+```
+https://your-webhook-proxy.workers.dev/qqbot/{random_key}
+```
+
+**详细文档**：[LC_WEBHOOK_PROXY.md](./LC_WEBHOOK_PROXY.md)
+
 
 ### 第五步：反向代理配置（重要）
 
@@ -525,7 +582,9 @@ sudo firewall-cmd --reload
 | `qqEnable` | 是否启用QQ场景 | true |
 | `guildEnable` | 是否启用频道场景 | true |
 | `guildMode` | 频道模式（0公域，1私域） | 0 |
-| `event.type` | 事件接收方式（0关闭，1webhook，2ws） | 0 |
+| `event.type` | 事件接收方式（0关闭，1webhook，2ws，3lc中转） | 0 |
+| `event.lcProxy.apiUrl` | lc webhook-proxy 服务器地址 | - |
+| `event.lcProxy.accessToken` | lc webhook-proxy 访问令牌 | - |
 
 #### Markdown 模式说明
 
@@ -556,8 +615,8 @@ QQ机器人适配器通过统一的webhook地址接收以下事件类型：
 
 #### 1. Webhook 方式
 
-- **优点**：配置简单，不需要额外的中转服务
-- **缺点**：需要有公网IP或域名
+- **优点**：配置简单，直连性能最好
+- **缺点**：需要有公网IP或域名，需要配置HTTPS
 - **适用场景**：有固定服务器或云服务器的用户
 
 配置完成后，需要在 QQ 开放平台配置 Webhook 回调地址。
@@ -566,7 +625,37 @@ QQ机器人适配器通过统一的webhook地址接收以下事件类型：
 
 - **优点**：适合内网环境，通过中转服务连接
 - **缺点**：需要额外部署中转服务
-- **适用场景**：没有公网IP的本地开发环境
+- **适用场景**：有自建 WebSocket 中转服务的用户
+
+#### 3. LC Webhook-Proxy 中转方式（推荐新手）
+
+- **优点**：
+  - 无需公网IP或域名
+  - 无需配置HTTPS证书
+  - 配置简单快速（5分钟完成）
+  - 支持内网环境
+  - 基于 Cloudflare Workers，全球加速
+- **缺点**：
+  - 增加少量延迟（约50-100ms）
+  - 依赖第三方服务（可自行部署）
+- **适用场景**：
+  - 没有公网IP的家庭网络
+  - 快速测试和开发
+  - 企业内网环境
+
+详细配置说明请查看：[LC_WEBHOOK_PROXY.md](./LC_WEBHOOK_PROXY.md)
+
+### 连接方式对比
+
+| 特性 | Webhook | WebSocket | LC Webhook-Proxy |
+|------|---------|-----------|-----------------|
+| 公网IP | 需要 | 不需要 | 不需要 |
+| HTTPS证书 | 需要 | 不需要 | 不需要 |
+| 配置难度 | 较难 | 中等 | 简单 |
+| 延迟 | 最低 | 低 | 较低 |
+| 稳定性 | 最高 | 高 | 高 |
+| 维护成本 | 中 | 高 | 低 |
+| 推荐场景 | 生产环境 | 自建服务 | 快速部署/测试 |
 
 ### 发送模式说明
 
@@ -786,6 +875,77 @@ proxy_request_buffering off;
 }
 ```
 
+#### 问题5：LC Webhook-Proxy 连接失败
+
+**症状**：日志显示 "lc webhook-proxy WebSocket连接已断开"
+
+**检查清单：**
+- [ ] `apiUrl` 配置正确（不要包含 `/qqbot/` 路径）
+- [ ] `accessToken` 正确（从 webhook-proxy CLI 获取）
+- [ ] webhook-proxy 服务正常运行
+- [ ] 网络可以访问 webhook-proxy
+
+**排查命令：**
+```bash
+# 测试 webhook-proxy 服务
+curl https://your-webhook-proxy.workers.dev/health
+
+# 查看 proxy 状态
+webhook-proxy list
+
+# 检查配置
+webhook-proxy config show
+```
+
+**常见错误：**
+1. **apiUrl 配置错误**：
+   ```json
+   // ❌ 错误
+   "apiUrl": "https://webhook-proxy.workers.dev/qqbot"
+   
+   // ✅ 正确
+   "apiUrl": "https://webhook-proxy.workers.dev"
+   ```
+
+2. **accessToken 过期或错误**：
+   - 重新运行 `webhook-proxy proxy create` 获取新的 token
+   - 确保复制了完整的 token（以 `proxy_` 开头）
+
+3. **WebSocket 协议错误**：
+   - 适配器会自动将 `https://` 转换为 `wss://`
+   - 确保 webhook-proxy 支持 WebSocket 连接
+
+**详细故障排查**：请查看 [LC_WEBHOOK_PROXY.md](./LC_WEBHOOK_PROXY.md#故障排查)
+
+#### 问题6：LC Webhook-Proxy 签名验证失败
+
+**症状**：日志显示 "lc webhook-proxy 签名验证失败"
+
+**可能原因：**
+- Karin 配置的 `secret` 与 webhook-proxy proxy 的 `webhook_secret` 不一致
+- webhook-proxy 未启用签名验证
+
+**解决方案：**
+```bash
+# 1. 查看当前 proxy 配置
+webhook-proxy list
+
+# 2. 确认 webhook_secret 与 Karin 的 secret 一致
+# 如果不一致，需要重新创建 proxy：
+webhook-proxy proxy delete <proxy-id>
+webhook-proxy proxy create
+# 创建时确保填入正确的 secret
+
+# 3. 更新 Karin 配置
+# 确保 config.json 中的 secret 与 webhook-proxy 一致
+```
+```json
+{
+  "guildEnable": true,
+  "guildMode": 1  // 私域机器人使用1
+}
+```
+
 ### 第十二步：进阶配置
 
 #### 多机器人配置
@@ -861,6 +1021,7 @@ proxy_request_buffering off;
 - [Karin 框架](https://github.com/KarinJS/Karin)
 - [QQ 机器人开放平台](https://bot.q.qq.com/)
 - [QQ 机器人开发文档](https://bot.q.qq.com/wiki/)
+- [LC Webhook-Proxy 项目](https://github.com/lc-cn/webhook-proxy) - 用于实现 type: 3 中转功能
 
 ## 技术支持
 
