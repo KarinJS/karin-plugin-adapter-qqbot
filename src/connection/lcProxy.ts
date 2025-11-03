@@ -2,7 +2,7 @@ import { log } from '@/utils'
 import { sign } from '@/core/api/sign'
 import { WebSocket } from 'node-karin/ws'
 import { event, fakeEvent } from '@/utils/common'
-import type { QQBotConfig, AllEvent, TransferEvent, TransferSign, TransferSignResponse } from '@/types'
+import type { QQBotConfig } from '@/types'
 
 /**
  * 缓存lc webhook-proxy连接
@@ -67,7 +67,7 @@ export const createLcProxyConnection = (
   socket.on('message', (raw) => {
     try {
       const data = JSON.parse(raw.toString())
-      
+
       // 处理心跳响应
       if (data.type === 'pong') {
         return
@@ -142,7 +142,7 @@ const lcEventHandler = (config: QQBotConfig, payload: any, raw: string) => {
 
     const signature = sign(secret, eventTs, plainToken)
     log('mark', `${appId}: [lc webhook-proxy][signature] ${signature}`)
-    
+
     // 注意: lc webhook-proxy需要我们返回签名响应，但WebSocket是单向的
     // webhook-proxy会自动处理鉴权响应，我们只需要验证即可
     return
@@ -151,7 +151,7 @@ const lcEventHandler = (config: QQBotConfig, payload: any, raw: string) => {
   // 验证签名
   const ed25519 = headers['x-signature-ed25519']
   const timestamp = headers['x-signature-timestamp']
-  
+
   if (!ed25519 || !timestamp) {
     fakeEvent(`${appId}: lc webhook-proxy 缺少签名字段: ${raw}`)
     return
@@ -160,7 +160,7 @@ const lcEventHandler = (config: QQBotConfig, payload: any, raw: string) => {
   // 将body转换为字符串进行签名验证
   const bodyStr = typeof body === 'string' ? body : JSON.stringify(body)
   const signature = sign(secret, timestamp, bodyStr)
-  
+
   if (ed25519 !== signature) {
     log('error', `${appId}: lc webhook-proxy 签名验证失败\n期望: ${signature}\n实际: ${ed25519}\nbody: ${bodyStr}`)
     return
