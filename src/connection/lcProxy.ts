@@ -5,6 +5,13 @@ import { event, fakeEvent } from '@/utils/common'
 import type { QQBotConfig } from '@/types'
 
 /**
+ * 常量定义
+ */
+const RECONNECT_DELAY_MS = 5000 // 重连延迟（毫秒）
+const HEARTBEAT_INTERVAL_MS = 30000 // 心跳间隔（毫秒）
+const OP_AUTH_CALLBACK = 13 // 鉴权回调操作码
+
+/**
  * 缓存lc webhook-proxy连接
  */
 const lcCache = new Map<string, { socket: WebSocket, close: () => void }>()
@@ -43,8 +50,8 @@ export const createLcProxyConnection = (
         return
       }
 
-      log('error', `${appid}: lc webhook-proxy WebSocket连接已断开，将在5秒后重连: ${wsUrl}`)
-      setTimeout(() => createLcProxyConnection(config), 5000)
+      log('error', `${appid}: lc webhook-proxy WebSocket连接已断开，将在${RECONNECT_DELAY_MS / 1000}秒后重连: ${wsUrl}`)
+      setTimeout(() => createLcProxyConnection(config), RECONNECT_DELAY_MS)
     } finally {
       const ws = lcCache.get(appid)
       if (ws) {
@@ -89,11 +96,16 @@ export const createLcProxyConnection = (
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ type: 'ping' }))
     }
-  }, 30000)
+  }, HEARTBEAT_INTERVAL_MS)
 
-  socket.on('close', () => {
+  // 连接关闭时清理心跳定时器
+  const originalClose = close
+  const closeWithCleanup = (isClose = false) => {
     clearInterval(heartbeat)
-  })
+    originalClose(isClose)
+  }
+
+  socket.on('close', () => closeWithCleanup(false))
 
   return socket
 }
@@ -131,7 +143,7 @@ const lcEventHandler = (config: QQBotConfig, payload: any, raw: string) => {
   const body = payload.body
 
   // 检查op类型，处理鉴权回调 (op=13)
-  if (body.op === 13) {
+  if (body.op === OP_AUTH_CALLBACK) {
     const eventTs = body?.d?.event_ts
     const plainToken = body?.d?.plain_token
 
