@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.3.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.10...v1.3.0) (2025-11-03)
+
+
+### Features
+
+* 适配`1.8.0` ([f6bff5c](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/f6bff5c70fcce8c2cb1bd3fa5257d05166563dcc))
+
+
+### Bug Fixes
+
+* build ([577e514](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/577e5148b6f729c5b2e98d954bb19ef853547648))
+* lock.yaml ([8d76d4e](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/8d76d4e737d1212fdfcbab2c3d226a4178c48d94))
+* token ([4b1f0f5](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/4b1f0f584d8018235845f617657f58cc5a295884))
+* web.config ([92bf606](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/92bf606b064fa0cf1eed658cd71f2a25a9470dff))
+
 ## [1.2.10](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.2.9...v1.2.10) (2025-05-03)
 
 
