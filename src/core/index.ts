@@ -12,6 +12,7 @@ import { GraphicTemplateMarkdown, rawMarkdown } from '@/core/adapter/handler'
 import { onChannelMsg, onDirectMsg, onFriendMsg, onGroupMsg } from '@/core/event/message'
 import { onGroupAddRobot, onGroupDelRobot } from '@/core/event/notice'
 import { createWebSocketConnection } from '@/connection/webSocket'
+import { createLcProxyConnection } from '@/connection/lcProxy'
 
 import type { QQBotConfig } from '@/types/config'
 import type { Event } from '@/types/event'
@@ -63,10 +64,13 @@ export const createBot = async (bot: QQBotConfig) => {
   client.adapter.version = pkg().version
 
   if (bot.event.type === 1) {
+    client.adapter.index = registerBot('http', client)
+  } else if (bot.event.type === 2) {
     client.adapter.index = registerBot('webSocketClient', client)
     createWebSocketConnection(bot)
-  } else {
-    client.adapter.index = registerBot('http', client)
+  } else if (bot.event.type === 3) {
+    client.adapter.index = registerBot('webSocketClient', client)
+    createLcProxyConnection(bot)
   }
 }
 
