@@ -41,6 +41,15 @@ export const getAccessToken = async (url: string, appId: string, secret: string)
 }
 
 /**
+ * 获取指定 appId 的 access_token
+ * @param appId 机器人ID
+ * @returns access_token 或 undefined
+ */
+export const getBotAccessToken = (appId: string): string | undefined => {
+  return BotMap.get(appId)
+}
+
+/**
  * @description 创建axios实例
  * @param url 请求地址
  * @param appId 机器人ID

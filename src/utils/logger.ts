@@ -2,13 +2,13 @@ import { logger, type LogMethodNames } from 'node-karin'
 
 /** QQBot日志 - 包装logger以添加前缀 */
 const logMethods = {
-  trace: (...args: any[]) => logger.trace('[QQBot]', ...args),
-  debug: (...args: any[]) => logger.debug('[QQBot]', ...args),
-  info: (...args: any[]) => logger.info('[QQBot]', ...args),
-  warn: (...args: any[]) => logger.warn('[QQBot]', ...args),
-  error: (...args: any[]) => logger.error('[QQBot]', ...args),
-  fatal: (...args: any[]) => logger.fatal('[QQBot]', ...args),
-  mark: (...args: any[]) => logger.mark('[QQBot]', ...args),
+  trace: (...args: any[]) => logger.trace('[QQ Official Bot]', ...args),
+  debug: (...args: any[]) => logger.debug('[QQ Official Bot]', ...args),
+  info: (...args: any[]) => logger.info('[QQ Official Bot]', ...args),
+  warn: (...args: any[]) => logger.warn('[QQ Official Bot]', ...args),
+  error: (...args: any[]) => logger.error('[QQ Official Bot]', ...args),
+  fatal: (...args: any[]) => logger.fatal('[QQ Official Bot]', ...args),
+  mark: (...args: any[]) => logger.mark('[QQ Official Bot]', ...args),
 }
 
 /** 

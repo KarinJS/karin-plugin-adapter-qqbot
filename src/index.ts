@@ -32,7 +32,11 @@ const checkOnboard = async () => {
     }
   } else {
     // 已有配置，正常初始化
-    initQQBotAdapter()
+    try {
+      await initQQBotAdapter()
+    } catch (error) {
+      logger.error('[QQ Official Bot] 初始化适配器失败:', error)
+    }
   }
 }
 

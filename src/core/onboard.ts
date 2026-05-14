@@ -203,7 +203,7 @@ export const qrRegister = async (timeoutSeconds = 600): Promise<QrRegisterResult
       taskId = result.taskId
       aesKey = result.aesKey
     } catch (error) {
-      logger.error('[QQBot][扫码登录] 创建绑定任务失败:', error)
+      logger.error('[QQ Official Bot][扫码登录] 创建绑定任务失败:', error)
       return null
     }
 
@@ -233,7 +233,7 @@ export const qrRegister = async (timeoutSeconds = 600): Promise<QrRegisterResult
 
       if (pollResult.status === BindStatus.COMPLETED) {
         if (!pollResult.encryptedSecret) {
-          logger.error('[QQBot][扫码登录] 绑定结果缺少加密密钥')
+          logger.error('[QQ Official Bot][扫码登录] 绑定结果缺少加密密钥')
           return null
         }
 
@@ -241,7 +241,7 @@ export const qrRegister = async (timeoutSeconds = 600): Promise<QrRegisterResult
         try {
           secret = decryptSecret(pollResult.encryptedSecret, aesKey)
         } catch (error) {
-          logger.error('[QQBot][扫码登录] 解密 secret 失败:', error)
+          logger.error('[QQ Official Bot][扫码登录] 解密 secret 失败:', error)
           return null
         }
 
@@ -260,7 +260,7 @@ export const qrRegister = async (timeoutSeconds = 600): Promise<QrRegisterResult
 
       if (pollResult.status === BindStatus.EXPIRED) {
         if (refreshCount >= MAX_REFRESHES) {
-          logger.error(`[QQBot][扫码登录] 二维码已过期 ${MAX_REFRESHES} 次，终止流程`)
+          logger.error(`[QQ Official Bot][扫码登录] 二维码已过期 ${MAX_REFRESHES} 次，终止流程`)
           return null
         }
         console.log(`\n  二维码已过期，正在刷新... (${refreshCount + 1}/${MAX_REFRESHES})`)
@@ -272,7 +272,7 @@ export const qrRegister = async (timeoutSeconds = 600): Promise<QrRegisterResult
 
     // 超时检查
     if (Date.now() >= deadline) {
-      logger.error(`[QQBot][扫码登录] 等待扫码超时（${timeoutSeconds}秒）`)
+      logger.error(`[QQ Official Bot][扫码登录] 等待扫码超时（${timeoutSeconds}秒）`)
       return null
     }
   }
@@ -300,7 +300,7 @@ const getBotName = async (appId: string, secret: string): Promise<string> => {
     })
     return meRes.data?.username || ''
   } catch (error) {
-    logger.debug('[QQBot][扫码登录] 获取 bot 名称失败:', error)
+    logger.debug('[QQ Official Bot][扫码登录] 获取 bot 名称失败:', error)
     return ''
   }
 }
@@ -333,7 +333,7 @@ export const runQrOnboard = async (): Promise<boolean> => {
     // 更新已有配置
     cfg[existingIndex].secret = result.secret
     if (name) cfg[existingIndex].name = name
-    logger.info(`[QQBot][扫码登录] 已更新已有配置: ${result.appId}`)
+    logger.info(`[QQ Official Bot][扫码登录] 已更新已有配置: ${result.appId}`)
   } else {
     // 新增配置
     const newConfig: QQBotConfig = {
@@ -343,7 +343,7 @@ export const runQrOnboard = async (): Promise<boolean> => {
       secret: result.secret,
     }
     cfg.push(newConfig)
-    logger.info(`[QQBot][扫码登录] 已添加新配置: ${result.appId}`)
+    logger.info(`[QQ Official Bot][扫码登录] 已添加新配置: ${result.appId}`)
   }
 
   writeConfig(cfg)
@@ -361,12 +361,11 @@ export const runQrOnboard = async (): Promise<boolean> => {
 }
 
 /**
- * 检查当前是否没有任何启用的 Bot 配置
+ * 检查当前是否没有任何 Bot 配置
  * @returns 是否需要扫码引导
  */
 export const needQrOnboard = (): boolean => {
   const cfg = config()
-  if (cfg.length === 0) return true
-  // 所有 bot 的 event.type 都为 0（关闭）时也需要引导
-  return cfg.every(bot => bot.event.type === 0)
+  // 只有配置完全为空时才触发扫码引导
+  return cfg.length === 0
 }

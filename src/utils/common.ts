@@ -72,7 +72,7 @@ export const expressAfterInit = (
  * @param log 日志
  */
 export const fakeEvent = (log: string) => {
-  logger.fatal(`${logger.red('[QQBot][虚假事件]')} ${log.replace(/\n/g, '\\n')}`)
+  logger.fatal(`${logger.red('[QQ Official Bot][虚假事件]')} ${log.replace(/\n/g, '\\n')}`)
 }
 
 /**
@@ -147,7 +147,7 @@ export const silkEncode = async (file: string | Buffer): Promise<Buffer> => {
     // TODO: 缓存silk文件 提升性能
     const ms = logger.yellow(duration + 'ms')
     const end = logger.yellow((Date.now() - start) + 'ms')
-    logger.info(`[QQBot] silk文件转码成功 音频时长: ${ms} 转码耗时: ${end}`)
+    logger.info(`[QQ Official Bot] silk文件转码成功 音频时长: ${ms} 转码耗时: ${end}`)
     fs.rmSync(temp, { recursive: true, force: true })
   }, 100)
   return Buffer.from(data)

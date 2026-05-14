@@ -77,7 +77,7 @@ export abstract class AdapterQQBot extends AdapterBase {
   constructor (QQBot: QQBotApi) {
     super()
     this.super = QQBot
-    this.adapter.name = '@karinjs/qqbot'
+    this.adapter.name = 'QQ Official Bot'
     this.adapter.protocol = 'qqbot'
     this.adapter.platform = 'qq'
     this.adapter.standard = 'other'

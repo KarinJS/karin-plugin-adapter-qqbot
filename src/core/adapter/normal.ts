@@ -115,7 +115,7 @@ export class AdapterQQBotNormal extends AdapterQQBot {
         continue
       }
 
-      this.logger('debug', `[QQBot][${v.type}] 不支持发送的消息类型`)
+      this.logger('debug', `[QQ Official Bot][${v.type}] 不支持发送的消息类型`)
     }
 
     if (list.content.length) {
@@ -243,7 +243,7 @@ export class AdapterQQBotNormal extends AdapterQQBot {
         continue
       }
 
-      this.logger('debug', `[QQBot][${v.type}] 不支持发送的消息类型`)
+      this.logger('debug', `[QQ Official Bot][${v.type}] 不支持发送的消息类型`)
     }
 
     /** 情况较为复杂... */

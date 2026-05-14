@@ -594,9 +594,18 @@ export interface MessageAuditRejectEvent extends BaseEvent {
 }
 
 /**
+ * RESUMED 子事件
+ */
+export interface ResumedEvent extends BaseEvent {
+  /** 事件类型 */
+  t: EventEnum.RESUMED
+}
+
+/**
  * 所有事件
  */
 export type Event = ReadyEvent
+  | ResumedEvent
   | C2CMsgEvent
   | GroupMsgEvent
   | GuildMsgEvent

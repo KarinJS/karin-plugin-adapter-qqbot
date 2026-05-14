@@ -5,6 +5,8 @@ import {
   basePath,
   requireFileSync,
   common,
+  logger,
+  unregisterBot,
 } from 'node-karin'
 import type { Config, QQBotConfig } from '@/types/config'
 import { stopWebSocketConnection } from '@/connection/webSocket'
@@ -110,7 +112,7 @@ export const getDefaultConfig = (): Config => [
       mode: 0,
     },
     event: {
-      type: 0,
+      type: 2,
       wsUrl: '',
       wsToken: '',
     },
@@ -129,15 +131,17 @@ setTimeout(() => {
 
     const result = common.diffArray(old, now)
 
-    // 处理删除的 bot：停止连接
+    // 处理删除的 bot：先注销 karin 中的 bot，再停止连接
     if (result.removed.length > 0) {
       result.removed.forEach(v => {
-        if (v.event.type !== 2) return
-        stopWebSocketConnection(v.appId)
+        unregisterBot('selfId', v.appId)
+        if (v.event.type === 2) {
+          stopWebSocketConnection(v.appId)
+        }
       })
     }
 
-    // 处理新增的 bot：初始化
+    // 处理新增的 bot：初始化并通过 karin 注册
     if (result.added.length > 0) {
       const appids = result.added.map(v => v.appId)
       cache.forEach(v => {
@@ -155,7 +159,10 @@ setTimeout(() => {
         // 简单比较 JSON 序列化后的字符串
         if (JSON.stringify(oldCfg) === JSON.stringify(newCfg)) return
 
-        // 配置发生变化，先停止再重新初始化
+        logger.info(`[QQ Official Bot][配置监听] 配置发生变化: ${newCfg.appId}，正在重载...`)
+
+        // 配置发生变化，先注销再重新初始化
+        unregisterBot('selfId', oldCfg.appId)
         if (oldCfg.event.type === 2) {
           stopWebSocketConnection(oldCfg.appId)
         }

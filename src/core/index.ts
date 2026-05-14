@@ -24,7 +24,14 @@ import type { Event } from '@/types/event'
  */
 export const initQQBotAdapter = async () => {
   const cfg = config()
-  cfg.forEach(bot => createBot(bot))
+  logger.debug(`[QQ Official Bot] 开始初始化 ${cfg.length} 个Bot...`)
+  for (const bot of cfg) {
+    try {
+      await createBot(bot)
+    } catch (error) {
+      logger.debug(`[QQ Official Bot] 初始化Bot失败 ${bot.appId || '(无appId)'}:`, error)
+    }
+  }
 }
 
 /**
@@ -32,20 +39,28 @@ export const initQQBotAdapter = async () => {
  * @param bot 机器人配置
  */
 export const createBot = async (bot: QQBotConfig) => {
-  if (bot.event.type === 0) {
-    log('debug', `${bot.appId}: bot已关闭，跳过初始化`)
+  const appId = String(bot.appId)
+  if (!appId) {
+    logger.warn('[QQ Official Bot] 配置中缺少 appId，跳过初始化')
     return
   }
 
-  const appId = String(bot.appId)
+  if (bot.event.type === 0) {
+    logger.info(`[QQ Official Bot][${appId}] 事件接收方式为"关闭"，跳过初始化。如需启用请修改 event.type 为 1(webhook) 或 2(ws)`)
+    return
+  }
+
+  logger.info(`[QQ Official Bot][${appId}] 开始获取 access_token...`)
   await getAccessToken(bot.tokenApi, appId, bot.secret)
 
   const url = bot.sandbox ? bot.sandboxApi : bot.prodApi
   const axios = createAxiosInstance(url, appId)
 
   const api = new QQBotApi(axios)
+  logger.debug(`[QQ Official Bot][${appId}] 获取 bot 信息...`)
   const data = await api.getMe()
   const { id, username, avatar } = data
+  logger.debug(`[QQ Official Bot][${appId}] bot 名称: ${username}`)
 
   const client = createClient(bot, api)
   client.account.name = username
@@ -65,11 +80,13 @@ export const createBot = async (bot: QQBotConfig) => {
   client.adapter.secret = bot.secret
   client.adapter.version = pkg().version
 
-  if (bot.event.type === 1) {
+  if (bot.event.type === 2) {
     client.adapter.index = registerBot('webSocketClient', client)
-    createWebSocketConnection(bot)
-  } else {
+    logger.debug('已注册为 webSocketClient')
+    await createWebSocketConnection(bot)
+  } else if (bot.event.type === 1) {
     client.adapter.index = registerBot('http', client)
+    logger.debug('info', '已注册为 http')
   }
 }
 
@@ -100,11 +117,42 @@ const createClient = (cfg: QQBotConfig, api: QQBotApi): AdapterQQBotNormal | Ada
  * @param client 机器人实例
  * @param event 事件
  */
+/** 事件中文映射表 */
+const eventNameMap: Record<string, string> = {
+  [EventEnum.READY]: '就绪',
+  [EventEnum.RESUMED]: '连接恢复',
+  [EventEnum.GROUP_AT_MESSAGE_CREATE]: '群聊@消息',
+  [EventEnum.C2C_MESSAGE_CREATE]: '好友消息',
+  [EventEnum.MESSAGE_CREATE]: '频道消息',
+  [EventEnum.AT_MESSAGE_CREATE]: '频道@消息',
+  [EventEnum.DIRECT_MESSAGE_CREATE]: '频道私信',
+  [EventEnum.GROUP_ADD_ROBOT]: '机器人入群',
+  [EventEnum.GROUP_DEL_ROBOT]: '机器人退群',
+  [EventEnum.GROUP_MSG_RECEIVE]: '群聊开启通知',
+  [EventEnum.GROUP_MSG_REJECT]: '群聊关闭通知',
+  [EventEnum.FRIEND_ADD]: '添加好友',
+  [EventEnum.FRIEND_DEL]: '删除好友',
+  [EventEnum.C2C_MSG_RECEIVE]: '单聊开启通知',
+  [EventEnum.C2C_MSG_REJECT]: '单聊关闭通知',
+  [EventEnum.INTERACTION_CREATE]: '互动事件',
+  [EventEnum.MESSAGE_AUDIT_PASS]: '消息审核通过',
+  [EventEnum.MESSAGE_AUDIT_REJECT]: '消息审核不通过',
+}
+
 export const createEvent = (
   client: AdapterQQBotNormal | AdapterQQBotMarkdown,
   event: Event
 ): void => {
+  const name = eventNameMap[event.t] || event.t
+  client.logger('debug', `[事件][${name}]`)
+
   switch (event.t) {
+    // WebSocket 生命周期事件
+    case EventEnum.READY:
+      return client.logger('info', `WebSocket 就绪: ${event.d?.user?.username || ''}`)
+    case EventEnum.RESUMED:
+      return client.logger('info', 'WebSocket 连接已恢复')
+    // 消息事件
     case EventEnum.GROUP_AT_MESSAGE_CREATE:
       return onGroupMsg(client, event)
     case EventEnum.C2C_MESSAGE_CREATE:
@@ -114,6 +162,7 @@ export const createEvent = (
       return onChannelMsg(client, event)
     case EventEnum.DIRECT_MESSAGE_CREATE:
       return onDirectMsg(client, event)
+    // 群聊机器人生命周期
     case EventEnum.GROUP_ADD_ROBOT:
       return onGroupAddRobot(client, event)
     case EventEnum.GROUP_DEL_ROBOT:
@@ -122,6 +171,7 @@ export const createEvent = (
       return onGroupMsgReceive(client, event)
     case EventEnum.GROUP_MSG_REJECT:
       return onGroupMsgReject(client, event)
+    // 好友生命周期
     case EventEnum.FRIEND_ADD:
       return onFriendAdd(client, event)
     case EventEnum.FRIEND_DEL:
