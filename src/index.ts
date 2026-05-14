@@ -25,8 +25,8 @@ const checkOnboard = async () => {
 
     const success = await runQrOnboard()
     if (success) {
-      // 扫码成功，重新初始化 Bot
-      await initQQBotAdapter()
+      // writeConfig 已触发 watch 回调自动初始化新配置，无需手动调用 initQQBotAdapter
+      logger.info('[QQ Official Bot] 扫码成功，配置已保存，watch 回调将自动完成初始化')
     } else {
       console.log('  扫码登录已取消或失败，请手动编辑配置文件添加机器人')
     }

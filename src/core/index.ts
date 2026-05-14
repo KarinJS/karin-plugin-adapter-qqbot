@@ -35,6 +35,25 @@ export const initQQBotAdapter = async () => {
 }
 
 /**
+ * 记录每个 appId 的初始化状态，防止并发调用 createBot 导致重复连接
+ */
+const initState = new Map<string, { hash: string; promise: Promise<void> }>()
+
+/**
+ * 计算配置的 hash，用于判断是否需要重新初始化
+ */
+const hashConfig = (bot: QQBotConfig): string => JSON.stringify({
+  appId: bot.appId,
+  secret: bot.secret,
+  tokenApi: bot.tokenApi,
+  prodApi: bot.prodApi,
+  sandboxApi: bot.sandboxApi,
+  sandbox: bot.sandbox,
+  event: bot.event,
+  markdown: bot.markdown,
+})
+
+/**
  * 创建Bot实例
  * @param bot 机器人配置
  */
@@ -50,49 +69,70 @@ export const createBot = async (bot: QQBotConfig) => {
     return
   }
 
-  // 清理旧资源，防止重复注册导致消息重复处理
-  unregisterBot('selfId', appId)
-  stopWebSocketConnection(appId)
-  event.removeAllListeners(appId)
-
-  logger.info(`[QQ Official Bot][${appId}] 开始获取 access_token...`)
-  await getAccessToken(bot.tokenApi, appId, bot.secret)
-
-  const url = bot.sandbox ? bot.sandboxApi : bot.prodApi
-  const axios = createAxiosInstance(url, appId)
-
-  const api = new QQBotApi(axios)
-  logger.debug(`[QQ Official Bot][${appId}] 获取 bot 信息...`)
-  const data = await api.getMe()
-  const { id, username, avatar } = data
-  logger.debug(`[QQ Official Bot][${appId}] bot 名称: ${username}`)
-
-  const client = createClient(bot, api)
-  client.account.name = username
-  client.account.avatar = avatar
-  client.account.selfId = appId
-
-  const qq = new URL(data.share_url).searchParams.get('robot_uin')!
-  client.account.subId.id = id
-  client.account.subId.qq = qq
-  client.account.subId.appid = appId
-  client.account.subId.union_openid = data.union_openid
-
-  event.on(appId, (event: Event) => createEvent(client, event))
-
-  // 注册Bot
-  client.adapter.address = url
-  client.adapter.secret = bot.secret
-  client.adapter.version = pkg().version
-
-  if (bot.event.type === 2) {
-    client.adapter.index = registerBot('webSocketClient', client)
-    logger.debug('已注册为 webSocketClient')
-    await createWebSocketConnection(bot)
-  } else if (bot.event.type === 1) {
-    client.adapter.index = registerBot('http', client)
-    logger.debug('info', '已注册为 http')
+  const hash = hashConfig(bot)
+  const existing = initState.get(appId)
+  if (existing) {
+    if (existing.hash === hash) {
+      logger.debug(`[QQ Official Bot][${appId}] 初始化已在进行中，等待完成...`)
+      return existing.promise
+    }
+    logger.debug(`[QQ Official Bot][${appId}] 配置已变更，等待旧初始化完成...`)
+    await existing.promise.catch(() => {})
   }
+
+  const promise = (async () => {
+    // 清理旧资源，防止重复注册导致消息重复处理
+    unregisterBot('selfId', appId)
+    stopWebSocketConnection(appId)
+    event.removeAllListeners(appId)
+
+    logger.info(`[QQ Official Bot][${appId}] 开始获取 access_token...`)
+    await getAccessToken(bot.tokenApi, appId, bot.secret)
+
+    const url = bot.sandbox ? bot.sandboxApi : bot.prodApi
+    const axios = createAxiosInstance(url, appId)
+
+    const api = new QQBotApi(axios)
+    logger.debug(`[QQ Official Bot][${appId}] 获取 bot 信息...`)
+    const data = await api.getMe()
+    const { id, username, avatar } = data
+    logger.debug(`[QQ Official Bot][${appId}] bot 名称: ${username}`)
+
+    const client = createClient(bot, api)
+    client.account.name = username
+    client.account.avatar = avatar
+    client.account.selfId = appId
+
+    const qq = new URL(data.share_url).searchParams.get('robot_uin')!
+    client.account.subId.id = id
+    client.account.subId.qq = qq
+    client.account.subId.appid = appId
+    client.account.subId.union_openid = data.union_openid
+
+    event.on(appId, (event: Event) => createEvent(client, event))
+
+    // 注册Bot
+    client.adapter.address = url
+    client.adapter.secret = bot.secret
+    client.adapter.version = pkg().version
+
+    if (bot.event.type === 2) {
+      client.adapter.index = registerBot('webSocketClient', client)
+      logger.debug('已注册为 webSocketClient')
+      await createWebSocketConnection(bot)
+    } else if (bot.event.type === 1) {
+      client.adapter.index = registerBot('http', client)
+      logger.debug('info', '已注册为 http')
+    }
+  })()
+
+  initState.set(appId, { hash, promise })
+  promise.finally(() => {
+    if (initState.get(appId)?.hash === hash) {
+      initState.delete(appId)
+    }
+  })
+  return promise
 }
 
 /**
