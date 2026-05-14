@@ -4,7 +4,7 @@ import { defineConfig } from 'tsdown'
 export default defineConfig({
   entry: ['src/index.ts', 'src/web.config.ts'],
   format: ['esm'],
-  target: 'node24',
+  target: 'node22',
   sourcemap: false,
   clean: true,
   dts: true,

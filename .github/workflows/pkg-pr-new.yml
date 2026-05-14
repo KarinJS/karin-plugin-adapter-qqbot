@@ -22,16 +22,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: 设置 pnpm
+        uses: pnpm/action-setup@v4
+
       - name: 设置 Node.js 环境
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: pnpm
 
       - name: 安装依赖
-        run: npm install --legacy-peer-deps --ignore-scripts
+        run: pnpm install --ignore-scripts
 
       - name: 构建输出
-        run: npm run build
+        run: pnpm run build
 
       # 使用 pkg.pr.new 发布预览版
       # 注意：需要先在 https://github.com/apps/pkg-pr-new 安装 GitHub App
