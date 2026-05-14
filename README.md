@@ -641,8 +641,7 @@ npm run lint
 # 发布正式版
 npm run pub
 
-# 发布测试版
-npm run pub-beta
+# 测试版通过 CI 自动发布：每次推送到 main 分支或 PR 都会触发 pkg.pr.new 生成预览包
 ```
 
 ## 项目结构
