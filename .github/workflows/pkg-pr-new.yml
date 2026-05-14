@@ -47,21 +47,17 @@ jobs:
 
       - name: 解析发布信息
         id: parse
-        shell: bash
+        shell: node {0}
         run: |
-          URLS=$(cat output.json | jq -r '.urls')
-          SHA=$(cat output.json | jq -r '.sha')
-          echo "urls=$URLS" >> $GITHUB_OUTPUT
-          echo "sha=$SHA" >> $GITHUB_OUTPUT
-
-          # 生成安装命令（多行输出）
-          {
-            echo "install_cmds<<EOF"
-            for url in $URLS; do
-              echo "pnpm add $url -w"
-            done
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
+          const fs = require('fs');
+          const data = JSON.parse(fs.readFileSync('output.json', 'utf8'));
+          const urls = data.packages.map(p => p.url).join(' ');
+          const sha = process.env.GITHUB_SHA?.slice(0, 7) || '';
+          const cmds = data.packages.map(p => `pnpm add ${p.url} -w`).join('\n');
+          const out = process.env.GITHUB_OUTPUT;
+          fs.appendFileSync(out, `urls=${urls}\n`);
+          fs.appendFileSync(out, `sha=${sha}\n`);
+          fs.appendFileSync(out, `install_cmds<<EOF\n${cmds}\nEOF\n`);
 
       - name: 生成工作流摘要
         shell: bash
