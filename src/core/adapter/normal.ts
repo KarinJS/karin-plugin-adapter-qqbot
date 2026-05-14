@@ -76,6 +76,17 @@ export class AdapterQQBotNormal extends AdapterQQBot {
         continue
       }
 
+      if (v.type === 'at') {
+        if (contact.scene === 'friend') continue
+        list.content.push(v.targetId === 'all' ? '<qqbot-at-everyone />' : `<qqbot-at-user id="${v.targetId}" />`)
+        continue
+      }
+
+      if (v.type === 'reply') {
+        list.reply.message_id = v.messageId
+        continue
+      }
+
       if (v.type === 'keyboard') {
         list.keyboard.push(v)
         continue
@@ -159,8 +170,14 @@ export class AdapterQQBotNormal extends AdapterQQBot {
       list.list.push(this.super.QQdMsgOptions('text', '不支持发送的消息类型'))
     }
 
+    /** 处理引用回复，仅在第一条消息上附加 */
+    let replyHandled = false
     for (const item of list.list) {
       pasmsg(item)
+      if (!replyHandled && list.reply.message_id) {
+        item.message_reference = { message_id: list.reply.message_id }
+        replyHandled = true
+      }
       const res = await send(contact.peer, item)
       rawData.rawData.push(res)
     }
@@ -195,7 +212,8 @@ export class AdapterQQBotNormal extends AdapterQQBot {
       }
 
       if (v.type === 'at') {
-        if (contact.scene === 'guild') list.content.push(v.targetId === 'all' ? '@everyone' : `<@${v.targetId}>`)
+        // TODO: 旧协议 @everyone 和 <@userid> 即将弃用，已更新为新协议格式
+        if (contact.scene === 'guild') list.content.push(v.targetId === 'all' ? '<qqbot-at-everyone />' : `<qqbot-at-user id="${v.targetId}" />`)
         continue
       }
 
@@ -313,8 +331,14 @@ export class AdapterQQBotNormal extends AdapterQQBot {
       list.list.push(this.super.GuildMsgOptions('text', '不支持发送的消息类型'))
     }
 
+    /** 处理引用回复，仅在第一条消息上附加 */
+    let replyHandled = false
     for (const item of list.list) {
       pasmsg(item)
+      if (!replyHandled && list.reply.message_id && !(item instanceof FormData)) {
+        item.message_reference = { message_id: list.reply.message_id }
+        replyHandled = true
+      }
       const res = await send(contact.peer, contact.subPeer, item)
       rawData.rawData.push(res)
     }

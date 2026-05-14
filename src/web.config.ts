@@ -111,9 +111,11 @@ export default defineConfig({
                   label: '正则',
                 }),
               }),
+              // TODO: 2026/04/23 官方更新：单聊、群聊场景自定义 Markdown 和按钮能力已全量开放，无需申请模板。
+              // 模式 0（直接发送）已原生支持 markdown 元素，模式 1/3/4 的强制 Markdown 转换可考虑 deprecate。
               components.radio.group('markdown:mode', {
                 label: 'markdown发送模式',
-                description: '机器人发送模式 0-直接发送 1-原生Markdown 3-旧图文模板Markdown 4-纯文模板Markdown 5-自定义处理',
+                description: '机器人发送模式 0-直接发送（支持markdown元素） 1-原生Markdown（强制文本转markdown） 3-旧图文模板Markdown 4-纯文模板Markdown 5-自定义处理',
                 defaultValue: '0',
                 radio: [
                   components.radio.create('0', {
@@ -121,7 +123,7 @@ export default defineConfig({
                     value: '0',
                   }),
                   components.radio.create('1', {
-                    label: '原生Markdown',
+                    label: '原生Markdown（强制转换）',
                     value: '1',
                   }),
                   components.radio.create('3', {

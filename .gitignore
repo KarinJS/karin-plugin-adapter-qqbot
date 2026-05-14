@@ -1,3 +1,6 @@
+# AI
+.claude
+
 # 包管理器文件
 .npmrc
 yarn.lock
@@ -16,6 +19,7 @@ lerna-debug.log*
 # 临时文件
 /logs/
 /temp/
+wiki/
 
 # 配置
 /lib

@@ -1,7 +1,7 @@
 /**
  * 需要注意 目前只有私聊可以收到file类型的消息
  */
-export type Content_type = 'image/gif' | 'image/jpeg' | 'image/png' | 'file'
+export type Content_type = 'image/gif' | 'image/jpeg' | 'image/png' | 'file' | 'video/mp4' | 'voice'
 
 /**
  * 富媒体基类
@@ -21,6 +21,10 @@ export interface Attachment {
   size: number
   /** 文件url */
   url: string
+  /** 语音文件链接（wav格式） */
+  voice_wav_url?: string
+  /** 语音 asr 参考结果 */
+  asr_refer_text?: string
 }
 
 /**
@@ -440,6 +444,10 @@ export interface FriendAddEvent extends BaseEvent {
     timestamp: number,
     /** 添加机器人的用户openid */
     openid: string,
+    /** 加好友场景值 */
+    scene: number,
+    /** 开发者自定义的回调数据 */
+    scene_param: string,
   },
 }
 
@@ -492,6 +500,100 @@ export interface C2CMsgReceiveEvent extends BaseEvent {
 }
 
 /**
+ * 互动事件（按钮点击等）
+ */
+export interface InteractionEvent extends BaseEvent {
+  t: EventEnum.INTERACTION_CREATE
+  op: 0
+  id: string
+  d: {
+    /** 消息按钮：11，单聊快捷菜单：12 */
+    type: number
+    /** 事件发生的场景：c2c、group、guild */
+    scene: string
+    /** 0 频道场景，1 群聊场景，2 单聊场景 */
+    chat_type: number
+    /** 触发时间 RFC 3339 格式 */
+    timestamp: string
+    /** 频道的 openid，仅在频道场景提供 */
+    guild_id?: string
+    /** 文字子频道的 openid，仅在频道场景提供 */
+    channel_id?: string
+    /** 单聊场景提供 */
+    user_openid?: string
+    /** 群的 openid，仅在群聊场景提供 */
+    group_openid?: string
+    /** 按钮触发用户，群聊的群成员 openid，仅在群聊场景提供 */
+    group_member_openid?: string
+    data: {
+      resolved: {
+        /** 操作按钮的 data 字段值 */
+        button_data: string
+        /** 操作按钮的 id 字段值 */
+        button_id: string
+        /** 操作的用户 userid，仅频道场景提供 */
+        user_id?: string
+        /** 操作按钮的 id 字段值，仅自定义菜单提供 */
+        feature_id?: string
+        /** 操作的消息id，目前仅频道场景提供 */
+        message_id?: string
+      }
+    }
+    version: number
+  }
+}
+
+/**
+ * 消息审核通过事件
+ */
+export interface MessageAuditPassEvent extends BaseEvent {
+  t: EventEnum.MESSAGE_AUDIT_PASS
+  op: 0
+  id: string
+  d: {
+    /** 消息审核 id */
+    audit_id: string
+    /** 消息 id，只有审核通过事件才会有值 */
+    message_id?: string
+    /** 频道 id */
+    guild_id: string
+    /** 子频道 id */
+    channel_id: string
+    /** 消息审核时间 */
+    audit_time: string
+    /** 消息创建时间 */
+    create_time: string
+    /** 子频道消息 seq */
+    seq_in_channel?: string
+  }
+}
+
+/**
+ * 消息审核不通过事件
+ */
+export interface MessageAuditRejectEvent extends BaseEvent {
+  t: EventEnum.MESSAGE_AUDIT_REJECT
+  op: 0
+  id: string
+  d: {
+    /** 消息审核 id */
+    audit_id: string
+    /** 消息 id，只有审核通过事件才会有值 */
+    message_id?: string
+    /** 频道 id */
+    guild_id: string
+    /** 子频道 id */
+    channel_id: string
+    /** 消息审核时间 */
+    audit_time: string
+    /** 消息创建时间 */
+    create_time: string
+    /** 子频道消息 seq */
+    seq_in_channel?: string
+  }
+}
+
+/**
  * 所有事件
  */
 export type Event = ReadyEvent
@@ -507,3 +609,6 @@ export type Event = ReadyEvent
   | FriendDelEvent
   | C2CMsgRejectEvent
   | C2CMsgReceiveEvent
+  | InteractionEvent
+  | MessageAuditPassEvent
+  | MessageAuditRejectEvent

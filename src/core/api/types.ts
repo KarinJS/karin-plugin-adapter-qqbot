@@ -13,6 +13,14 @@ export interface SendQQMessageRequest {
   msg_type: 0 | 2 | 3 | 4 | 7
 }
 
+/** 消息引用对象 */
+export interface MessageReference {
+  /** 需要引用回复的消息 id */
+  message_id: string
+  /** 是否忽略获取引用消息详情错误，默认否 */
+  ignore_get_message_error?: boolean
+}
+
 /** 发送QQ被动消息参数 */
 export interface QQMessageID {
   /** 前置收到的事件 ID，用于发送被动消息，支持事件："INTERACTION_CREATE"、"C2C_MSG_RECEIVE"、"FRIEND_ADD" */
@@ -21,6 +29,10 @@ export interface QQMessageID {
   msg_id?: string
   /** 回复消息的序号，与 msg_id 联合使用，避免相同消息id回复重复发送，不填默认是1。相同的 msg_id + msg_seq 重复发送会失败。 */
   msg_seq?: number
+  /** 指明发送消息为互动召回消息，与 msg_id，event_id 互斥使用 */
+  is_wakeup?: boolean
+  /** 引用消息对象，QQ单聊和群聊场景均支持 */
+  message_reference?: MessageReference
 }
 
 /** 发送QQ文本消息请求参数 */
@@ -114,6 +126,8 @@ export interface SendGuildMessageID {
   msg_id?: string
   /** 事件id */
   event_id?: string
+  /** 引用消息对象 */
+  message_reference?: MessageReference
 }
 
 /** 发送频道引用消息参数 */

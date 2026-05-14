@@ -27,18 +27,30 @@ export const QQBotConvertKarin = (
   }
 
   for (const v of data.attachments || []) {
-    if (v.content_type === 'file') {
-      console.log(v)
-      continue
-    }
     const url = v.url.startsWith('http') ? v.url : `https://${v.url}`
-    elements.push(segment.image(url, {
-      subType: v.content_type.split('/')[1],
-      name: v.filename,
-      width: v.width,
-      height: v.height,
-    }))
+    if (v.content_type.startsWith('image/')) {
+      elements.push(segment.image(url, {
+        subType: v.content_type.split('/')[1],
+        name: v.filename,
+        width: v.width,
+        height: v.height,
+      }))
+    } else if (v.content_type === 'video/mp4') {
+      elements.push(segment.video(url))
+    } else if (v.content_type === 'voice') {
+      // 优先使用 wav 格式链接，如果没有则使用原始链接
+      elements.push(segment.record(v.voice_wav_url || url))
+    } else if (v.content_type === 'file') {
+      // TODO: node-karin 框架如果支持 file 类型 segment，可以在此处处理
+      console.log(v)
+    }
   }
+
+  /** 官方会对消息中的特殊字符进行转义，需要反转义 */
+  const unescapeContent = (text: string) => text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
 
   const regex = /<faceType=\d+,faceId="\d+",ext="[^"]+">|<@!\d+>|[^<]+/g
   const result = data?.content?.match(regex) || []
@@ -51,14 +63,15 @@ export const QQBotConvertKarin = (
       const name = mentions[id]?.username || ''
       elements.push(segment.at(id === subBotID ? appid : id, name))
     } else {
+      let text = unescapeContent(v)
       const cfg = getConfig(appid)
       if (cfg?.regex) {
         for (const r of cfg.regex) {
           const reg = r.reg instanceof RegExp ? r.reg : new RegExp(r.reg)
-          v = v.trim().replace(reg, r.rep)
+          text = text.trim().replace(reg, r.rep)
         }
       }
-      elements.push(segment.text(v))
+      elements.push(segment.text(text))
     }
   })
 

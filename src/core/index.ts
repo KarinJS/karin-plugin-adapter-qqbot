@@ -10,7 +10,10 @@ import { AdapterQQBotMarkdown } from '@/core/adapter/markdown'
 import { createAxiosInstance, getAccessToken } from '@/core/internal/axios'
 import { GraphicTemplateMarkdown, rawMarkdown } from '@/core/adapter/handler'
 import { onChannelMsg, onDirectMsg, onFriendMsg, onGroupMsg } from '@/core/event/message'
-import { onGroupAddRobot, onGroupDelRobot } from '@/core/event/notice'
+import {
+  onGroupAddRobot, onGroupDelRobot, onGroupMsgReceive, onGroupMsgReject,
+  onFriendAdd, onFriendDel, onC2CMsgReceive, onC2CMsgReject
+} from '@/core/event/notice'
 import { createWebSocketConnection } from '@/connection/webSocket'
 
 import type { QQBotConfig } from '@/types/config'
@@ -120,6 +123,26 @@ export const createEvent = (
       return onGroupAddRobot(client, event)
     case EventEnum.GROUP_DEL_ROBOT:
       return onGroupDelRobot(client, event)
+    case EventEnum.GROUP_MSG_RECEIVE:
+      return onGroupMsgReceive(client, event)
+    case EventEnum.GROUP_MSG_REJECT:
+      return onGroupMsgReject(client, event)
+    case EventEnum.FRIEND_ADD:
+      return onFriendAdd(client, event)
+    case EventEnum.FRIEND_DEL:
+      return onFriendDel(client, event)
+    case EventEnum.C2C_MSG_RECEIVE:
+      return onC2CMsgReceive(client, event)
+    case EventEnum.C2C_MSG_REJECT:
+      return onC2CMsgReject(client, event)
+    // TODO: INTERACTION_CREATE 事件需要调用 PUT /interactions/{interaction_id} 回应，node-karin 框架暂无对应事件类型
+    case EventEnum.INTERACTION_CREATE:
+      return client.logger('debug', `INTERACTION_CREATE 事件未处理: ${JSON.stringify(event)}`)
+    // TODO: MESSAGE_AUDIT_PASS / MESSAGE_AUDIT_REJECT 事件需要框架支持消息审核事件类型
+    case EventEnum.MESSAGE_AUDIT_PASS:
+      return client.logger('debug', `MESSAGE_AUDIT_PASS 事件未处理: ${JSON.stringify(event)}`)
+    case EventEnum.MESSAGE_AUDIT_REJECT:
+      return client.logger('debug', `MESSAGE_AUDIT_REJECT 事件未处理: ${JSON.stringify(event)}`)
     default:
       logger.error(`未知事件类型: ${JSON.stringify(event)}`)
   }

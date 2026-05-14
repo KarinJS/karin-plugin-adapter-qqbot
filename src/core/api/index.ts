@@ -136,7 +136,8 @@ export class QQBotApi {
       case 'ark':
         return { msg_type: 3, ark: data }
       case 'media':
-        return { msg_type: 7, media: { file_info: data }, content: '' }
+        // TODO: 当 msg_type = 7 时，官方文档要求 content 字段需要填入一个值，后续版本可能会修复此问题
+        return { msg_type: 7, media: { file_info: data }, content: ' ' }
       default:
         throw new Error('未知的消息类型')
     }
@@ -276,14 +277,14 @@ export class QQBotApi {
     } else if (type === 'group') {
       url = `/v2/groups/${targetId}/messages/${messageId}`
     } else if (type === 'channels') {
-      url = ` /channels/${targetId}/messages/${messageId}?hidetip=${hidetip}`
+      url = `/channels/${targetId}/messages/${messageId}?hidetip=${hidetip}`
     } else if (type === 'dms') {
       url = `/dms/${targetId}/messages/${messageId}?hidetip=${hidetip}`
     } else {
       throw new Error('未知的撤回消息类型')
     }
 
-    return this.get(url).then(() => true).catch(() => false)
+    return this.axios.delete(url).then(() => true).catch(() => false)
   }
 
   /**

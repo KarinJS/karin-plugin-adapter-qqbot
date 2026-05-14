@@ -12,12 +12,13 @@
   },
   "author": "shijin",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/index.mjs",
+  "types": "dist/index.d.mts",
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc && tsup",
+    "build": "tsc && tsdown",
     "dev": "tsx src/app.ts",
     "karin": "karin",
     "pub": "npm publish --access public",
@@ -26,23 +27,23 @@
   },
   "dependencies": {
     "@karinjs/geturls": "^1.0.2",
-    "form-data": "^4.0.2",
-    "image-size": "^1.2.0",
+    "form-data": "^4.0.5",
+    "image-size": "^2.0.2",
     "qrcode": "^1.5.4",
-    "silk-wasm": "^3.6.3",
+    "silk-wasm": "^3.7.1",
     "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
-    "@types/express": "5.0.5",
+    "@types/express": "5.0.6",
     "@types/form-data": "^2.5.2",
-    "@types/node": "^20.17.19",
-    "@types/qrcode": "^1.5.5",
-    "eslint": "^9.21.0",
-    "neostandard": "^0.12.1",
-    "node-karin": "^1.12.2",
-    "tsup": "^8.3.6",
-    "tsx": "^4.19.3",
-    "typescript": "^5.7.3"
+    "@types/node": "^24.12.4",
+    "@types/qrcode": "^1.5.6",
+    "eslint": "^10.3.0",
+    "neostandard": "^0.13.0",
+    "node-karin": "^1.15.5",
+    "tsdown": "^0.22.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
   },
   "publishConfig": {
     "access": "public",
@@ -65,6 +66,6 @@
       "resources"
     ],
     "ts-web": "src/web.config.ts",
-    "web": "dist/web.config.js"
+    "web": "dist/web.config.mjs"
   }
 }
