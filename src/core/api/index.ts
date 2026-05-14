@@ -81,6 +81,22 @@ export class QQBotApi {
   }
 
   /**
+   * 发送put请求
+   * @param path 请求路径
+   * @param options 请求数据
+   * @param headers 请求头
+   */
+  async put<T> (path: string, options = {}, headers?: Record<string, string>): Promise<T> {
+    try {
+      const result = await this.axios.put(path, options, { headers })
+      return result.data
+    } catch (error) {
+      this.handleError(path, options, error)
+      throw error
+    }
+  }
+
+  /**
    * 处理请求错误
    * @param error 错误信息
    */

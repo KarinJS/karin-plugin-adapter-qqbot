@@ -4,7 +4,7 @@ import { QQBotApi } from '@/core/api'
 import { event } from '@/utils/common'
 import { config, pkg } from '@/utils/config'
 import { EventEnum } from '@/types/event'
-import { logger, registerBot } from 'node-karin'
+import { logger, registerBot, unregisterBot } from 'node-karin'
 import { AdapterQQBotNormal } from '@/core/adapter/normal'
 import { AdapterQQBotMarkdown } from '@/core/adapter/markdown'
 import { createAxiosInstance, getAccessToken } from '@/core/internal/axios'
@@ -14,7 +14,7 @@ import {
   onGroupAddRobot, onGroupDelRobot, onGroupMsgReceive, onGroupMsgReject,
   onFriendAdd, onFriendDel, onC2CMsgReceive, onC2CMsgReject
 } from '@/core/event/notice'
-import { createWebSocketConnection } from '@/connection/webSocket'
+import { createWebSocketConnection, stopWebSocketConnection } from '@/connection/webSocket'
 
 import type { QQBotConfig } from '@/types/config'
 import type { Event } from '@/types/event'
@@ -49,6 +49,11 @@ export const createBot = async (bot: QQBotConfig) => {
     logger.info(`[QQ Official Bot][${appId}] 事件接收方式为"关闭"，跳过初始化。如需启用请修改 event.type 为 1(webhook) 或 2(ws)`)
     return
   }
+
+  // 清理旧资源，防止重复注册导致消息重复处理
+  unregisterBot('selfId', appId)
+  stopWebSocketConnection(appId)
+  event.removeAllListeners(appId)
 
   logger.info(`[QQ Official Bot][${appId}] 开始获取 access_token...`)
   await getAccessToken(bot.tokenApi, appId, bot.secret)
