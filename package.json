@@ -19,7 +19,7 @@
   ],
   "scripts": {
     "build": "tsc && tsdown",
-    "dev": "tsx src/app.ts",
+    "dev": "tsx watch src/app.ts",
     "karin": "karin",
     "pub": "npm publish --access public",
     "sort": "npx sort-package-json"

@@ -19,7 +19,7 @@ const cacheMap: Record<string, QQBotConfig> = {}
 export const pkg = () => requireFileSync(`${dirPath}/package.json`)
 
 /** 用户配置的插件名称 */
-const pluginName = pkg().name.replace(/\//g, '-')
+const pluginName = pkg().name
 /** 用户配置 */
 const dirConfig = `${basePath}/${pluginName}/config`
 
@@ -29,6 +29,7 @@ const dirConfig = `${basePath}/${pluginName}/config`
 export const config = (): Config => {
   const cfgPath = `${dirConfig}/config.json`
   if (!fs.existsSync(cfgPath)) {
+    fs.mkdirSync(dirConfig, { recursive: true })
     fs.writeFileSync(cfgPath, JSON.stringify([], null, 2))
   }
   if (cache) return cache
@@ -55,6 +56,7 @@ export const getConfig = (appid: string) => {
  * @param config 配置
  */
 export const writeConfig = (config: Config) => {
+  fs.mkdirSync(dirConfig, { recursive: true })
   fs.writeFileSync(`${dirConfig}/config.json`, JSON.stringify(config, null, 2))
 }
 
