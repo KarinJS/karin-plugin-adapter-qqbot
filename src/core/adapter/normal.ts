@@ -102,11 +102,6 @@ export class AdapterQQBotNormal extends AdapterQQBot {
         continue
       }
 
-      if (v.type === 'markdownTpl') {
-        list.markdownTpl.push(v)
-        continue
-      }
-
       if (v.type === 'video' || v.type === 'record') {
         let url: string
         if (v.file.startsWith('http')) {
@@ -245,11 +240,6 @@ export class AdapterQQBotNormal extends AdapterQQBot {
 
       if (v.type === 'markdown') {
         list.markdown.push(v)
-        continue
-      }
-
-      if (v.type === 'markdownTpl') {
-        list.markdownTpl.push(v)
         continue
       }
 

@@ -21,8 +21,9 @@ export default defineConfig({
     const cfg = config.config()
     cfg.forEach((item) => {
       data.push({
-        title: item.appId,
-        subtitle: '',
+        title: item.name || item.appId,
+        subtitle: item.appId,
+        name: item.name,
         appId: item.appId,
         secret: item.secret,
         prodApi: item.prodApi,
@@ -32,8 +33,7 @@ export default defineConfig({
         qqEnable: item.qqEnable,
         guildEnable: item.guildEnable,
         guildMode: item.guildMode,
-        exclude: item.exclude,
-        regex: item.regex.map((item: any) => `<${item.reg}> <${item.rep}>`),
+        regex: item.regex.map((item: any) => `&lt;${item.reg}&gt; &lt;${item.rep}&gt;`),
       })
     })
 
@@ -47,6 +47,10 @@ export default defineConfig({
           children: {
             key: 'qqbotConfig',
             children: [
+              components.input.create('name', {
+                label: '机器人名称',
+                description: '请输入机器人名称，扫码登录会自动获取',
+              }),
               components.input.create('appId', {
                 label: 'AppID',
                 description: '请输入你的AppID',
@@ -95,27 +99,17 @@ export default defineConfig({
                 description: '频道场景模式 打开为公域 关闭为私域',
                 defaultSelected: true,
               }),
-              components.input.group('exclude', {
-                data: [],
-                label: '文本中的url转二维码白名单',
-                description: '文本中的url转二维码白名单 配置后将不转换这些url为二维码',
-                template: components.input.create('exclude_url', {
-                  label: '白名单',
-                }),
-              }),
               components.input.group('regex', {
                 data: [],
                 label: '接受到消息后对文本进行表达式处理',
-                description: '格式比较复杂: <reg> <rep> 分别表示正则和替换内容，请正确填写',
+                description: '格式比较复杂: &lt;reg&gt; &lt;rep&gt; 分别表示正则和替换内容，请正确填写',
                 template: components.input.create('regex', {
                   label: '正则',
                 }),
               }),
-              // TODO: 2026/04/23 官方更新：单聊、群聊场景自定义 Markdown 和按钮能力已全量开放，无需申请模板。
-              // 模式 0（直接发送）已原生支持 markdown 元素，模式 1/3/4 的强制 Markdown 转换可考虑 deprecate。
               components.radio.group('markdown:mode', {
                 label: 'markdown发送模式',
-                description: '机器人发送模式 0-直接发送（支持markdown元素） 1-原生Markdown（强制文本转markdown） 3-旧图文模板Markdown 4-纯文模板Markdown 5-自定义处理',
+                description: '机器人发送模式 0-直接发送（支持markdown元素） 1-原生Markdown（强制文本转markdown）',
                 defaultValue: '0',
                 radio: [
                   components.radio.create('0', {
@@ -126,31 +120,7 @@ export default defineConfig({
                     label: '原生Markdown（强制转换）',
                     value: '1',
                   }),
-                  components.radio.create('3', {
-                    label: '旧图文模板Markdown',
-                    value: '3',
-                  }),
-                  components.radio.create('4', {
-                    label: '纯文模板Markdown',
-                    value: '4',
-                  }),
-                  // components.radio.create('5', {
-                  //   label: '自定义处理',
-                  //   value: '5',
-                  // }),
                 ],
-              }),
-              components.input.create('markdown:id', {
-                label: 'markdown模板ID',
-                description: '请输入你的markdown模板ID',
-              }),
-              components.input.group('markdown:kv', {
-                data: [],
-                label: 'markdown模板变量',
-                description: '请输入你的markdown模板变量',
-                template: components.input.create('markdown:kv:key', {
-                  label: '变量',
-                }),
               }),
               components.radio.group('event:type', {
                 label: '事件接收方式',
@@ -191,6 +161,7 @@ export default defineConfig({
   save: (config: {
     qqbot: [
       {
+        name: string,
         appId: string,
         secret: string,
         prodApi: string,
@@ -200,11 +171,8 @@ export default defineConfig({
         qqEnable: boolean,
         guildEnable: boolean,
         guildMode: 0 | 1,
-        exclude: string[],
         regex: string[],
-        'markdown:mode': 0 | 1 | 3 | 4 | 5,
-        'markdown:id': string,
-        'markdown:kv': string[],
+        'markdown:mode': 0 | 1,
         'event:type': 0 | 1 | 2,
         'event:wsUrl': string,
         'event:wsToken': string
@@ -218,14 +186,12 @@ export default defineConfig({
         regex: item.regex.map((item: any) => {
           const [reg, rep] = item.split(' ')
           return {
-            reg: reg.replace(/^<|>$|$/g, ''),
-            rep: rep.replace(/^<|>$|$/g, ''),
+            reg: reg.replace(/^&lt;|&gt;$/g, ''),
+            rep: rep.replace(/^&lt;|&gt;$/g, ''),
           }
         }),
         markdown: {
           mode: item['markdown:mode'] ?? 0,
-          id: item['markdown:id'] ?? '',
-          kv: item['markdown:kv'] ?? [],
         },
         event: {
           type: item['event:type'] ?? 0,

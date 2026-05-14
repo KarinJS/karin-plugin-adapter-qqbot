@@ -8,7 +8,7 @@ import { logger, registerBot } from 'node-karin'
 import { AdapterQQBotNormal } from '@/core/adapter/normal'
 import { AdapterQQBotMarkdown } from '@/core/adapter/markdown'
 import { createAxiosInstance, getAccessToken } from '@/core/internal/axios'
-import { GraphicTemplateMarkdown, rawMarkdown } from '@/core/adapter/handler'
+import { rawMarkdown } from '@/core/adapter/handler'
 import { onChannelMsg, onDirectMsg, onFriendMsg, onGroupMsg } from '@/core/event/message'
 import {
   onGroupAddRobot, onGroupDelRobot, onGroupMsgReceive, onGroupMsgReject,
@@ -88,12 +88,7 @@ const createClient = (cfg: QQBotConfig, api: QQBotApi): AdapterQQBotNormal | Ada
 
   // 模式 1: 原生Markdown
   if (mode === 1) {
-    return new AdapterQQBotMarkdown(api, rawMarkdown, cfg)
-  }
-
-  // 模式 3/4/5: 图文模板Markdown
-  if (mode >= 3 && mode <= 5) {
-    return new AdapterQQBotMarkdown(api, GraphicTemplateMarkdown, cfg)
+    return new AdapterQQBotMarkdown(api, rawMarkdown)
   }
 
   // 默认返回正常模式

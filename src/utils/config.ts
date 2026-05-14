@@ -71,13 +71,13 @@ export const formatConfig = (user: Config): Config => {
     result.push({
       ...def,
       ...item,
-      event: {
-        ...def.event,
-        ...item.event,
-      },
       markdown: {
         ...def.markdown,
         ...item.markdown,
+      },
+      event: {
+        ...def.event,
+        ...item.event,
       },
     })
   })
@@ -90,16 +90,16 @@ export const formatConfig = (user: Config): Config => {
  */
 export const getDefaultConfig = (): Config => [
   {
+    name: '',
     appId: '',
     secret: '',
     prodApi: 'https://api.sgroup.qq.com',
     sandboxApi: 'https://sandbox.api.sgroup.qq.com',
-    tokenApi: '',
+    tokenApi: 'https://bots.qq.com/app/getAppAccessToken',
     sandbox: false,
     qqEnable: true,
     guildEnable: true,
     guildMode: 0,
-    exclude: [],
     regex: [
       {
         reg: '^/',
@@ -108,13 +108,6 @@ export const getDefaultConfig = (): Config => [
     ],
     markdown: {
       mode: 0,
-      id: '',
-      kv: [
-        'text_start',
-        'img_dec',
-        'img_url',
-        'text_end',
-      ],
     },
     event: {
       type: 0,
@@ -135,6 +128,8 @@ setTimeout(() => {
     })
 
     const result = common.diffArray(old, now)
+
+    // 处理删除的 bot：停止连接
     if (result.removed.length > 0) {
       result.removed.forEach(v => {
         if (v.event.type !== 2) return
@@ -142,13 +137,31 @@ setTimeout(() => {
       })
     }
 
+    // 处理新增的 bot：初始化
     if (result.added.length > 0) {
-      /** 需要使用格式化之后的数据 */
       const appids = result.added.map(v => v.appId)
       cache.forEach(v => {
         if (!appids.includes(v.appId)) return
         if (v.event.type === 0) return
         createBot(v)
+      })
+    }
+
+    // 处理修改的 bot：比较 common 中的配置是否发生变化
+    if (result.common.length > 0) {
+      result.common.forEach(newCfg => {
+        const oldCfg = old.find(c => c.appId === newCfg.appId)
+        if (!oldCfg) return
+        // 简单比较 JSON 序列化后的字符串
+        if (JSON.stringify(oldCfg) === JSON.stringify(newCfg)) return
+
+        // 配置发生变化，先停止再重新初始化
+        if (oldCfg.event.type === 2) {
+          stopWebSocketConnection(oldCfg.appId)
+        }
+        if (newCfg.event.type !== 0) {
+          createBot(newCfg)
+        }
       })
     }
   })

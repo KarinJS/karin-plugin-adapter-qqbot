@@ -6,16 +6,12 @@ import { SendGuildMsg, SendQQMsg } from '@/core/api/types'
 import type { QQBotApi } from '@/core/api'
 import type { Contact, ElementTypes, Message, SendMsgResults } from 'node-karin'
 import type { RawMarkdown } from '@/core/adapter/handler'
-import type { QQBotConfig } from '@/types/config'
-
 /** markdown */
 export class AdapterQQBotMarkdown extends AdapterQQBot {
-  _config: QQBotConfig
   markdown: RawMarkdown
-  constructor (QQBot: QQBotApi, markdown: RawMarkdown, config: QQBotConfig) {
+  constructor (QQBot: QQBotApi, markdown: RawMarkdown) {
     super(QQBot)
     this.markdown = markdown
-    this._config = config
   }
 
   async srcReply (e: Message, elements: ElementTypes[]) {
@@ -105,11 +101,6 @@ export class AdapterQQBotMarkdown extends AdapterQQBot {
 
       if (v.type === 'markdown') {
         list.markdown.push(v)
-        continue
-      }
-
-      if (v.type === 'markdownTpl') {
-        list.markdownTpl.push(v)
         continue
       }
 
@@ -220,11 +211,6 @@ export class AdapterQQBotMarkdown extends AdapterQQBot {
 
       if (v.type === 'markdown') {
         list.markdown.push(v)
-        continue
-      }
-
-      if (v.type === 'markdownTpl') {
-        list.markdownTpl.push(v)
         continue
       }
 

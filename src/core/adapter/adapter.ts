@@ -13,7 +13,6 @@ import type {
   ButtonElement,
   KeyboardElement,
   MarkdownElement,
-  MarkdownTplElement,
   SendMsgResults,
   Contact,
 } from 'node-karin'
@@ -49,8 +48,6 @@ export interface Grouping<T extends 'qq' | 'guild'> {
   keyboard: KeyboardElement[]
   /** markdown */
   markdown: MarkdownElement[]
-  /** markdown模板 */
-  markdownTpl: MarkdownTplElement[]
   /** 频道专属 图片url */
   imageUrls: string[]
   /** 频道专属 图片file */
@@ -143,7 +140,6 @@ export abstract class AdapterQQBot extends AdapterBase {
       button: [],
       keyboard: [],
       markdown: [],
-      markdownTpl: [],
       imageUrls: [],
       imageFiles: [],
       reply: { message_id: '' },
@@ -188,11 +184,7 @@ export abstract class AdapterQQBot extends AdapterBase {
    * - 处理按钮、markdown
    * - 统一格式后推入待发送消息列表
    * @param type 消息类型
-   * @param button 按钮
-   * @param keyboard 键盘
-   * @param markdown markdown
-   * @param markdownTpl markdown模板
-   * @returns 消息列表
+   * @param list 分类列表
    */
   markdownToButton<T extends 'qq' | 'guild'> (
     type: T,
@@ -214,20 +206,6 @@ export abstract class AdapterQQBot extends AdapterBase {
 
     list.markdown.forEach((v) => {
       const item = type === 'guild' ? this.super.GuildMsgOptions('markdown', { content: v.markdown }) : this.super.QQdMsgOptions('markdown', { content: v.markdown })
-      if (rows.length) item.keyboard = { content: { rows } }
-      list.list.push(item as T extends 'qq' ? SendQQMsg : FormData | SendGuildMsg)
-    })
-
-    list.markdownTpl.forEach((v) => {
-      const item = type === 'guild'
-        ? this.super.GuildMsgOptions('markdown', {
-          custom_template_id: v.templateId,
-          params: v.params,
-        })
-        : this.super.QQdMsgOptions('markdown', {
-          custom_template_id: v.templateId,
-          params: v.params,
-        })
       if (rows.length) item.keyboard = { content: { rows } }
       list.list.push(item as T extends 'qq' ? SendQQMsg : FormData | SendGuildMsg)
     })
