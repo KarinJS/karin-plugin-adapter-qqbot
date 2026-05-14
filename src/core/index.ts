@@ -167,6 +167,7 @@ const eventNameMap: Record<string, string> = {
   [EventEnum.READY]: '就绪',
   [EventEnum.RESUMED]: '连接恢复',
   [EventEnum.GROUP_AT_MESSAGE_CREATE]: '群聊@消息',
+  [EventEnum.GROUP_MESSAGE_CREATE]: '群聊消息',
   [EventEnum.C2C_MESSAGE_CREATE]: '好友消息',
   [EventEnum.MESSAGE_CREATE]: '频道消息',
   [EventEnum.AT_MESSAGE_CREATE]: '频道@消息',
@@ -199,6 +200,7 @@ export const createEvent = (
       return client.logger('info', 'WebSocket 连接已恢复')
     // 消息事件
     case EventEnum.GROUP_AT_MESSAGE_CREATE:
+    case EventEnum.GROUP_MESSAGE_CREATE:
       return onGroupMsg(client, event)
     case EventEnum.C2C_MESSAGE_CREATE:
       return onFriendMsg(client, event)

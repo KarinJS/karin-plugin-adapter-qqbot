@@ -126,6 +126,8 @@ export const enum EventEnum {
   C2C_MSG_RECEIVE = 'C2C_MSG_RECEIVE',
   /** 用户在群里@机器人时收到的消息 */
   GROUP_AT_MESSAGE_CREATE = 'GROUP_AT_MESSAGE_CREATE',
+  /** 群聊消息 */
+  GROUP_MESSAGE_CREATE = 'GROUP_MESSAGE_CREATE',
   /** 机器人被添加到群聊 */
   GROUP_ADD_ROBOT = 'GROUP_ADD_ROBOT',
   /** 机器人被移出群聊 */
@@ -232,12 +234,12 @@ export interface C2CMsgEvent extends BaseEvent {
 }
 
 /**
- * GROUP_AT_MESSAGE_CREATE子事件
+ * GROUP_AT_MESSAGE_CREATE / GROUP_MESSAGE_CREATE 子事件
  */
 export interface GroupMsgEvent extends BaseEvent {
   /** 事件类型 */
-  t: EventEnum.GROUP_AT_MESSAGE_CREATE,
-  /** 平台方事件ID 格式: GROUP_AT_MESSAGE_CREATE:abc... */
+  t: EventEnum.GROUP_AT_MESSAGE_CREATE | EventEnum.GROUP_MESSAGE_CREATE,
+  /** 平台方事件ID 格式: GROUP_AT_MESSAGE_CREATE:abc... 或 GROUP_MESSAGE_CREATE:abc... */
   id: string,
   d: {
     /** 富媒体消息 */
