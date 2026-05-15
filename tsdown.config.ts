@@ -2,7 +2,7 @@ import { builtinModules } from 'node:module'
 import { defineConfig } from 'tsdown'
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/web.config.ts'],
+  entry: ['src/index.ts', 'src/web.config.ts', 'src/apps/*.ts'],
   format: ['esm'],
   target: 'node22',
   sourcemap: false,
