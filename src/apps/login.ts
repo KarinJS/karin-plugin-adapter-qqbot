@@ -41,8 +41,8 @@ export const qqLogin = karin.command(
       const ok = await runQrOnboard({
         onQr: async ({ base64, url, refresh }) => {
           const head = refresh === 0
-            ? '请使用手机 QQ 扫描以下二维码完成授权：'
-            : `二维码已过期，已自动刷新（第 ${refresh} 次）：`
+            ? '请使用手机 QQ 扫描二维码完成授权（二维码 60s 内有效，过期会自动刷新最多 3 次）：'
+            : `上一张二维码已过期，已自动刷新（第 ${refresh}/3 次，仍为 60s 有效期）：`
           try {
             await e.reply([
               segment.text(head),
