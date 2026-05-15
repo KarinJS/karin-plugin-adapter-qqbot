@@ -1,5 +1,62 @@
 # Changelog
 
+## [2.0.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.3.1...v2.0.0)
+
+完整重写。对齐 QQ 开放平台 2026 年起的新事件协议与 Markdown / Keyboard 全量开放后的发送方式。
+
+### ⚠ BREAKING CHANGES
+
+- **配置结构**：
+  - 移除 `markdown.mode`（模板模式 2/3/4/5 全部废弃）
+  - 新增 `markdown.enable`（boolean）控制是否自动 markdown 化
+  - 新增 `keyboard.enable`（boolean）控制 URL 是否自动转 keyboard 按钮
+  - 移除 `event.wsUrl` / `event.wsToken`（中转方案已废弃，直连官方网关）
+  - 不提供自动迁移：旧配置需手动改写或重新扫码
+- **API 类**：`QQBotApi` 拆分为子模块门面
+  - `super.messages.*`（sendFriendMsg / sendGroupMsg / sendChannelMsg / sendDmsMsg / recall）
+  - `super.media.upload`
+  - `super.interaction.ack`
+  - `super.meta.getMe / createDms / getGateway`
+  - `super.qq.{text,markdown,ark,media}` / `super.guild.{text,image,embed,ark,markdown}` 构造器
+  - 旧 `QQdMsgOptions` / `GuildMsgOptions` 命名错别字已移除
+- **适配器**：删除 `AdapterQQBotNormal` / `AdapterQQBotMarkdown` 二选一，合并为唯一 `AdapterQQBot`
+- **事件类型**：`GroupMsgEvent.d` 新增 `mentions[]` / `message_scene` / `message_type` / `author.username` / `author.bot` / `author.union_openid`；`C2CMsgEvent.d` 同步对齐
+- **删除模板**：`Markdown` / `Keyboard` 类型移除模板分支（`custom_template_id` / 模板 `id`）
+
+### Features
+
+- 完整支持 `GROUP_MESSAGE_CREATE` 群聊全量消息事件，通过 `mentions[].is_you` 判断是否补 self-at（与 `GROUP_AT_MESSAGE_CREATE` 共用 handler）
+- WebSocket 接入层重写，**支持 Resume**：断网时携带 `session_id` / `seq` 通过 `op:6` 恢复，服务端拒绝时降级 Identify；指数退避 `1.5s × 2^n + jitter`，上限 30s
+- 完整接入 `INTERACTION_CREATE`：自动 `PUT /interactions/{id}` ack 防止客户端 loading，按 `chat_type` 借道 group/friend/guild message 事件投递业务层
+- 双发送通道：`含 segment.markdown / markdown.enable=true 且无视频语音` → markdown 通道；其余 → 经典通道
+- 二维码扫码登录拆分为 `crypto / portal / qr / index` 子模块，错误日志统一走 logger
+- intents 自动探测：从最大权限位（含 `GROUP_AND_C2C_EVENT` / `PUBLIC_GUILD_MESSAGES` / `DIRECT_MESSAGE` 等）逐级回退到可用集合，仅打一次汇总日志
+- 被动消息 `event_id` 按官方场景白名单校验
+- 频道场景图片上传支持 FormData 与 URL 双路径
+- 新事件 `author.username` 写入 `sender.nick`，业务层可拿到群昵称
+
+### Bug Fixes
+
+- 修复 access_token 刷新内存泄漏：旧实现 setTimeout 句柄未保留，bot 销毁后定时器仍在跑、同 appId 重复初始化产生并发刷新链；新增 `stopTokenRefresh(appId)` 并在 `destroyBot` 统一清理
+- 修复 webhook `op:13` 路径下用 finally 状态机控制响应的混乱逻辑
+- 修复重连未传入 `session_id` / `seq` 导致每次都是全新 Identify（Resume 形同虚设）
+
+### Refactor
+
+- `core/api/` 按职能拆分（http / messages / media / interaction / meta / builders）
+- `core/adapter/` 拆为 `base / grouping / pipeline-qq / pipeline-guild / text-to-md`
+- `core/event/` 抽出 `dispatcher.ts`，分发逻辑与具体 handler 分离
+- `core/onboard/` 拆为 `crypto / portal / qr / index`
+- `connection/` 抽 `transport.ts` 事件总线；`ws/` 拆 `client / intents / manager`
+- 删除 `core/internal/sign.ts` 重复实现，签名校验合并到 `core/api/sign.ts`
+- `utils/` 移除 `event` / `silkEncode` / `textToButton` / `escapeMarkdown` / `expressStack` 等死代码
+- 删除 `types/ws.ts`（中转方案）、`utils/dir.ts`（仅一行 re-export）
+
+### Docs
+
+- README 重写：删除模板 markdown 相关章节，新增双通道决策、Resume 行为、INTERACTION 接入、新版 GROUP_MESSAGE_CREATE 报文解读
+- 新增 `plan/` 目录：13 篇 2.0 重写路线图文档
+
 ## [1.3.1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.3.0...v1.3.1) (2025-11-03)
 
 
