@@ -1,5 +1,5 @@
 import FormData from 'form-data'
-import { common, karinToQQBot, fileToUrl } from 'node-karin'
+import { karinToQQBot, fileToUrl } from 'node-karin'
 import { groupElements } from './grouping'
 import { extractUrlButtons, imagesToMarkdown } from './text-to-md'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
@@ -9,6 +9,9 @@ import type { SendGuildMsg, SendGuildResponse } from '@/core/api/types'
 
 /**
  * 处理频道场景（子频道 + 私信）的发送
+ *
+ * 永远走 markdown 通道（msg_type=2），文本 / at / 图片均通过 markdown
+ * 渲染。Markdown / Keyboard 已全量开放，老的 type=text/image 通道不再使用。
  */
 export const sendGuild = async (
   ctx: AdapterQQBot,
@@ -24,59 +27,7 @@ export const sendGuild = async (
     grouping.buttons.push(...buttons)
   }
 
-  const useMarkdown = grouping.markdowns.length > 0 ||
-    (ctx.cfg.markdown.enable &&
-        grouping.media.length === 0 &&
-        (grouping.text.length > 0 || grouping.guildImageUrls.length > 0 || grouping.guildImageFiles.length > 0))
-
-  if (useMarkdown) {
-    return sendGuildMarkdown(ctx, contact, grouping)
-  }
-  return sendGuildClassic(ctx, contact, grouping)
-}
-
-/**
- * 经典通道：text/image/(combine)
- */
-const sendGuildClassic = async (
-  ctx: AdapterQQBot,
-  contact: Contact<'guild' | 'direct'>,
-  grouping: Grouping<'guild'>
-): Promise<SendMsgResults> => {
-  const items: Array<SendGuildMsg | FormData> = []
-
-  const text = grouping.text.join('')
-  if (text) {
-    if (grouping.guildImageUrls.length) {
-      const url = grouping.guildImageUrls.shift()
-      items.unshift(ctx.super.guild.text(text, url))
-    } else if (grouping.guildImageFiles.length) {
-      const file = grouping.guildImageFiles.shift()!
-      const buffer = await common.buffer(file)
-      const form = new FormData()
-      form.append('content', text)
-      form.append('file_image', buffer)
-      items.unshift(form as unknown as FormData)
-    } else {
-      items.unshift(ctx.super.guild.text(text))
-    }
-  }
-
-  for (const url of grouping.guildImageUrls) {
-    items.push(ctx.super.guild.image(url))
-  }
-  for (const file of grouping.guildImageFiles) {
-    const buffer = await common.buffer(file)
-    const form = new FormData()
-    form.append('file_image', buffer)
-    items.push(form)
-  }
-
-  if (!items.length) {
-    items.push(ctx.super.guild.text('不支持发送的消息类型'))
-  }
-
-  return flushGuild(ctx, contact, grouping, items)
+  return sendGuildMarkdown(ctx, contact, grouping)
 }
 
 /**
@@ -107,7 +58,9 @@ const sendGuildMarkdown = async (
   if (lines.length || grouping.buttons.length || grouping.keyboards.length) {
     const keyboard = buildKeyboard(grouping)
     items.push(ctx.super.guild.markdown({ content: lines.join('\n') }, keyboard))
-  } else {
+  }
+
+  if (!items.length) {
     items.push(ctx.super.guild.text('不支持发送的消息类型'))
   }
 

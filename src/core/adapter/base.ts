@@ -8,10 +8,10 @@ import type {
 import type { QQBotConfig } from '@/types/config'
 
 /**
- * QQ Official Bot 适配器（合并 normal + markdown）
+ * QQ Official Bot 适配器
  *
- * 由配置 `markdown.enable` / `keyboard.enable` 与元素中是否存在 markdown
- * 决定发送路径（详见 pipeline-qq / pipeline-guild）
+ * 全场景统一走 msg_type=2 Markdown 通道（详见 pipeline-qq / pipeline-guild）。
+ * 视频 / 语音 / 文件由 pipeline 内部以 msg_type=7 紧随主消息补发。
  */
 export class AdapterQQBot extends AdapterBase {
   /** 与官方 API 交互 */

@@ -33,7 +33,6 @@ export default defineConfig({
         guildEnable: item.guildEnable,
         guildMode: item.guildMode === 1,
         regex: item.regex.map((r: any) => `${r.reg} ${r.rep}`),
-        'markdown:enable': !!item.markdown?.enable,
         'keyboard:enable': item.keyboard?.enable !== false,
         'event:type': String(item.event?.type ?? 2),
       })
@@ -107,11 +106,6 @@ export default defineConfig({
                   placeholder: '^/ #',
                 }),
               }),
-              components.switch.create('markdown:enable', {
-                label: '自动 Markdown',
-                description: '将纯文本/图文消息自动转为 markdown 发送（官方已全量开放）',
-                defaultSelected: false,
-              }),
               components.switch.create('keyboard:enable', {
                 label: 'URL 自动按钮',
                 description: '将文本中的链接自动转为 keyboard 按钮',
@@ -158,7 +152,6 @@ export default defineConfig({
       guildEnable: boolean
       guildMode: boolean
       regex: string[]
-      'markdown:enable': boolean
       'keyboard:enable': boolean
       'event:type': string
     }>
@@ -189,7 +182,6 @@ export default defineConfig({
         guildEnable: !!item.guildEnable,
         guildMode,
         regex,
-        markdown: { enable: !!item['markdown:enable'] },
         keyboard: { enable: item['keyboard:enable'] !== false },
         event: { type: eventType },
       }

@@ -24,11 +24,6 @@ export interface QQBotConfig {
   guildMode: 0 | 1
   /** 收到消息后对文本进行表达式处理 */
   regex: { reg: string | RegExp; rep: string }[]
-  /** Markdown 自动化 */
-  markdown: {
-    /** 是否将纯文本/图文消息自动转为 markdown 发送 */
-    enable: boolean
-  }
   /** 按钮自动化 */
   keyboard: {
     /** 是否将文本中的 URL 自动转换为 keyboard 按钮 */

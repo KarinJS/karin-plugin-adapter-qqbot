@@ -72,7 +72,6 @@ export const formatConfig = (user: Config): Config => {
   return user.map(item => ({
     ...def,
     ...item,
-    markdown: { ...def.markdown, ...item.markdown },
     keyboard: { ...def.keyboard, ...item.keyboard },
     event: { ...def.event, ...item.event },
   }))
@@ -96,7 +95,6 @@ export const getDefaultConfig = (): Config => [
     regex: [
       { reg: '^/', rep: '#' },
     ],
-    markdown: { enable: false },
     keyboard: { enable: true },
     event: { type: 2 },
   },

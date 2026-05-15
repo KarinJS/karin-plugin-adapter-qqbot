@@ -1,5 +1,4 @@
-import { common, fileToUrl, karinToQQBot } from 'node-karin'
-import { handleUrl, qrs } from '@/utils/common'
+import { fileToUrl, karinToQQBot } from 'node-karin'
 import { groupElements } from './grouping'
 import { extractUrlButtons, imagesToMarkdown } from './text-to-md'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
@@ -35,68 +34,13 @@ export const sendQQ = async (
     grouping.buttons.push(...buttons)
   }
 
-  // 决定通道
-  const useMarkdown = grouping.markdowns.length > 0 ||
-    (ctx.cfg.markdown.enable &&
-        grouping.media.length === 0 &&
-        (grouping.text.length > 0 || grouping.qqImages.length > 0))
-
-  if (useMarkdown) {
-    return sendQQMarkdown(ctx, contact, grouping, target)
-  }
-  return sendQQClassic(ctx, contact, grouping, target)
-}
-
-/**
- * 经典通道：文本（含 URL→ QR）+ 富媒体（图/视频/语音/文件）+ 可选 markdown 行
- */
-const sendQQClassic = async (
-  ctx: AdapterQQBot,
-  contact: Contact<'friend' | 'group'>,
-  grouping: Grouping<'qq'>,
-  target: 'user' | 'group'
-): Promise<SendMsgResults> => {
-  const items: SendQQMsg[] = []
-
-  // 文本 + URL 转 QR（仅在未启用 keyboard.enable 时；启用了走 markdown）
-  let textContent = grouping.text.join('')
-  if (textContent) {
-    const urls = handleUrl(textContent)
-    if (urls.length) {
-      urls.forEach(u => { textContent = textContent.replace(new RegExp(u, 'g'), '[请扫码查看]') })
-      const qrList = await qrs(urls)
-      const qr = qrList.length === 1
-        ? qrList[0]
-        : (await common.mergeImage(qrList, 3)).base64
-      grouping.qqImages.push(qr)
-    }
-    items.push(ctx.super.qq.text(textContent))
-  }
-
-  // 图片
-  for (const file of grouping.qqImages) {
-    const base64 = await common.base64(file)
-    const res = await ctx.super.media.upload(target, contact.peer, 'image', base64, false)
-    items.push(ctx.super.qq.media(res.file_info))
-  }
-
-  // 视频 / 语音 / 文件
-  for (const m of grouping.media) {
-    let url = m.source
-    if (!url.startsWith('http')) {
-      const ext = m.kind === 'record' ? 'mp3' : m.kind === 'video' ? 'mp4' : 'bin'
-      const file = await fileToUrl(m.kind, url, `${m.kind}.${ext}`)
-      url = file.url
-    }
-    const res = await ctx.super.media.upload(target, contact.peer, m.kind, url, false)
-    items.push(ctx.super.qq.media(res.file_info))
-  }
-
-  if (!items.length) {
-    items.push(ctx.super.qq.text('不支持发送的消息类型'))
-  }
-
-  return flushQQ(ctx, contact, grouping, items)
+  /**
+   * 永远走 markdown 通道：
+   * text / at / image 通过 markdown content 渲染（at 用内嵌标签）；
+   * 视频 / 语音 / 文件由 sendQQMarkdown 内部以 msg_type=7 并发补发。
+   * Markdown / Keyboard 已全量开放，无需再走老的 msg_type=0 文本通道。
+   */
+  return sendQQMarkdown(ctx, contact, grouping, target)
 }
 
 /**
@@ -132,15 +76,14 @@ const sendQQMarkdown = async (
     grouping.markdowns.forEach(m => lines.push(m.markdown))
   }
 
-  if (lines.length === 0 && grouping.buttons.length === 0 && grouping.keyboards.length === 0) {
-    items.push(ctx.super.qq.text('不支持发送的消息类型'))
-  } else {
+  // markdown 主消息：有任意可渲染内容才推
+  if (lines.length || grouping.buttons.length || grouping.keyboards.length) {
     const content = lines.join('\n')
     const keyboard = buildKeyboard(grouping)
     items.push(ctx.super.qq.markdown({ content }, keyboard))
   }
 
-  // markdown 通道不携带视频/语音/文件，落到经典通道补发
+  // 视频 / 语音 / 文件 → msg_type=7 单独补发
   for (const m of grouping.media) {
     let url = m.source
     if (!url.startsWith('http')) {
@@ -150,6 +93,10 @@ const sendQQMarkdown = async (
     }
     const res = await ctx.super.media.upload(target, contact.peer, m.kind, url, false)
     items.push(ctx.super.qq.media(res.file_info))
+  }
+
+  if (!items.length) {
+    items.push(ctx.super.qq.text('不支持发送的消息类型'))
   }
 
   return flushQQ(ctx, contact, grouping, items)

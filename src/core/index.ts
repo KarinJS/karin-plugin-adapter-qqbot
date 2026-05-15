@@ -38,7 +38,6 @@ const hashConfig = (bot: QQBotConfig): string => JSON.stringify({
   sandboxApi: bot.sandboxApi,
   sandbox: bot.sandbox,
   event: bot.event,
-  markdown: bot.markdown,
   keyboard: bot.keyboard,
 })
 
