@@ -39,20 +39,28 @@ pnpm add @karinjs/adapter-qqbot
 
 ### 方式 A：扫码登录（推荐）
 
-首次启动且配置为空时，插件自动弹出扫码引导。
-
-```bash
-pnpm dev   # 或 pnpm start
-```
-
-控制台会输出：
+启动后没有任何已配置的 QQBot 时，控制台只打印一行提示：
 
 ```
   ==========================================
-  未检测到启用的 QQBot 配置
-  请使用二维码扫码方式快速添加机器人
-  ==========================================
+  未检测到 QQBot 配置
+  请使用任意可用 bot（如 OneBot / Console 适配器）
+  对机器人发送指令： #QQ登录
+  扫码授权完成后会自动写入配置并完成初始化
 
+  ⚠ 注意：扫码授权会刷新该机器人的 secret，旧 secret 立即失效
+  ==========================================
+```
+
+按提示，在**任意已连接的 bot 适配器**（OneBot、Console、Discord …）下，给机器人发送：
+
+```
+#QQ登录       # 或 #qq登录 / #qqlogin / #QQLogin
+```
+
+服务端控制台随后弹出 ASCII 二维码：
+
+```
   ▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢
   ▢ ASCII QR ▢▢▢▢▢▢▢
   ▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢
@@ -66,8 +74,10 @@ pnpm dev   # 或 pnpm start
 1. 从平台拉取 `appId` + 加密的 `secret`
 2. 本地 AES-256-GCM 解密
 3. 调 `/users/@me` 获取昵称
-4. 写入 `@karinjs/adapter-qqbot/config/config.json`
+4. 写入 `${karin-base}/@karinjs-adapter-qqbot/config/config.json`
 5. `watch` 回调自动初始化 bot，无需重启
+
+> 该指令同样可用于**新增账号**和**刷新已有账号的 secret**。
 
 ### 方式 B：手动配置
 
@@ -290,9 +300,26 @@ src/
 │       ├── portal.ts       q.qq.com 接口
 │       ├── qr.ts           终端二维码 + 轮询
 │       └── index.ts        runQrOnboard / needQrOnboard
+├── apps/                   karin app 插件
+│   └── login.ts            #QQ登录 指令
 ├── types/                  事件、配置、opcode 类型
 └── utils/                  日志、配置读写、文本工具
+
+demo/                       示例 / 烟测 app（不进 npm 包，不自动加载）
+└── qqtest.ts               QQBot 2.0 真号烟测命令集合
 ```
+
+### Verbose 调试
+
+WS 入站消息、bus 派发、dispatcher 路由等关键链路的 debug 日志默认走 `logger.debug`，
+karin 默认日志级别下不可见。诊断「事件收不到」类问题时设置：
+
+```bash
+QQBOT_VERBOSE=1 pnpm dev
+# Windows PowerShell：$env:QQBOT_VERBOSE='1'; pnpm dev
+```
+
+启用后 debug 日志以 `[QQ Official Bot][DEBUG]` 前缀走 mark 级别，强制可见。
 
 ---
 
