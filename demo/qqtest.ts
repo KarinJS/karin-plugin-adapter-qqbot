@@ -16,7 +16,7 @@
  *   #qqtest who          打印 author / sender / contact
  */
 
-import karin, { segment, logger } from 'node-karin'
+import karin, { segment, logger, fs } from 'node-karin'
 
 const ONLY_QQBOT = { adapter: ['qqbot'] }
 
@@ -42,7 +42,7 @@ export const text = karin.command(/^#?qqtest\s+text$/i, async (e) => {
 
 export const md = karin.command(/^#?qqtest\s+md$/i, async (e) => {
   await e.reply([
-    segment.markdown('# 这是 markdown\n\n**加粗** _斜体_\n\n- 列表 1\n- 列表 2'),
+    segment.markdown(fs.readFileSync('1.md', 'utf-8')),
   ])
 }, { name: 'qqtest:md', ...ONLY_QQBOT })
 
