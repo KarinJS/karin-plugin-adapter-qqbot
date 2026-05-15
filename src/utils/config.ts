@@ -1,5 +1,4 @@
 import fs from 'node:fs'
-import path from 'node:path'
 import { dirPath } from '@/root'
 import {
   watch,
@@ -30,46 +29,10 @@ export const pkg = () => requireFileSync(`${dirPath}/package.json`)
 
 /** npm 包名，如 @karinjs/adapter-qqbot */
 const pluginName: string = pkg().name
-/** 文件系统下的目录名：把 npm 包名里的 `/` 规范化为 `-`，与 karin 框架对齐 */
+/** 文件系统目录名：把 npm 包名里的 `/` 规范化为 `-`，与 karin 框架对齐 */
 const pluginDirName: string = pluginName.replace(/\//g, '-')
 /** 配置目录：${basePath}/@karinjs-adapter-qqbot/config */
 const dirConfig = `${basePath}/${pluginDirName}/config`
-/** 1.x / 2.0 早期使用的旧位置（pluginName 含 `/` 导致多嵌一层） */
-const legacyDirConfig = `${basePath}/${pluginName}/config`
-
-/**
- * 启动时若旧位置存在 config.json 而新位置为空，则一次性迁移
- */
-const migrateLegacyConfigIfNeeded = (): void => {
-  const newPath = `${dirConfig}/config.json`
-  const legacyPath = `${legacyDirConfig}/config.json`
-  if (newPath === legacyPath) return
-  if (!fs.existsSync(legacyPath)) return
-
-  // 新位置已有非空内容则不动
-  if (fs.existsSync(newPath)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(newPath, 'utf8'))
-      if (Array.isArray(data) && data.length > 0) return
-    } catch { /* 损坏 / 空文件，继续迁移 */ }
-  }
-
-  try {
-    fs.mkdirSync(dirConfig, { recursive: true })
-    fs.copyFileSync(legacyPath, newPath)
-    const bak = legacyPath + '.migrated.bak'
-    try { fs.renameSync(legacyPath, bak) } catch { /* ignore */ }
-    logger.info(
-      `[QQ Official Bot] 已将旧位置配置迁移到新路径\n` +
-      `  旧: ${path.resolve(legacyPath)}（已重命名为 .migrated.bak）\n` +
-      `  新: ${path.resolve(newPath)}`
-    )
-  } catch (err) {
-    logger.error('[QQ Official Bot] 配置迁移失败:', err)
-  }
-}
-
-migrateLegacyConfigIfNeeded()
 
 /**
  * 读取配置
