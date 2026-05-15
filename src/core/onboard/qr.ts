@@ -2,9 +2,7 @@ import qrcode from 'qrcode'
 import { sleep } from '@/utils/common'
 import { log } from '@/utils/logger'
 import { decryptSecret } from './crypto'
-import {
-  BindStatus, createBindTask, pollBindResult, buildConnectUrl,
-} from './portal'
+import { BindStatus, createBindTask, pollBindResult, buildConnectUrl } from './portal'
 
 /** 默认轮询间隔（毫秒） */
 const POLL_INTERVAL = 2_000
@@ -19,23 +17,45 @@ export interface QrRegisterResult {
   userOpenid: string
 }
 
-const printQr = async (url: string): Promise<void> => {
-  try {
-    const ascii = await qrcode.toString(url, { type: 'terminal', small: true })
-    console.log(ascii)
-    console.log(`  请使用 QQ 扫描上方二维码，或在手机 QQ 打开链接：\n  ${url}\n`)
-  } catch {
-    console.log(`  请在手机 QQ 中打开链接：\n  ${url}\n`)
-  }
+/**
+ * 每次产生新二维码时的回调
+ */
+export interface QrCodeInfo {
+  /** 扫码链接 */
+  url: string
+  /** ASCII 二维码（终端可见） */
+  ascii: string
+  /** PNG 二维码 base64：`base64://xxx`，可直接喂给 segment.image */
+  base64: string
+  /** 第几轮（首次=0，过期刷新 +1） */
+  refresh: number
+}
+
+export interface QrRegisterOptions {
+  /** 总超时秒数，默认 600 */
+  timeoutSeconds?: number
+  /** 每次产生新二维码时的回调（首次 / 过期刷新都会调用） */
+  onQr?: (info: QrCodeInfo) => void | Promise<void>
 }
 
 /**
- * 走一遍扫码登录：
- * 1. 创建绑定任务 + 终端二维码
- * 2. 轮询直到状态变为 COMPLETED / 二维码过期 / 超时
+ * 生成二维码（同时拿到 ascii / base64）
+ */
+const renderQr = async (url: string): Promise<{ ascii: string; base64: string }> => {
+  const ascii = await qrcode.toString(url, { type: 'terminal', small: true }).catch(() => '')
+  const dataUrl = await qrcode.toDataURL(url, { width: 320, margin: 2 })
+  const base64 = `base64://${dataUrl.split(',')[1]}`
+  return { ascii, base64 }
+}
+
+/**
+ * 扫码登录主流程：
+ * 1. 创建绑定任务，调用 onQr 暴露二维码
+ * 2. 轮询直到 COMPLETED / 二维码过期刷新 / 超时
  * 3. 解密返回 secret
  */
-export const qrRegister = async (timeoutSeconds = DEFAULT_TIMEOUT_S): Promise<QrRegisterResult | null> => {
+export const qrRegister = async (opts: QrRegisterOptions = {}): Promise<QrRegisterResult | null> => {
+  const { timeoutSeconds = DEFAULT_TIMEOUT_S, onQr } = opts
   const deadline = Date.now() + timeoutSeconds * 1000
 
   for (let refresh = 0; refresh <= MAX_REFRESHES; refresh++) {
@@ -47,8 +67,23 @@ export const qrRegister = async (timeoutSeconds = DEFAULT_TIMEOUT_S): Promise<Qr
       return null
     }
 
-    console.log()
-    await printQr(buildConnectUrl(task.taskId))
+    const url = buildConnectUrl(task.taskId)
+    const { ascii, base64 } = await renderQr(url)
+
+    // 终端输出（备用，方便服务端运维）
+    if (ascii) {
+      console.log()
+      console.log(ascii)
+    }
+    console.log(`  请使用 QQ 扫码，或在手机 QQ 打开：\n  ${url}\n`)
+
+    if (onQr) {
+      try {
+        await onQr({ url, ascii, base64, refresh })
+      } catch (err) {
+        log('warn', '[扫码登录] onQr 回调异常:', err)
+      }
+    }
 
     while (Date.now() < deadline) {
       let result: Awaited<ReturnType<typeof pollBindResult>>
@@ -71,10 +106,7 @@ export const qrRegister = async (timeoutSeconds = DEFAULT_TIMEOUT_S): Promise<Qr
           log('error', '[扫码登录] 解密 secret 失败:', err)
           return null
         }
-        console.log(`\n  扫码授权成功！App ID: ${result.appId}`)
-        if (result.userOpenid) {
-          console.log(`  扫码用户 OpenID: ${result.userOpenid}`)
-        }
+        log('info', `[扫码登录] 授权成功，App ID: ${result.appId}`)
         return { appId: result.appId, secret, userOpenid: result.userOpenid }
       }
 
@@ -83,7 +115,7 @@ export const qrRegister = async (timeoutSeconds = DEFAULT_TIMEOUT_S): Promise<Qr
           log('error', `[扫码登录] 二维码已过期 ${MAX_REFRESHES} 次，终止流程`)
           return null
         }
-        console.log(`\n  二维码已过期，正在刷新... (${refresh + 1}/${MAX_REFRESHES})`)
+        log('info', `[扫码登录] 二维码过期，正在刷新 (${refresh + 1}/${MAX_REFRESHES})`)
         break
       }
 
