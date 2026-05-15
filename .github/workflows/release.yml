@@ -1,56 +1,57 @@
 name: Release and Publish
+
 on:
   push:
-    # 监听 main 分支的 push 事件
-    branches:
-      - main
-    # 避免在 tag 上重复运行
-    tags:
-      - '!**'
+    branches: [main]
+    tags: ['!**']
 
-# 赋予 release-please-action 权限
+# release-please 需要 contents:write + pull-requests:write
+# npm trusted publishing 需要 id-token:write
 permissions:
   contents: write
   pull-requests: write
+  id-token: write
 
 jobs:
-  # 设置 release-please 任务（正式发布到 NPM）
   release-please:
-    # 设置任务运行环境为 ubuntu-latest
     runs-on: ubuntu-latest
     steps:
-      # 使用 release-please-action 动作来自动创建发布 PR
-      - uses: googleapis/release-please-action@v4
+      - name: Run release-please
+        uses: googleapis/release-please-action@v4
         id: release
         with:
-          # 设置发布类型为 node
           release-type: node
-      # 检出代码
-      - uses: actions/checkout@v4
+
+      - name: Checkout
         if: ${{ steps.release.outputs.release_created }}
-      # 设置 pnpm
-      - uses: pnpm/action-setup@v4
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        if: ${{ steps.release.outputs.release_created }}
+        uses: pnpm/action-setup@v4
         with:
           version: 9
 
-      # 设置 Node.js 环境
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/setup-node@v4
         with:
-          # 设置 Node.js 版本
-          node-version: 22
-          # 设置 npm 源
+          node-version: 24
           registry-url: 'https://registry.npmjs.org'
           cache: pnpm
-      # 安装依赖
-      - run: pnpm install
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.RELEASE }}
+
+      - name: Install dependencies
         if: ${{ steps.release.outputs.release_created }}
-      # 构建输出
-      - run: pnpm run build
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
         if: ${{ steps.release.outputs.release_created }}
-      # 发布到 npm
-      - run: pnpm run pub
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: pnpm run build
+
+      # 使用 npm trusted publishing（OIDC）
+      # 需要在 npm 包后台启用：Settings → Trusted publishers
+      # provider: GitHub Actions / repo: KarinJS/karin-plugin-adapter-qqbot /
+      # workflow: .github/workflows/release.yml / environment: 留空
+      - name: Publish to npm (trusted)
         if: ${{ steps.release.outputs.release_created }}
+        run: npm publish --provenance --access public
