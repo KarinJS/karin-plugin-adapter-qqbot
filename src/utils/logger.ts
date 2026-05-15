@@ -1,38 +1,26 @@
 import { logger, type LogMethodNames } from 'node-karin'
 
-/**
- * 强制把 debug 日志输出到 mark 级别（确保 karin 默认日志级别下也可见）
- * 启用方式：环境变量 QQBOT_VERBOSE=1 或 QQBOT_DEBUG=1
- */
-const VERBOSE =
-  process.env.QQBOT_VERBOSE === '1' ||
-  process.env.QQBOT_DEBUG === '1'
-
 const PREFIX = '[QQ Official Bot]'
 
-const logMethods = {
-  trace: (...args: any[]) => logger.trace(PREFIX, ...args),
-  debug: VERBOSE
-    ? (...args: any[]) => logger.mark(`${PREFIX}[DEBUG]`, ...args)
-    : (...args: any[]) => logger.debug(PREFIX, ...args),
-  info: (...args: any[]) => logger.info(PREFIX, ...args),
-  warn: (...args: any[]) => logger.warn(PREFIX, ...args),
-  error: (...args: any[]) => logger.error(PREFIX, ...args),
-  fatal: (...args: any[]) => logger.fatal(PREFIX, ...args),
-  mark: (...args: any[]) => logger.mark(PREFIX, ...args),
-}
-
-if (VERBOSE) {
-  logger.mark(`${PREFIX} 已启用 VERBOSE 调试模式（QQBOT_VERBOSE=1）`)
+const m = {
+  trace: (...a: any[]) => logger.trace(PREFIX, ...a),
+  debug: (...a: any[]) => logger.debug(PREFIX, ...a),
+  info: (...a: any[]) => logger.info(PREFIX, ...a),
+  warn: (...a: any[]) => logger.warn(PREFIX, ...a),
+  error: (...a: any[]) => logger.error(PREFIX, ...a),
+  fatal: (...a: any[]) => logger.fatal(PREFIX, ...a),
+  mark: (...a: any[]) => logger.mark(PREFIX, ...a),
 }
 
 /**
- * QQBot 日志函数，支持两种调用方式：
+ * QQBot 日志函数
  * - log('info', '消息')
  * - log.info('消息')
+ *
+ * 日志级别由 karin 框架的 log.level 控制
  */
 export function log (level: LogMethodNames, ...args: any[]): void {
-  logMethods[level](...args)
+  m[level](...args)
 }
 
-Object.assign(log, logMethods)
+Object.assign(log, m)
