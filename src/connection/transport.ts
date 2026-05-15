@@ -1,4 +1,5 @@
 import EventEmitter from 'node:events'
+import { log } from '@/utils/logger'
 import type { Event } from '@/types/event'
 
 /**
@@ -12,6 +13,11 @@ bus.setMaxListeners(0)
  * 推送一条事件到业务层
  */
 export const dispatch = (appId: string, ev: Event) => {
+  const n = bus.listenerCount(appId)
+  log('debug', `${appId}: bus.dispatch t=${ev.t} listeners=${n}`)
+  if (n === 0) {
+    log('warn', `${appId}: 收到事件 ${ev.t} 但没有监听器（dispatcher 未注册或已被移除）`)
+  }
   bus.emit(appId, ev)
 }
 

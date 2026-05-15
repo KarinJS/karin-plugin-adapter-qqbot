@@ -1,4 +1,5 @@
 import { logger } from 'node-karin'
+import { log } from '@/utils/logger'
 import { EventEnum } from '@/types/event'
 import {
   onGroupMsg, onFriendMsg, onChannelMsg, onDirectMsg,
@@ -40,6 +41,7 @@ const eventLabel: Record<string, string> = {
 export const dispatch = (client: AdapterQQBot, ev: Event): void => {
   const label = eventLabel[ev.t] || ev.t
   client.logger('debug', `[事件][${label}]`)
+  log('debug', `${client.selfId}: dispatcher routing t=${ev.t} -> ${label}`)
 
   switch (ev.t) {
     case EventEnum.READY:

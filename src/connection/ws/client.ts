@@ -61,7 +61,8 @@ export class WSClient {
       log('debug', `${this.opts.appId}: WebSocket opened (${this.opts.gatewayUrl})`)
     })
 
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
+      log('debug', `${this.opts.appId}: WebSocket close code=${code} reason=${reason?.toString() || '(empty)'}`)
       if (this.closed) return
       this.close('closed')
     })
@@ -70,6 +71,10 @@ export class WSClient {
       log('error', `${this.opts.appId}: WebSocket error:`, err)
       if (this.closed) return
       this.close('error')
+    })
+
+    ws.on('unexpected-response', (_req, res) => {
+      log('error', `${this.opts.appId}: WebSocket unexpected-response status=${res.statusCode} ${res.statusMessage}`)
     })
 
     ws.on('message', (raw) => this.onMessage(raw))
@@ -143,34 +148,49 @@ export class WSClient {
   }
 
   private onMessage (raw: WebSocket.RawData) {
+    const text = raw.toString()
     let msg: any
     try {
-      msg = JSON.parse(raw.toString())
+      msg = JSON.parse(text)
     } catch {
-      log('error', `${this.opts.appId}: non-JSON message: ${raw}`)
+      log('error', `${this.opts.appId}: non-JSON message: ${text}`)
       return
     }
+
+    // 全量入站日志（debug）：op + t + s + 截断 payload
+    log(
+      'debug',
+      `${this.opts.appId}: << op=${msg.op} t=${msg.t ?? '-'} s=${msg.s ?? '-'} ` +
+      `body=${text.length > 500 ? text.slice(0, 500) + '...' : text}`
+    )
 
     switch (msg.op) {
       case Opcode.Hello: {
         this.heartbeatInterval = msg.d?.heartbeat_interval || 45000
+        log('debug', `${this.opts.appId}: Hello received, heartbeat_interval=${this.heartbeatInterval}ms, session=${this.sessionId || '(none)'} seq=${this.seq}`)
         this.startHeartbeat()
         if (this.sessionId && this.seq) this.resume()
         else this.identify()
         break
       }
       case Opcode.HeartbeatACK:
+        log('debug', `${this.opts.appId}: HeartbeatACK`)
         break
       case Opcode.Dispatch: {
         if (typeof msg.s === 'number') this.seq = msg.s
         if (msg.t === 'READY') {
           this.sessionId = msg.d?.session_id || ''
+          log('debug', `${this.opts.appId}: READY received, session_id=${this.sessionId}`)
         }
-        this.opts.onEvent(msg as Event)
+        try {
+          this.opts.onEvent(msg as Event)
+        } catch (err) {
+          log('error', `${this.opts.appId}: onEvent handler threw:`, err)
+        }
         break
       }
       case Opcode.Reconnect: {
-        log('debug', `${this.opts.appId}: server asked reconnect`)
+        log('debug', `${this.opts.appId}: server asked reconnect (op:7)`)
         this.close('reconnect')
         break
       }
@@ -181,6 +201,7 @@ export class WSClient {
           this.seq = 0
           this.close('session_lost')
         } else {
+          log('error', `${this.opts.appId}: auth_fail (op:9 with no prior session)`)
           this.close('auth_fail')
         }
         break
