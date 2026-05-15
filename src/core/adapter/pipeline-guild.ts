@@ -24,10 +24,10 @@ export const sendGuild = async (
     grouping.buttons.push(...buttons)
   }
 
-  const useMarkdown = grouping.markdowns.length > 0
-    || (ctx.cfg.markdown.enable
-        && grouping.media.length === 0
-        && (grouping.text.length > 0 || grouping.guildImageUrls.length > 0 || grouping.guildImageFiles.length > 0))
+  const useMarkdown = grouping.markdowns.length > 0 ||
+    (ctx.cfg.markdown.enable &&
+        grouping.media.length === 0 &&
+        (grouping.text.length > 0 || grouping.guildImageUrls.length > 0 || grouping.guildImageFiles.length > 0))
 
   if (useMarkdown) {
     return sendGuildMarkdown(ctx, contact, grouping)

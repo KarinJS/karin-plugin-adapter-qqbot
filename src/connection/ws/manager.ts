@@ -104,7 +104,8 @@ export const start = async (cfg: QQBotConfig): Promise<void> => {
   // 注册占位 conn，pendingTimer 能在 stop 时被取消
   conns.set(cfg.appId, {
     client: null,
-    cfg, intents,
+    cfg,
+    intents,
     intentHistory: [intents],
     aborted: false,
   })

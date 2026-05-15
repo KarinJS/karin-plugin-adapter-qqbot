@@ -17,7 +17,7 @@ export const BindStatus = {
   COMPLETED: 2,
   EXPIRED: 3,
 } as const
-export type BindStatus = typeof BindStatus[keyof typeof BindStatus]
+export type BindStatusValue = typeof BindStatus[keyof typeof BindStatus]
 
 interface ApiEnvelope<T> {
   retcode: number
@@ -63,7 +63,7 @@ export const pollBindResult = async (taskId: string) => {
   if (data.retcode !== 0) throw new Error(`poll_bind_result: ${data.msg || 'unknown error'}`)
   const d = data.data ?? ({} as Partial<PollData>)
   return {
-    status: (d.status ?? BindStatus.NONE) as BindStatus,
+    status: (d.status ?? BindStatus.NONE) as BindStatusValue,
     appId: String(d.bot_appid ?? ''),
     encryptedSecret: d.bot_encrypt_secret ?? '',
     userOpenid: d.user_openid ?? '',

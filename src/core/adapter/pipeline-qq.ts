@@ -36,10 +36,10 @@ export const sendQQ = async (
   }
 
   // 决定通道
-  const useMarkdown = grouping.markdowns.length > 0
-    || (ctx.cfg.markdown.enable
-        && grouping.media.length === 0
-        && (grouping.text.length > 0 || grouping.qqImages.length > 0))
+  const useMarkdown = grouping.markdowns.length > 0 ||
+    (ctx.cfg.markdown.enable &&
+        grouping.media.length === 0 &&
+        (grouping.text.length > 0 || grouping.qqImages.length > 0))
 
   if (useMarkdown) {
     return sendQQMarkdown(ctx, contact, grouping, target)
