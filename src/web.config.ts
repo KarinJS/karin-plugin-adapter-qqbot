@@ -1,12 +1,12 @@
 import { Config } from './types'
-import { pkg, config, writeConfig } from './utils'
+import { config } from './utils'
 import { defineConfig, components } from 'node-karin'
 
 export default defineConfig({
   info: {
-    id: pkg().name,
+    id: config.pkg().name,
     name: 'QQBot 适配器',
-    version: pkg().version,
+    version: config.pkg().version,
     description: '为 karin 提供 QQ 官方 Bot 连接能力（2.0）',
     author: [
       {
@@ -195,7 +195,7 @@ export default defineConfig({
       }
     })
 
-    writeConfig(data)
+    config.writeConfig(data)
     return { success: true, message: '保存成功' }
   },
 })

@@ -1,5 +1,5 @@
 import fs from 'node:fs'
-import { dirPath } from '@/utils/dir'
+import { dirPath } from '@/root'
 import {
   watch,
   basePath,
