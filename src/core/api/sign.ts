@@ -1,51 +1,39 @@
 import nacl from 'tweetnacl'
 
 /**
- * 从提供的种子生成密钥对
- * @param seed 用于生成密钥的种子
+ * 从 secret 生成密钥对（不足 32 字节循环填充）
  */
 export const generateKeyPair = (seed: string) => {
   let finalSeed = seed
-  while (finalSeed.length < 32) {
-    finalSeed = finalSeed.repeat(2)
-  }
+  while (finalSeed.length < 32) finalSeed = finalSeed.repeat(2)
   finalSeed = finalSeed.slice(0, 32)
   const seedBuffer = Buffer.from(finalSeed, 'utf-8')
-  const keyPair = nacl.sign.keyPair.fromSeed(seedBuffer)
-  return keyPair
+  return nacl.sign.keyPair.fromSeed(seedBuffer)
 }
 
 /**
- * 使用提供的私钥、事件时间戳和明文令牌对消息进行签名
- * @param privateKey 用于签名的私钥
- * @param eventTs 计算签名使用时间戳
- * @param plainToken 需要计算签名的字符串
- * @returns 生成的十六进制格式的签名
+ * 用 secret 对 eventTs + plainToken 签名（hex 编码）
  */
-export const signMessage = (
-  privateKey: Uint8Array,
-  eventTs: string,
-  plainToken: string
-) => {
-  const message = eventTs + plainToken
-  const messageBytes = Buffer.from(message, 'utf-8')
-  const signature = nacl.sign.detached(messageBytes, privateKey)
+export const sign = (secret: string, eventTs: string, plainToken: string): string => {
+  const { secretKey } = generateKeyPair(secret)
+  const messageBytes = Buffer.from(eventTs + plainToken, 'utf-8')
+  const signature = nacl.sign.detached(messageBytes, secretKey)
   return Buffer.from(signature).toString('hex')
 }
 
 /**
- * 签名
+ * 验证 webhook 推送签名（ed25519）
  * @param secret 机器人密钥
- * @param eventTs 计算签名使用时间戳
- * @param plainToken 需要计算签名的字符串
- * @returns 生成的十六进制格式的签名
+ * @param timestamp x-signature-timestamp 头
+ * @param rawBody 原始 body 字符串
+ * @param ed25519Hex x-signature-ed25519 头
  */
-export const sign = (
+export const verifySignature = (
   secret: string,
-  eventTs: string,
-  plainToken: string
-) => {
-  const { secretKey } = generateKeyPair(secret)
-  const signature = signMessage(secretKey, eventTs, plainToken)
-  return signature
+  timestamp: string,
+  rawBody: string,
+  ed25519Hex: string
+): boolean => {
+  const expected = sign(secret, timestamp, rawBody)
+  return expected === ed25519Hex
 }
