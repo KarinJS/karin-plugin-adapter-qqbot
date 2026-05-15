@@ -2,7 +2,7 @@ import { URL } from 'url'
 import { logger, registerBot, unregisterBot } from 'node-karin'
 import { QQBotApi } from '@/core/api'
 import { config, pkg, bindHandlers } from '@/utils/config'
-import { createAxiosInstance, getAccessToken } from '@/core/internal/axios'
+import { createAxiosInstance, getAccessToken, stopTokenRefresh } from '@/core/internal/axios'
 import { AdapterQQBot } from '@/core/adapter/base'
 import { dispatch as dispatchEvent } from '@/core/event/dispatcher'
 import { bus, offAll } from '@/connection/transport'
@@ -68,6 +68,7 @@ export const createBot = async (bot: QQBotConfig): Promise<void> => {
     unregisterBot('selfId', appId)
     ws.stop(appId)
     offAll(appId)
+    stopTokenRefresh(appId)
 
     logger.info(`[QQ Official Bot][${appId}] 获取 access_token...`)
     await getAccessToken(bot.tokenApi, appId, bot.secret)
@@ -111,5 +112,15 @@ export const createBot = async (bot: QQBotConfig): Promise<void> => {
   return promise
 }
 
-// 把 createBot / stop 注入到 config watch 回调
-bindHandlers(createBot, ws.stop)
+/**
+ * 销毁 bot：注销 + 关 WS + 取消监听 + 停止 token 刷新
+ */
+export const destroyBot = (appId: string): void => {
+  unregisterBot('selfId', appId)
+  ws.stop(appId)
+  offAll(appId)
+  stopTokenRefresh(appId)
+}
+
+// 把 createBot / destroyBot 注入到 config watch 回调
+bindHandlers(createBot, destroyBot)

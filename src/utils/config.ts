@@ -6,23 +6,22 @@ import {
   requireFileSync,
   common,
   logger,
-  unregisterBot,
 } from 'node-karin'
 import type { Config, QQBotConfig } from '@/types/config'
 
 let cache: Config | undefined
 const cacheMap: Record<string, QQBotConfig> = {}
 
-/** 延迟解析，避免循环依赖 */
+/** 延迟注入，避免与 core/index.ts 循环依赖 */
 let _createBot: ((cfg: QQBotConfig) => Promise<void>) | undefined
-let _stopWs: ((appId: string) => boolean) | undefined
+let _destroyBot: ((appId: string) => void) | undefined
 
 export const bindHandlers = (
   createBot: (cfg: QQBotConfig) => Promise<void>,
-  stopWs: (appId: string) => boolean
+  destroyBot: (appId: string) => void
 ) => {
   _createBot = createBot
-  _stopWs = stopWs
+  _destroyBot = destroyBot
 }
 
 /** package.json */
@@ -109,10 +108,7 @@ setTimeout(() => {
 
     const diff = common.diffArray(old, now)
 
-    diff.removed.forEach(v => {
-      unregisterBot('selfId', v.appId)
-      if (v.event.type === 2) _stopWs?.(v.appId)
-    })
+    diff.removed.forEach(v => _destroyBot?.(v.appId))
 
     if (diff.added.length > 0) {
       const ids = new Set(diff.added.map(v => v.appId))
@@ -128,8 +124,7 @@ setTimeout(() => {
       if (!prev) return
       if (JSON.stringify(prev) === JSON.stringify(curr)) return
       logger.info(`[QQ Official Bot][配置监听] 配置已变更: ${curr.appId}，重新初始化`)
-      unregisterBot('selfId', prev.appId)
-      if (prev.event.type === 2) _stopWs?.(prev.appId)
+      _destroyBot?.(prev.appId)
       if (curr.event.type !== 0) _createBot?.(curr)
     })
   })

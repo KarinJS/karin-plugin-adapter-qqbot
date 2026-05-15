@@ -1,74 +1,96 @@
 import axios from 'node-karin/axios'
+import { log } from '@/utils/logger'
 
-/** 存储Bot对应的鉴权凭证 */
-const BotMap = new Map<string, string>()
-
-/** 获取调用凭证返回类型 */
-export interface AccessTokenResponse {
-  /** 获取到的凭证 */
+/**
+ * 每个 appId 一份 token 状态
+ */
+interface TokenState {
   accessToken: string
-  /** 凭证有效时间，单位：秒。目前是7200秒之内的值。 */
-  expiresIn: number
+  /** 刷新定时器，销毁 bot 时需要清理 */
+  refreshTimer?: NodeJS.Timeout
+}
+
+const tokens = new Map<string, TokenState>()
+
+/** access_token 接口返回 */
+interface AccessTokenResponse {
+  access_token: string
+  expires_in: number | string
 }
 
 /**
- * @description 获取调用凭证
- * @param url 请求地址
- * @param appId 机器人ID
- * @param secret 机器人密钥
- * @returns 获取到的凭证
- * @throws 获取调用凭证失败
+ * 拉取 access_token 并安排下一次刷新
+ * - 提前 50s 刷新，防止边界过期
+ * - 同一 appId 旧定时器会被清理，避免并发刷新链
  */
-export const getAccessToken = async (url: string, appId: string, secret: string) => {
-  const response = await axios.post(url, {
-    appId: String(appId),
-    clientSecret: secret,
-  })
-
-  const { access_token: accessToken, expires_in: expiresIn } = response.data
-  if (!accessToken || !expiresIn) {
-    throw new Error(`获取调用凭证失败: ${JSON.stringify(response.data)}`)
+export const getAccessToken = async (
+  url: string,
+  appId: string,
+  secret: string
+): Promise<{ accessToken: string; expiresIn: number }> => {
+  let res
+  try {
+    res = await axios.post<AccessTokenResponse>(url, {
+      appId: String(appId),
+      clientSecret: secret,
+    })
+  } catch (err) {
+    log('error', `[${appId}] 获取 access_token 失败:`, err)
+    throw err
   }
 
-  BotMap.set(appId, accessToken)
+  const accessToken = res.data?.access_token
+  const expiresIn = Number(res.data?.expires_in)
+  if (!accessToken || !expiresIn || Number.isNaN(expiresIn)) {
+    throw new Error(`获取 access_token 失败: ${JSON.stringify(res.data)}`)
+  }
 
-  /** 剩下1分钟开始刷新 */
-  setTimeout(() => {
-    getAccessToken(url, appId, secret)
-  }, Number(expiresIn) * 1000 - 50000)
+  // 取出旧 state 清理定时器
+  const prev = tokens.get(appId)
+  if (prev?.refreshTimer) clearTimeout(prev.refreshTimer)
+
+  const state: TokenState = { accessToken }
+  tokens.set(appId, state)
+
+  // 提前 50s 刷新，避免边界过期
+  const delay = Math.max(5_000, expiresIn * 1000 - 50_000)
+  state.refreshTimer = setTimeout(() => {
+    getAccessToken(url, appId, secret).catch(() => { /* 错误已记录 */ })
+  }, delay)
 
   return { accessToken, expiresIn }
 }
 
 /**
- * 获取指定 appId 的 access_token
- * @param appId 机器人ID
- * @returns access_token 或 undefined
+ * 读取已缓存的 access_token
  */
 export const getBotAccessToken = (appId: string): string | undefined => {
-  return BotMap.get(appId)
+  return tokens.get(appId)?.accessToken
 }
 
 /**
- * @description 创建axios实例
- * @param url 请求地址
- * @param appId 机器人ID
+ * 停止某个 bot 的 token 刷新（销毁 bot 时调用）
  */
-export const createAxiosInstance = (url: string, appId: string) => {
+export const stopTokenRefresh = (appId: string): void => {
+  const state = tokens.get(appId)
+  if (!state) return
+  if (state.refreshTimer) clearTimeout(state.refreshTimer)
+  tokens.delete(appId)
+}
+
+/**
+ * 创建 axios 实例，自动从 tokens map 取最新 access_token
+ */
+export const createAxiosInstance = (baseURL: string, appId: string) => {
   const instance = axios.create({
-    baseURL: url,
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    baseURL,
+    headers: { 'Content-Type': 'application/json' },
     timeout: 5500,
   })
-
-  instance.interceptors.request.use(
-    (config) => {
-      config.headers.Authorization = `QQBot ${BotMap.get(appId)}`
-      return config
-    }
-  )
-
+  instance.interceptors.request.use(config => {
+    const token = tokens.get(appId)?.accessToken
+    if (token) config.headers.Authorization = `QQBot ${token}`
+    return config
+  })
   return instance
 }
