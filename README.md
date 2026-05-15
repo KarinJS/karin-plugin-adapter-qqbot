@@ -1,869 +1,323 @@
 # @karinjs/adapter-qqbot
 
-QQ机器人适配器插件，为 Karin 框架提供 QQ 机器人支持。
+[![npm](https://img.shields.io/npm/v/@karinjs/adapter-qqbot?style=flat-square)](https://www.npmjs.com/package/@karinjs/adapter-qqbot)
+[![license](https://img.shields.io/npm/l/@karinjs/adapter-qqbot?style=flat-square)](./LICENSE)
 
-## 功能特性
+为 [Karin](https://github.com/KarinJS/Karin) 框架提供 QQ 官方机器人接入能力。
 
-- ✅ 支持 QQ 群聊消息收发
-- ✅ 支持 QQ 好友消息收发
-- ✅ 支持 QQ 频道消息收发
-- ✅ 支持 WebSocket 和 Webhook 两种连接方式
-- ✅ 支持多种 Markdown 模板（原生、图文模板、纯文模板）
-- ✅ 支持沙盒环境和正式环境
-- ✅ 完整的 TypeScript 类型定义
-- ✅ 自动消息签名验证
+> **2.0 已发布**：完整重写，对齐 QQ 开放平台 2026 年起的新事件协议
+> （`GROUP_MESSAGE_CREATE` 全量群聊消息 + `mentions` 数组），并适配
+> Markdown / Keyboard 全量开放后的发送方式。
+
+---
+
+## 特性
+
+- 🌐 **完整事件支持**：群聊（@/全量）、单聊、频道、频道私信、按钮点击、机器人入退群、主动消息开关
+- 📨 **双发送通道**：自动选择「经典通道」（text + media）或「Markdown 通道」（msg_type=2 + keyboard），按消息内容与配置开关
+- 🔌 **双接入方式**：WebSocket（推荐，无需公网）/ Webhook（QQ 主动推送）
+- ♻️ **WebSocket Resume**：断网自动重连，携带 `session_id` / `seq` 通过 `op:6` 恢复，减少消息丢失
+- 🔑 **扫码登录**：插件首次启动自动二维码引导，授权后写回 `config.json`
+- 🧩 **按钮回调**：完整接入 `INTERACTION_CREATE`，自动 ack 并以普通消息事件投递给业务层
+- 🛡️ **签名校验**：webhook 入口自动用 ed25519 校验
+- 📐 **完整 TypeScript 类型**
+- 🧹 **零 1.x 残留**：不再依赖 Markdown 模板 / keyboard 模板 / 中转服务
+
+---
 
 ## 安装
 
-### 使用 pnpm（推荐）
-
 ```bash
-pnpm add @karinjs/adapter-qqbot -w
+pnpm add @karinjs/adapter-qqbot
 ```
 
-### 使用 npm
+> 要求 Node.js >= 18，Karin >= 1.15
 
-```bash
-npm install @karinjs/adapter-qqbot
-```
-
-### 使用 yarn
-
-```bash
-yarn add @karinjs/adapter-qqbot
-```
+---
 
 ## 快速开始
 
-### 前置要求
+### 方式 A：扫码登录（推荐）
 
-- 已安装并配置好 [Karin 框架](https://github.com/KarinJS/Karin)
-- Node.js >= 16
-- 有QQ开放平台的机器人应用
+首次启动且配置为空时，插件自动弹出扫码引导。
 
-### 5分钟快速配置
-
-1. **安装插件**
-   ```bash
-   pnpm add @karinjs/adapter-qqbot -w
-   ```
-
-2. **获取机器人信息**
-   - 访问 [QQ开放平台](https://bot.q.qq.com/)
-   - 创建机器人应用，获取 AppID 和 Secret
-
-3. **创建配置**
-   ```json
-   [
-     {
-       "appId": "你的AppID",
-       "secret": "你的Secret",
-       "event": { "type": 1 }
-     }
-   ]
-   ```
-
-4. **配置回调地址**
-   - 在QQ开放平台设置**统一**回调地址：`https://你的域名/qqbot/webhook`
-   - **必须使用HTTPS协议**，端口必须为443（默认HTTPS端口）
-   - 该地址接收所有事件：群聊、C2C私聊、频道消息等
-
-5. **启动服务**
-   ```bash
-   npm start
-   ```
-
-完成！现在可以邀请机器人到群聊测试了。
-
-## 详细配置指南
-
-### 第一步：获取机器人凭证
-
-1. 访问 [QQ开放平台](https://bot.q.qq.com/)
-2. 登录并创建新的机器人应用
-3. 获取 `AppID` 和 `Secret`
-4. 记录这些信息，后续配置需要用到
-
-### 第二步：创建配置文件
-
-配置文件位置：`@karinjs/@karinjs-adapter-qqbot/config/config.json`
-
-如果文件不存在，插件会自动创建一个空的配置文件。
-
-### 第三步：基本配置
-
-#### 最简配置示例
-
-```json
-[
-  {
-    "appId": "你的机器人AppID",
-    "secret": "你的机器人Secret"
-  }
-]
+```bash
+pnpm dev   # 或 pnpm start
 ```
 
-#### 完整配置示例
+控制台会输出：
+
+```
+  ==========================================
+  未检测到启用的 QQBot 配置
+  请使用二维码扫码方式快速添加机器人
+  ==========================================
+
+  ▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢
+  ▢ ASCII QR ▢▢▢▢▢▢▢
+  ▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢
+
+  请使用 QQ 扫描上方二维码，或在手机 QQ 打开链接：
+  https://q.qq.com/qqbot/openclaw/connect.html?task_id=...
+```
+
+手机 QQ 扫码授权后，插件自动：
+
+1. 从平台拉取 `appId` + 加密的 `secret`
+2. 本地 AES-256-GCM 解密
+3. 调 `/users/@me` 获取昵称
+4. 写入 `@karinjs/adapter-qqbot/config/config.json`
+5. `watch` 回调自动初始化 bot，无需重启
+
+### 方式 B：手动配置
+
+在 [QQ 开放平台](https://bot.q.qq.com/) 创建机器人，记录 `AppID` 与 `Secret`，然后编辑：
+
+`@karinjs/adapter-qqbot/config/config.json`：
 
 ```json
 [
   {
-    "appId": "你的机器人AppID",
-    "secret": "你的机器人Secret",
+    "name": "我的机器人",
+    "appId": "1234567890",
+    "secret": "your-secret",
     "prodApi": "https://api.sgroup.qq.com",
     "sandboxApi": "https://sandbox.api.sgroup.qq.com",
-    "tokenApi": "",
+    "tokenApi": "https://bots.qq.com/app/getAppAccessToken",
     "sandbox": false,
     "qqEnable": true,
     "guildEnable": true,
     "guildMode": 0,
-    "exclude": [],
-    "regex": [
-      {
-        "reg": "^/",
-        "rep": "#"
-      }
-    ],
-    "markdown": {
-      "mode": 0,
-      "id": "",
-      "kv": [
-        "text_start",
-        "img_dec", 
-        "img_url",
-        "text_end"
-      ]
-    },
-    "event": {
-      "type": 1,
-      "wsUrl": "",
-      "wsToken": ""
-    }
+    "regex": [{ "reg": "^/", "rep": "#" }],
+    "markdown": { "enable": false },
+    "keyboard": { "enable": true },
+    "event": { "type": 2 }
   }
 ]
 ```
 
-### 第四步：选择事件接收方式
+保存即生效（`watch` 自动重载）。
 
-#### 方式一：Webhook（推荐）
+---
 
-**适用场景：** 有公网IP或域名的服务器
+## 配置项详解
 
-1. 在配置文件中设置：
+| 字段 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `name` | string | `""` | 机器人显示名（扫码登录会自动获取） |
+| `appId` | string | — | 机器人 AppID（**必填**） |
+| `secret` | string | — | 机器人 Secret（**必填**） |
+| `prodApi` | string | `https://api.sgroup.qq.com` | 正式环境 API 基址 |
+| `sandboxApi` | string | `https://sandbox.api.sgroup.qq.com` | 沙盒环境 API 基址 |
+| `tokenApi` | string | `https://bots.qq.com/app/getAppAccessToken` | access_token 获取接口 |
+| `sandbox` | boolean | `false` | 是否启用沙盒环境 |
+| `qqEnable` | boolean | `true` | 是否处理单聊 / 群聊 |
+| `guildEnable` | boolean | `true` | 是否处理频道消息 |
+| `guildMode` | `0` \| `1` | `0` | `0` 公域（只接 @ 消息）/ `1` 私域（所有消息） |
+| `regex` | object[] | `[{reg:"^/", rep:"#"}]` | 收到消息后对文本执行的正则替换 |
+| `markdown.enable` | boolean | `false` | 是否将纯文本/图文消息**自动**转为 markdown 发送 |
+| `keyboard.enable` | boolean | `true` | 是否将文本中的 URL **自动**转为 keyboard 按钮 |
+| `event.type` | `0` \| `1` \| `2` | `2` | 事件接收方式：0 关闭 / 1 webhook / 2 WebSocket |
+
+---
+
+## 事件接收方式
+
+### WebSocket（推荐，`event.type: 2`）
+
+- 主动连接 QQ 官方 `wss://api.sgroup.qq.com/websocket/`
+- 无需公网 IP / HTTPS 证书
+- intents 自动探测，从最大权限位逐级回退到可用集合
+- **自动 Resume**：断网时记录 `session_id` / `seq`，下次连接走 `op:6` 让服务端补发丢失的事件；服务端拒绝 Resume 时降级 Identify
+- 指数退避重连：`1.5s × 2^n + jitter`，上限 30s
+
+### Webhook（`event.type: 1`）
+
+- QQ 主动推送 `POST /qqbot/webhook` 到你的服务
+- 自动处理 `op:13` 鉴权回调（签名回包）
+- 普通事件用 ed25519 校验签名
+- 需要公网 HTTPS：在 QQ 开放平台后台配置「统一回调地址」为 `https://your-domain/qqbot/webhook`
+
+---
+
+## 发送通道
+
+适配器内部按以下规则选择通道，**业务层无感**：
+
+```
+含 segment.markdown(...)            → markdown 通道
+markdown.enable=true 且无视频/语音    → markdown 通道
+其余                                 → 经典通道
+```
+
+### 经典通道
+
+- 文本：`msg_type=0`
+- 图片 / 视频 / 语音 / 文件：`msg_type=7`（先 `/v2/.../files` 上传换取 `file_info`）
+- 文本中带 URL（关闭 `keyboard.enable` 时）：自动转 QR 图，避免链接审核问题
+
+### Markdown 通道
+
+- 文本 + 图片合并为一段 markdown：`![karin #宽px #高px](url)` 内嵌
+- 文本中 URL（开启 `keyboard.enable` 时）自动转 `segment.button` 挂载到 `keyboard.content.rows`
+- 显式 `segment.markdown(...)` / `segment.keyboard(...)` 直接走此通道
+
+> ⚠️ Markdown 通道不支持视频、语音、文件 —— 这些 element 会被自动 fallback 到经典通道追加发送。
+
+---
+
+## 按钮回调（INTERACTION_CREATE）
+
+收到按钮点击时，适配器：
+
+1. 立即 `PUT /interactions/{id}` `code=0` 回 ack，防止客户端 loading
+2. 将事件转为对应场景的消息事件投递：
+   - `chat_type=0` → guild message
+   - `chat_type=1` → group message
+   - `chat_type=2` → friend message
+3. 消息 elements 结构：
+
+```ts
+[
+  segment.at(selfId),       // 群 / 单聊场景自动补
+  segment.text(button_data),
+  segment.json('{"tag":"qqbot-button-click","button_id":"...","button_data":"...",...}'),
+  // srcReply 末尾自动追加 segment.pasmsg(id, 'event')
+]
+```
+
+业务层通过 `e.rawEvent.t === 'INTERACTION_CREATE'` 区分普通消息与按钮点击。
+
+---
+
+## 群聊消息事件
+
+QQ 官方 2026 起的新版 `GROUP_MESSAGE_CREATE` 报文：
+
 ```json
 {
-  "event": {
-    "type": 1
+  "op": 0, "t": "GROUP_MESSAGE_CREATE",
+  "d": {
+    "author": {
+      "id": "...", "member_openid": "...", "union_openid": "",
+      "username": "小布丁qwq", "bot": false
+    },
+    "content": " /分布 ",
+    "group_id": "...", "group_openid": "...",
+    "id": "ROBOT1.0_...",
+    "mentions": [
+      { "is_you": true, "scope": "single", "username": "方舟生存飞升", "...": "..." }
+    ],
+    "message_scene": { "ext": ["msg_idx=REFIDX_..."], "source": "default" },
+    "message_type": 0,
+    "timestamp": "2026-05-08T13:24:53+08:00"
   }
 }
 ```
 
-2. 在QQ开放平台配置回调地址：
-   - 回调地址格式：`https://你的域名/qqbot/webhook`
-   - 例如：`https://your-domain.com/qqbot/webhook`
-   - **⚠️ 重要限制：**
-     - 必须使用 **HTTPS** 协议
-     - 端口必须为 **443**（标准HTTPS端口）
-     - 不支持自定义端口（如:8080、:3000等）
-   
-> **重要说明：** 这是**统一的回调地址**，QQ开放平台会将所有配置的事件类型（群聊、C2C私聊、频道消息等）都发送到这个地址。您不需要为不同的消息类型配置不同的回调地址。
+适配器行为：
 
-#### 方式二：WebSocket
+- 当 `mentions[].is_you === true` 时，elements 头部自动补 `segment.at(self)`
+- `author.username` 写入 `sender.nick`
+- `cfg.regex` 应用到 content 拆分后的每个文本段
+- 原始报文完整保留在 `e.rawEvent`，业务层可访问 `mentions` / `message_scene` / `message_type`
 
-**适用场景：** 内网环境，需要通过中转服务连接
+---
 
-1. 在配置文件中设置：
-```json
-{
-  "event": {
-    "type": 2,
-    "wsUrl": "wss://your-websocket-server/ws",
-    "wsToken": "你的ws认证token"
-  }
-}
-```
+## 撤回 / 引用回复 / 被动消息
 
-### 第五步：反向代理配置（重要）
+- **撤回**：`bot.recallMsg(contact, messageId)` —— 自动按场景调用 `/v2/users` / `/v2/groups` / `/channels` / `/dms`
+- **引用回复**：传入 `segment.reply(messageId)`，仅附加在第一条消息上
+- **被动消息白名单**：
+  - 单聊 `event_id` 接受：`INTERACTION_CREATE` / `C2C_MSG_RECEIVE` / `FRIEND_ADD`
+  - 群聊 `event_id` 接受：`INTERACTION_CREATE` / `GROUP_ADD_ROBOT` / `GROUP_MSG_RECEIVE`
 
-> **为什么需要反向代理？**
-> 
-> QQ开放平台对Webhook回调地址有严格要求：
-> - **必须使用HTTPS协议**（不支持HTTP）
-> - **端口必须为443**（标准HTTPS端口，不支持自定义端口）
-> - 必须有有效的SSL证书
-> 
-> 如果你的Karin服务运行在：
-> - 内网服务器（如家用电脑、局域网服务器）
-> - 云服务器的内网端口（如3000端口）
-> - Docker容器内部
-> 
-> 就需要通过反向代理将内网服务暴露到公网的443端口，并配置SSL证书。
+---
 
-#### 反向代理的目标
+## Web 配置面板
 
-**反向代理要代理的地址：** `http://127.0.0.1:3000/qqbot/webhook`
+Karin 内置 Web 面板可视化编辑 `config.json`，本插件提供以下控件：
 
-这是Karin QQBot适配器监听的统一webhook接收地址，用于接收**所有类型**的QQ机器人事件，包括：
-- 群聊消息（GROUP_AT_MESSAGE_CREATE）
-- C2C私聊消息（C2C_MESSAGE_CREATE）
-- 频道消息（GUILD_MESSAGE_CREATE）
-- 频道私信（DIRECT_MESSAGE_CREATE）
-- 其他机器人事件
+- 基础字段：name / appId / secret / prodApi / sandboxApi / tokenApi
+- 沙盒、QQ 场景、频道场景、频道私域模式开关
+- 正则规则列表（每行 `<regex> <replacement>`）
+- **自动 Markdown** 开关（`markdown.enable`）
+- **URL 自动按钮** 开关（`keyboard.enable`）
+- 事件接收方式（关闭 / Webhook / WebSocket）
 
-QQ开放平台会将所有配置的事件都发送到这个统一的回调地址，然后由适配器内部根据事件类型进行分发处理。
+---
 
-#### 方案一：Nginx 反向代理（推荐）
-
-**1. 安装Nginx**
-```bash
-# Ubuntu/Debian
-sudo apt update && sudo apt install nginx
-
-# CentOS/RHEL
-sudo yum install nginx
-```
-
-**2. 创建配置文件**
-
-创建 `/etc/nginx/sites-available/karin-qqbot`：
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;  # 替换为你的域名或公网IP
-    
-    # QQ机器人webhook接收地址
-    location /qqbot/webhook {
-        # 代理到本地Karin服务
-        proxy_pass http://127.0.0.1:3000/qqbot/webhook;
-        
-        # 必要的代理头设置
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        
-        # 关键配置：保持原始请求体用于签名验证
-        proxy_buffering off;
-        proxy_request_buffering off;
-        proxy_read_timeout 300;
-        proxy_connect_timeout 300;
-        proxy_send_timeout 300;
-    }
-    
-    # 可选：为Karin的其他功能添加代理
-    location /karin/ {
-        proxy_pass http://127.0.0.1:3000/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-**获取免费SSL证书（Let's Encrypt）：**
-
-```bash
-# 1. 安装certbot
-sudo apt update
-sudo apt install certbot python3-certbot-nginx
-
-# 2. 获取SSL证书（自动配置Nginx）
-sudo certbot --nginx -d your-domain.com
-
-# 3. 测试自动续期
-sudo certbot renew --dry-run
-
-# 4. 设置自动续期（可选）
-sudo crontab -e
-# 添加以下行：
-# 0 12 * * * /usr/bin/certbot renew --quiet
-```
-
-**手动配置SSL证书：**
-
-如果你有其他SSL证书提供商的证书，按以下格式配置：
-
-```nginx
-ssl_certificate /path/to/your/certificate.crt;      # 证书文件
-ssl_certificate_key /path/to/your/private.key;     # 私钥文件
-```
-
-**3. 启用配置**
-```bash
-# 创建软链接启用站点
-sudo ln -s /etc/nginx/sites-available/karin-qqbot /etc/nginx/sites-enabled/
-
-# 测试配置文件语法
-sudo nginx -t
-
-# 重载配置
-sudo systemctl reload nginx
-
-# 确保Nginx开机自启
-sudo systemctl enable nginx
-```
-
-**4. 配置HTTPS（必需）**
-
-> **⚠️ 重要：** QQ开放平台**强制要求**使用HTTPS协议和443端口，以下配置是**必需的**，不是可选的。
-
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name your-domain.com;
-    
-    # SSL证书配置（使用Let's Encrypt免费证书）
-    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
-    
-    # 如果没有SSL证书，可以使用以下命令获取Let's Encrypt免费证书：
-    # sudo apt install certbot python3-certbot-nginx
-    # sudo certbot --nginx -d your-domain.com
-    
-    # SSL优化配置
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers EECDH+AESGCM:EDH+AESGCM;
-    ssl_prefer_server_ciphers on;
-    
-    location /qqbot/webhook {
-        proxy_pass http://127.0.0.1:3000/qqbot/webhook;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        
-        # 保持原始请求体
-        proxy_buffering off;
-        proxy_request_buffering off;
-    }
-}
-
-# HTTP自动跳转HTTPS（推荐配置）
-server {
-    listen 80;
-    server_name your-domain.com;
-    return 301 https://$server_name$request_uri;
-}
-```
-
-#### 方案二：宝塔面板配置
-
-**1. 创建网站**
-- 域名：填写你的域名
-- 根目录：可以是任意目录（不会用到）
-
-**2. 配置SSL证书（必需）**
-- 进入网站设置 → SSL
-- 申请Let's Encrypt免费证书或上传自有证书
-- 开启"强制HTTPS"
-
-**3. 添加反向代理**
-
-有两种配置方式，选择其一：
-
-**方式一：代理整个域名到Karin服务**
-- **代理名称：** Karin Service
-- **目标URL：** `http://127.0.0.1:3000`
-- **发送域名：** `$host`
-- **代理目录：** `/`
-
-**方式二：只代理webhook路径（推荐）**
-- **代理名称：** QQBot Webhook
-- **目标URL：** `http://127.0.0.1:3000/qqbot/webhook`
-- **发送域名：** `$host`
-- **代理目录：** `/qqbot/webhook`
-
-> **推荐使用方式一**，这样整个域名都会指向您的Karin服务，QQ开放平台访问 `https://your-domain.com/qqbot/webhook` 时会被代理到 `http://127.0.0.1:3000/qqbot/webhook`。
-
-**4. 高级设置**
-添加以下配置到反向代理的配置文件中：
-```nginx
-proxy_buffering off;
-proxy_request_buffering off;
-```
-
-> **重要提醒：** 确保网站已启用HTTPS并强制跳转，QQ开放平台只接受HTTPS协议的回调地址。
-
-#### 方案三：Caddy 服务器
-
-**1. 安装Caddy**
-```bash
-# 参考官方文档安装Caddy
-```
-
-**2. 创建Caddyfile**
-```caddy
-your-domain.com {
-    reverse_proxy /qqbot/webhook/* 127.0.0.1:3000
-    
-    # 自动HTTPS
-    tls {
-        on_demand
-    }
-}
-```
-
-#### 方案四：Cloudflare Tunnel（内网穿透）
-
-**适用场景：** 没有公网IP，通过Cloudflare暴露服务
-
-**1. 安装cloudflared**
-```bash
-# 下载并安装cloudflared
-wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-sudo dpkg -i cloudflared-linux-amd64.deb
-```
-
-**2. 登录Cloudflare**
-```bash
-cloudflared tunnel login
-```
-
-**3. 创建隧道**
-```bash
-cloudflared tunnel create karin-qqbot
-```
-
-**4. 配置DNS**
-```bash
-cloudflared tunnel route dns karin-qqbot your-subdomain.your-domain.com
-```
-
-**5. 运行隧道**
-```bash
-cloudflared tunnel run --url http://localhost:3000 karin-qqbot
-```
-
-#### 方案五：frp 内网穿透
-
-**适用场景：** 使用自建或第三方frp服务
-
-**客户端配置 (frpc.ini):**
-```ini
-[common]
-server_addr = your-frp-server.com
-server_port = 7000
-token = your_token
-
-[karin-qqbot]
-type = http
-local_ip = 127.0.0.1
-local_port = 3000
-custom_domains = your-domain.com
-```
-
-### 第六步：QQ开放平台回调地址要求
-
-#### 官方限制条件
-
-QQ开放平台对Webhook回调地址有以下**强制要求**：
-
-| 要求项 | 限制 | 说明 |
-|--------|------|------|
-| **协议** | 必须HTTPS | 不支持HTTP协议 |
-| **端口** | 必须443 | 不支持自定义端口（如:8080、:3000等） |
-| **SSL证书** | 必须有效 | 需要被浏览器信任的证书 |
-| **域名** | 必须有域名 | 不支持IP地址直接访问 |
-| **响应时间** | 3秒内 | 超时会重试 |
-
-#### 正确的回调地址格式
-
-✅ **正确格式：**
-- `https://your-domain.com/qqbot/webhook`
-- `https://bot.your-company.com/qqbot/webhook`
-
-❌ **错误格式：**
-- `http://your-domain.com/qqbot/webhook` （不支持HTTP）
-- `https://your-domain.com:3000/qqbot/webhook` （不支持自定义端口）
-- `https://123.456.789.10/qqbot/webhook` （不支持IP地址）
-
-### 第七步：域名和防火墙配置
-
-#### 域名解析配置
-
-确保域名正确解析到你的服务器：
-```bash
-# 检查域名解析
-nslookup your-domain.com
-dig your-domain.com
-```
-
-#### 防火墙配置
-
-**Ubuntu/Debian (ufw):**
-```bash
-# 开放HTTP和HTTPS端口
-sudo ufw allow 80
-sudo ufw allow 443
-
-# 如果直接暴露端口
-sudo ufw allow 3000
-```
-
-**CentOS/RHEL (firewalld):**
-```bash
-# 开放端口
-sudo firewall-cmd --permanent --add-port=80/tcp
-sudo firewall-cmd --permanent --add-port=443/tcp
-sudo firewall-cmd --reload
-```
-
-**云服务器安全组：**
-- 阿里云：安全组规则添加入方向 80、443 端口
-- 腾讯云：防火墙规则添加入站 80、443 端口
-- AWS：Security Group 添加 HTTP、HTTPS 规则
-
-### 第九步：配置参数说明
-
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `appId` | 机器人ID（必填） | "" |
-| `secret` | 机器人密钥（必填） | "" |
-| `sandbox` | 是否使用沙盒环境 | false |
-| `qqEnable` | 是否启用QQ场景 | true |
-| `guildEnable` | 是否启用频道场景 | true |
-| `guildMode` | 频道模式（0公域，1私域） | 0 |
-| `event.type` | 事件接收方式（0关闭，1webhook，2ws） | 0 |
-
-#### Markdown 模式说明
-
-| 模式 | 说明 | 适用场景 |
-|------|------|----------|
-| 0 | 直接发送 | 简单文本和图片消息 |
-| 1 | 原生Markdown | 需要富文本格式 |
-| 3 | 旧图文模板 | 复杂图文混排 |
-| 4 | 纯文模板 | 多段文本消息 |
-| 5 | 自定义处理 | 完全自定义逻辑 |
-
-#### 支持的事件类型
-
-QQ机器人适配器通过统一的webhook地址接收以下事件类型：
-
-| 事件类型 | 说明 | 处理函数 |
-|---------|------|---------|
-| `GROUP_AT_MESSAGE_CREATE` | 群聊@机器人消息 | `onGroupMsg` |
-| `C2C_MESSAGE_CREATE` | C2C私聊消息 | `onFriendMsg` |
-| `GUILD_MESSAGE_CREATE` | 频道消息 | `onChannelMsg` |
-| `DIRECT_MESSAGE_CREATE` | 频道私信 | `onDirectMsg` |
-
-所有这些事件都通过同一个回调地址 `/qqbot/webhook` 接收，适配器内部会根据事件类型自动分发到对应的处理函数。
-
-## 使用说明
-
-### 连接方式说明
-
-#### 1. Webhook 方式
-
-- **优点**：配置简单，不需要额外的中转服务
-- **缺点**：需要有公网IP或域名
-- **适用场景**：有固定服务器或云服务器的用户
-
-配置完成后，需要在 QQ 开放平台配置 Webhook 回调地址。
-
-#### 2. WebSocket 方式
-
-- **优点**：适合内网环境，通过中转服务连接
-- **缺点**：需要额外部署中转服务
-- **适用场景**：没有公网IP的本地开发环境
-
-### 发送模式说明
-
-#### 模式 0：直接发送（推荐）
-
-最简单的模式，直接发送纯文本和图片消息。
-
-#### 模式 1：原生 Markdown
-
-使用 QQ 官方的原生 Markdown 格式发送消息。
-
-#### 模式 3：旧图文模板 Markdown
-
-使用旧版图文混排模板，适合需要复杂排版的场景。
-
-#### 模式 4：纯文模板 Markdown
-
-使用纯文本模板，支持多个文本字段。
-
-#### 模式 5：自定义处理
-
-完全自定义消息处理逻辑。
-
-## 开发指南
-
-### 环境要求
-
-- Node.js >= 16
-- TypeScript >= 5.0
-- Karin 框架
-
-### 本地开发
-
-1. 克隆仓库
+## 开发
 
 ```bash
 git clone https://github.com/KarinJS/karin-plugin-adapter-qqbot.git
 cd karin-plugin-adapter-qqbot
+pnpm install
+pnpm dev          # tsx watch
+pnpm build        # tsc + tsdown
 ```
 
-2. 安装依赖
-
-```bash
-npm install
-```
-
-3. 开发模式运行
-
-```bash
-npm run dev
-```
-
-### 构建项目
-
-项目使用 `tsup` 进行打包，同时会运行 `tsc` 进行类型检查。
-
-```bash
-npm run build
-```
-
-构建产物会输出到 `dist` 目录。
-
-### 代码检查
-
-```bash
-npm run lint
-```
-
-### 发布
-
-```bash
-# 发布正式版
-npm run pub
-
-# 测试版通过 CI 自动发布：每次推送到 main 分支或 PR 都会触发 pkg.pr.new 生成预览包
-```
-
-## 项目结构
+源码结构（2.0）：
 
 ```
-karin-plugin-adapter-qqbot/
-├── src/
-│   ├── connection/      # 连接层（WebSocket、Webhook、路由）
-│   ├── core/           # 核心功能（适配器、事件处理、API）
-│   ├── types/          # TypeScript 类型定义
-│   └── utils/          # 工具函数
-├── dist/               # 构建产物
-├── config/             # 配置文件目录
-├── package.json
-├── tsconfig.json       # TypeScript 配置
-└── tsup.config.ts      # 打包配置
+src/
+├── connection/
+│   ├── routing.ts          express 路由聚合
+│   ├── webhook.ts          POST /qqbot/webhook
+│   ├── transport.ts        事件总线（appId → 业务）
+│   └── ws/
+│       ├── client.ts       单连接生命周期 + 心跳 + Resume
+│       ├── intents.ts      intents 探测与回退
+│       └── manager.ts      多 bot 连接管理
+├── core/
+│   ├── index.ts            createBot / destroyBot / initQQBotAdapter
+│   ├── api/                QQBotApi 门面 + http/messages/media/interaction/meta/builders
+│   ├── internal/axios.ts   access_token 缓存 + 自动刷新
+│   ├── adapter/
+│   │   ├── base.ts         AdapterQQBot
+│   │   ├── grouping.ts     消息归类
+│   │   ├── pipeline-qq.ts  QQ 单聊/群聊发送管线
+│   │   ├── pipeline-guild.ts 频道发送管线
+│   │   └── text-to-md.ts   URL→ 按钮、图片→ markdown
+│   ├── event/
+│   │   ├── dispatcher.ts   事件分发器
+│   │   ├── message.ts      群/单/频道/私信消息
+│   │   ├── notice.ts       入退群/好友/主动消息开关
+│   │   ├── interaction.ts  按钮回调
+│   │   └── conver.ts       报文 → karin elements
+│   └── onboard/
+│       ├── crypto.ts       AES-256-GCM 解密
+│       ├── portal.ts       q.qq.com 接口
+│       ├── qr.ts           终端二维码 + 轮询
+│       └── index.ts        runQrOnboard / needQrOnboard
+├── types/                  事件、配置、opcode 类型
+└── utils/                  日志、配置读写、文本工具
 ```
 
-## API 使用示例
+---
 
-### 发送群消息
+## 从 1.x 升级
 
-```typescript
-import type { AdapterQQBot } from '@karinjs/adapter-qqbot'
+2.0 是破坏式重写，**不提供配置自动迁移**。需要手动调整：
 
-// 在你的插件中使用
-export class MyPlugin extends plugin {
-  async handleGroupMessage(e: KarinMessage) {
-    const bot = e.bot as AdapterQQBot
-    // 发送消息
-    await bot.SendMessage(e.contact, [
-      { type: 'text', text: 'Hello, World!' }
-    ])
-  }
-}
-```
+| 1.x | 2.0 |
+| --- | --- |
+| `markdown.mode: 0` | `markdown.enable: false` |
+| `markdown.mode: 1` | `markdown.enable: true` |
+| `markdown.mode: 2/3/4/5` (模板) | 已废弃，改为 `markdown.enable: true` |
+| `event.wsUrl` / `event.wsToken` | 删除（中转方案已废弃） |
+| 新增 | `keyboard.enable: true`（默认） |
 
-### 撤回消息
+完整改动详见 [CHANGELOG.md](./CHANGELOG.md) 2.0.0 段落。
 
-```typescript
-await bot.recallMsg(e.contact, messageId)
-```
+---
 
-## 常见问题
+## 反馈
 
-### 第十步：验证配置
+- Issue：https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues
 
-#### 1. 检查配置文件
+---
 
-确保配置文件格式正确：
+## License
 
-```bash
-# 查看配置文件
-cat @karinjs/@karinjs-adapter-qqbot/config/config.json
-```
-
-#### 2. 启动服务
-
-```bash
-# 启动 Karin 服务
-npm start
-# 或者
-node app.js
-```
-
-#### 3. 查看日志
-
-检查日志文件，确认机器人连接成功：
-
-```bash
-# 查看最新日志
-tail -f logs/error/*.log
-```
-
-正常情况下应该看到类似信息：
-- `QQBot [AppID] 连接成功`
-- `Webhook服务已启动，端口: 3000`
-
-#### 4. 测试机器人
-
-1. 将机器人邀请到测试群
-2. 发送消息测试机器人响应
-3. 检查日志确认消息接收正常
-
-### 第十一步：常见问题排查
-
-#### 问题1：Webhook接收不到消息
-
-**检查清单：**
-- [ ] QQ开放平台回调地址配置正确
-- [ ] 服务器防火墙开放对应端口
-- [ ] Nginx反向代理配置正确
-- [ ] 域名解析正确指向服务器IP
-
-**排查命令：**
-```bash
-# 检查端口是否监听
-netstat -tlnp | grep :3000
-
-# 检查防火墙状态
-sudo ufw status
-
-# 测试本地接口
-curl -X POST http://localhost:3000/qqbot/webhook
-```
-
-#### 问题2：签名验证失败
-
-**可能原因：**
-- Secret配置错误
-- 反向代理修改了请求体
-- 时间戳差异过大
-
-**解决方案：**
-```nginx
-# Nginx配置中添加
-proxy_buffering off;
-proxy_request_buffering off;
-```
-
-#### 问题3：消息发送失败
-
-**检查清单：**
-- [ ] AppID和Secret正确
-- [ ] 机器人有发送消息权限
-- [ ] API地址配置正确
-- [ ] 网络连接正常
-
-#### 问题4：频道消息收不到
-
-**可能原因：**
-- 频道机器人权限不足
-- guildEnable配置为false
-- 私域机器人未正确配置
-
-**解决方案：**
-```json
-{
-  "guildEnable": true,
-  "guildMode": 1  // 私域机器人使用1
-}
-```
-
-### 第十二步：进阶配置
-
-#### 多机器人配置
-
-```json
-[
-  {
-    "appId": "机器人1的AppID",
-    "secret": "机器人1的Secret",
-    "event": { "type": 1 }
-  },
-  {
-    "appId": "机器人2的AppID", 
-    "secret": "机器人2的Secret",
-    "event": { "type": 1 }
-  }
-]
-```
-
-#### 环境分离配置
-
-开发环境使用沙盒：
-```json
-{
-  "sandbox": true,
-  "sandboxApi": "https://sandbox.api.sgroup.qq.com"
-}
-```
-
-生产环境使用正式API：
-```json
-{
-  "sandbox": false,
-  "prodApi": "https://api.sgroup.qq.com"
-}
-```
-
-#### 消息过滤配置
-
-```json
-{
-  "exclude": [
-    "https://example.com",
-    "https://trusted-site.com"
-  ],
-  "regex": [
-    {
-      "reg": "^/",
-      "rep": "#"
-    },
-    {
-      "reg": "\\[图片\\]",
-      "rep": ""
-    }
-  ]
-}
-```
-
-## 更新日志
-
-查看 [CHANGELOG.md](./CHANGELOG.md) 了解版本更新历史。
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 许可证
-
-本项目基于 [项目许可证] 开源。
-
-## 相关链接
-
-- [Karin 框架](https://github.com/KarinJS/Karin)
-- [QQ 机器人开放平台](https://bot.q.qq.com/)
-- [QQ 机器人开发文档](https://bot.q.qq.com/wiki/)
-
-## 技术支持
-
-如有问题，请通过以下方式获取帮助：
-
-- 提交 [GitHub Issue](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues)
-- 加入 Karin 开发者社群
+MIT
