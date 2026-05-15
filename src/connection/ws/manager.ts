@@ -8,25 +8,58 @@ import { computeMax, computeFallback, formatIntentNames, intentBitMap } from './
 import type { QQBotConfig } from '@/types/config'
 
 interface ManagedConn {
-  client: WSClient
+  /** 已建立的 client；fetchGateway 阶段为 null */
+  client: WSClient | null
   cfg: QQBotConfig
   intents: number
-  /** 探测过的 intents 历史，仅在汇总日志时使用 */
+  /** 探测过的 intents 历史 */
   intentHistory: number[]
+  /** 待触发的 reconnect / retry 定时器，stop 时需清理 */
+  pendingTimer?: NodeJS.Timeout
+  /** stop 后置 true，setTimeout 回调启动时检查并提前退出 */
+  aborted: boolean
 }
 
 const conns = new Map<string, ManagedConn>()
 
-/** 获取网关地址 */
+/** /gateway 接口超时（毫秒） */
+const GATEWAY_FETCH_TIMEOUT_MS = 5_000
+
+/**
+ * 从 prodApi / sandboxApi 推导兜底的 WSS 地址
+ * 官方实际长期返回的也是 wss://{host}/websocket/，不依赖 /gateway 也能直连
+ */
+const buildFallbackWssUrl = (cfg: QQBotConfig): string => {
+  const apiUrl = cfg.sandbox ? cfg.sandboxApi : cfg.prodApi
+  const wss = apiUrl.replace(/^https?:\/\//i, 'wss://').replace(/\/+$/, '')
+  return `${wss}/websocket/`
+}
+
+/**
+ * 获取网关地址：优先调 /gateway；失败 / 超时 / 限频 → 直接 fallback 到硬编码
+ */
 const fetchGateway = async (cfg: QQBotConfig): Promise<string> => {
   const apiUrl = cfg.sandbox ? cfg.sandboxApi : cfg.prodApi
+  const fallback = buildFallbackWssUrl(cfg)
   const accessToken = getBotAccessToken(cfg.appId)
-  if (!accessToken) throw new Error('no access_token')
-  const { data } = await axios.get(`${apiUrl}/gateway`, {
-    headers: { Authorization: `QQBot ${accessToken}` },
-  })
-  if (!data?.url) throw new Error('gateway url empty')
-  return data.url
+  if (!accessToken) {
+    log('warn', `${cfg.appId}: 无 access_token，使用硬编码 WSS ${fallback}`)
+    return fallback
+  }
+  try {
+    const { data } = await axios.get(`${apiUrl}/gateway`, {
+      headers: { Authorization: `QQBot ${accessToken}` },
+      timeout: GATEWAY_FETCH_TIMEOUT_MS,
+    })
+    if (data?.url) return data.url
+    log('warn', `${cfg.appId}: /gateway 返回为空，使用硬编码 WSS ${fallback}`)
+    return fallback
+  } catch (err: any) {
+    const data = err?.response?.data
+    const reason = data?.message || err?.message || 'unknown'
+    log('warn', `${cfg.appId}: /gateway 调用失败 (${reason})，使用硬编码 WSS ${fallback}`)
+    return fallback
+  }
 }
 
 /** 重连退避（毫秒） */
@@ -64,13 +97,36 @@ export const start = async (cfg: QQBotConfig): Promise<void> => {
   if (cfg.event.type !== 2) return
   if (!cfg.appId) return
 
-  // 已存在则先停掉
-  if (conns.has(cfg.appId)) {
-    stop(cfg.appId)
-  }
+  // 已存在则先停掉（同步等待 stop 走完，清掉 pendingTimer）
+  if (conns.has(cfg.appId)) stop(cfg.appId)
 
   const intents = computeMax()
+  // 注册占位 conn，pendingTimer 能在 stop 时被取消
+  conns.set(cfg.appId, {
+    client: null,
+    cfg, intents,
+    intentHistory: [intents],
+    aborted: false,
+  })
   await connect(cfg, intents, 0)
+}
+
+/**
+ * 调度一次重试（统一封装，便于 stop 取消）
+ */
+const schedule = (
+  appId: string,
+  delay: number,
+  fn: () => void
+): void => {
+  const conn = conns.get(appId)
+  if (!conn || conn.aborted) return
+  if (conn.pendingTimer) clearTimeout(conn.pendingTimer)
+  conn.pendingTimer = setTimeout(() => {
+    if (conn.aborted) return
+    conn.pendingTimer = undefined
+    fn()
+  }, delay)
 }
 
 /**
@@ -82,15 +138,14 @@ const connect = async (
   attempt: number,
   resume?: { sessionId: string; seq: number }
 ) => {
-  let gatewayUrl: string
-  try {
-    gatewayUrl = await fetchGateway(cfg)
-  } catch (err) {
-    log('error', `${cfg.appId}: 获取 WSS 地址失败:`, err)
-    const delay = backoff(attempt)
-    setTimeout(() => connect(cfg, intents, attempt + 1), delay)
-    return
-  }
+  // stop 后取消
+  let conn = conns.get(cfg.appId)
+  if (!conn || conn.aborted) return
+
+  const gatewayUrl = await fetchGateway(cfg)
+
+  conn = conns.get(cfg.appId)
+  if (!conn || conn.aborted) return
 
   const client = new WSClient({
     appId: cfg.appId,
@@ -105,18 +160,11 @@ const connect = async (
     onClose: (reason) => onClose(cfg, intents, attempt, reason, client),
   })
 
-  // 初次创建时记录 history
-  let prev = conns.get(cfg.appId)
-  if (!prev || prev.intentHistory.length === 0) {
-    conns.set(cfg.appId, {
-      client, cfg, intents,
-      intentHistory: prev?.intentHistory.length ? [...prev.intentHistory, intents] : [intents],
-    })
-  } else {
-    prev.client = client
-    prev.cfg = cfg
-    prev.intents = intents
-    prev.intentHistory.push(intents)
+  conn.client = client
+  conn.cfg = cfg
+  conn.intents = intents
+  if (conn.intentHistory[conn.intentHistory.length - 1] !== intents) {
+    conn.intentHistory.push(intents)
   }
 
   client.start()
@@ -132,44 +180,54 @@ const onClose = (
   reason: CloseReason,
   client: WSClient
 ) => {
-  const conn = conns.get(cfg.appId)
   // 上层主动 stop()
   if (reason === 'manual') {
-    conns.delete(cfg.appId)
     log('debug', `${cfg.appId}: WebSocket 已主动关闭`)
     return
   }
+
+  const conn = conns.get(cfg.appId)
+  if (!conn || conn.aborted) return
 
   // intents 不可用 → 回退
   if (reason === 'auth_fail') {
     const fallback = computeFallback(intents)
     if (fallback && fallback !== intents) {
-      setTimeout(() => connect(cfg, fallback, 0), 1000)
+      schedule(cfg.appId, 1000, () => connect(cfg, fallback, 0))
       return
     }
     summarize(cfg.appId, 0, false)
     log('error', `${cfg.appId}: 鉴权失败，所有 intents 均不可用，请检查机器人是否已上线`)
+    conn.aborted = true
     conns.delete(cfg.appId)
     return
   }
 
   // 服务端要求重连：尝试 Resume
   // session_lost：清空 sessionId 后重新 Identify
-  // closed/error：尝试 Resume，失败再 fresh
+  // closed / error：尝试 Resume，失败再 fresh
   const snap = client.snapshot()
   const resume = reason === 'session_lost' ? undefined : (snap.sessionId ? snap : undefined)
   const delay = backoff(attempt)
   log('error', `${cfg.appId}: WebSocket 断开 (${reason})，${delay}ms 后重连...`)
-  setTimeout(() => connect(cfg, intents, attempt + 1, resume), delay)
+  schedule(cfg.appId, delay, () => connect(cfg, intents, attempt + 1, resume))
 }
 
 /**
- * 停止连接
+ * 停止连接（同步：标记 abort + 清 pendingTimer + 关 client）
  */
 export const stop = (appId: string): boolean => {
   const conn = conns.get(appId)
   if (!conn) return false
-  conn.client.stop()
+  conn.aborted = true
+  if (conn.pendingTimer) {
+    clearTimeout(conn.pendingTimer)
+    conn.pendingTimer = undefined
+  }
+  try {
+    conn.client?.stop()
+  } catch { /* ignore */ }
+  conns.delete(appId)
   return true
 }
 
