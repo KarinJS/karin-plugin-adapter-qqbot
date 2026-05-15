@@ -378,4 +378,13 @@ export class QQBotApi {
   dms (recipientID: string, srcGuildID: string): Promise<DmsResponse> {
     return this.post('/users/@me/dms', { recipient_id: recipientID, source_guild_id: srcGuildID })
   }
+
+  /**
+   * 回应按钮回调
+   * @param interactionId INTERACTION_CREATE 事件中的 id
+   * @param code 0 成功 / 1 失败 / 2 频繁 / 3 重复 / 4 无权限 / 5 仅管理员
+   */
+  ackInteraction (interactionId: string, code: 0 | 1 | 2 | 3 | 4 | 5 = 0): Promise<void> {
+    return this.put(`/interactions/${interactionId}`, { code }).then(() => undefined)
+  }
 }

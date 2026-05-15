@@ -46,23 +46,15 @@ export interface SendQQTextMessageRequest extends SendQQMessageRequest, QQMessag
   content: string
 }
 
-/** markdown消息结构 */
-export type Markdown = {
+/** markdown 消息结构（官方已全量开放原生 markdown，2.0 不再支持模板模式） */
+export interface Markdown {
   /** markdown 文本 */
   content: string
-} | {
-  /** markdown 模版id，申请模版后获得 */
-  custom_template_id: string
-  /** 模版内变量与填充值的kv映射 */
-  params: { key: string, values: string[] }[]
 }
 
-/** 按钮消息结构 */
-export type Keyboard = {
+/** 按钮消息结构（官方已全量开放自定义 keyboard，2.0 不再支持模板按钮） */
+export interface Keyboard {
   content: { rows: ReturnType<typeof karinToQQBot> }
-} | {
-  /** 按钮模版id */
-  id: string
 }
 
 /** 发送QQ Markdown 消息请求参数 */
