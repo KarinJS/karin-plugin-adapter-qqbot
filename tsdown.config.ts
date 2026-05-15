@@ -11,6 +11,8 @@ export default defineConfig({
   outDir: 'dist',
   treeshake: true,
   minify: false,
+  // package.json type=module 时输出 .js / .d.ts，避免 .mjs / .d.mts
+  fixedExtension: false,
   ignoreWatch: [],
   deps: {
     onlyBundle: false,

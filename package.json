@@ -12,8 +12,8 @@
   },
   "author": "shijin",
   "type": "module",
-  "main": "dist/index.mjs",
-  "types": "dist/index.d.mts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
     "dist"
   ],
@@ -71,6 +71,6 @@
       "resources"
     ],
     "ts-web": "src/web.config.ts",
-    "web": "dist/web.config.mjs"
+    "web": "dist/web.config.js"
   }
 }
