@@ -49,7 +49,7 @@ const sendGuildClassic = async (
   if (text) {
     if (grouping.guildImageUrls.length) {
       const url = grouping.guildImageUrls.shift()
-      items.unshift(ctx.super.GuildMsgOptions('text', text, url))
+      items.unshift(ctx.super.guild.text(text, url))
     } else if (grouping.guildImageFiles.length) {
       const file = grouping.guildImageFiles.shift()!
       const buffer = await common.buffer(file)
@@ -58,12 +58,12 @@ const sendGuildClassic = async (
       form.append('file_image', buffer)
       items.unshift(form as unknown as FormData)
     } else {
-      items.unshift(ctx.super.GuildMsgOptions('text', text))
+      items.unshift(ctx.super.guild.text(text))
     }
   }
 
   for (const url of grouping.guildImageUrls) {
-    items.push(ctx.super.GuildMsgOptions('image', url))
+    items.push(ctx.super.guild.image(url))
   }
   for (const file of grouping.guildImageFiles) {
     const buffer = await common.buffer(file)
@@ -73,7 +73,7 @@ const sendGuildClassic = async (
   }
 
   if (!items.length) {
-    items.push(ctx.super.GuildMsgOptions('text', '不支持发送的消息类型'))
+    items.push(ctx.super.guild.text('不支持发送的消息类型'))
   }
 
   return flushGuild(ctx, contact, grouping, items)
@@ -105,12 +105,10 @@ const sendGuildMarkdown = async (
   grouping.markdowns.forEach(m => lines.push(m.markdown))
 
   if (lines.length || grouping.buttons.length || grouping.keyboards.length) {
-    const md = ctx.super.GuildMsgOptions('markdown', { content: lines.join('\n') })
     const keyboard = buildKeyboard(grouping)
-    if (keyboard) md.keyboard = keyboard
-    items.push(md)
+    items.push(ctx.super.guild.markdown({ content: lines.join('\n') }, keyboard))
   } else {
-    items.push(ctx.super.GuildMsgOptions('text', '不支持发送的消息类型'))
+    items.push(ctx.super.guild.text('不支持发送的消息类型'))
   }
 
   return flushGuild(ctx, contact, grouping, items)
@@ -134,9 +132,9 @@ const flushGuild = async (
   const passive = buildPassiveGuild(grouping)
   const send = contact.scene === 'guild'
     ? (peer: string, subPeer: string, item: SendGuildMsg | FormData) =>
-        ctx.super.sendChannelMsg(subPeer, item)
+        ctx.super.messages.sendChannelMsg(subPeer, item)
     : (peer: string, _subPeer: string, item: SendGuildMsg | FormData) =>
-        ctx.super.sendDmsMsg(peer, item)
+        ctx.super.messages.sendDmsMsg(peer, item)
 
   let replyHandled = false
   for (const item of items) {

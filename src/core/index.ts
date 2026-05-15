@@ -76,7 +76,7 @@ export const createBot = async (bot: QQBotConfig): Promise<void> => {
     const axios = createAxiosInstance(baseUrl, appId)
     const api = new QQBotApi(axios)
 
-    const me = await api.getMe()
+    const me = await api.meta.getMe()
     const client = new AdapterQQBot(bot, api)
     client.account.name = me.username
     client.account.avatar = me.avatar

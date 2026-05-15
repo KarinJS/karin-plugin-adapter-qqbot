@@ -1,7 +1,7 @@
 import { common, fileToUrl, karinToQQBot } from 'node-karin'
 import { handleUrl, qrs } from '@/utils/common'
 import { groupElements } from './grouping'
-import { extractUrlButtons, imagesToMarkdown, composeMarkdown } from './text-to-md'
+import { extractUrlButtons, imagesToMarkdown } from './text-to-md'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
 import type { Grouping } from './grouping'
@@ -70,14 +70,14 @@ const sendQQClassic = async (
         : (await common.mergeImage(qrList, 3)).base64
       grouping.qqImages.push(qr)
     }
-    items.push(ctx.super.QQdMsgOptions('text', textContent))
+    items.push(ctx.super.qq.text(textContent))
   }
 
   // 图片
   for (const file of grouping.qqImages) {
     const base64 = await common.base64(file)
-    const res = await ctx.super.uploadMedia(target, contact.peer, 'image', base64, false)
-    items.push(ctx.super.QQdMsgOptions('media', res.file_info))
+    const res = await ctx.super.media.upload(target, contact.peer, 'image', base64, false)
+    items.push(ctx.super.qq.media(res.file_info))
   }
 
   // 视频 / 语音 / 文件
@@ -88,12 +88,12 @@ const sendQQClassic = async (
       const file = await fileToUrl(m.kind, url, `${m.kind}.${ext}`)
       url = file.url
     }
-    const res = await ctx.super.uploadMedia(target, contact.peer, m.kind, url, false)
-    items.push(ctx.super.QQdMsgOptions('media', res.file_info))
+    const res = await ctx.super.media.upload(target, contact.peer, m.kind, url, false)
+    items.push(ctx.super.qq.media(res.file_info))
   }
 
   if (!items.length) {
-    items.push(ctx.super.QQdMsgOptions('text', '不支持发送的消息类型'))
+    items.push(ctx.super.qq.text('不支持发送的消息类型'))
   }
 
   return flushQQ(ctx, contact, grouping, items)
@@ -133,11 +133,11 @@ const sendQQMarkdown = async (
   }
 
   if (lines.length === 0 && grouping.buttons.length === 0 && grouping.keyboards.length === 0) {
-    items.push(ctx.super.QQdMsgOptions('text', '不支持发送的消息类型'))
+    items.push(ctx.super.qq.text('不支持发送的消息类型'))
   } else {
     const content = lines.join('\n')
     const keyboard = buildKeyboard(grouping)
-    items.push(ctx.super.QQdMsgOptions('markdown', { content }, keyboard))
+    items.push(ctx.super.qq.markdown({ content }, keyboard))
   }
 
   // markdown 通道不携带视频/语音/文件，落到经典通道补发
@@ -148,8 +148,8 @@ const sendQQMarkdown = async (
       const file = await fileToUrl(m.kind, url, `${m.kind}.${ext}`)
       url = file.url
     }
-    const res = await ctx.super.uploadMedia(target, contact.peer, m.kind, url, false)
-    items.push(ctx.super.QQdMsgOptions('media', res.file_info))
+    const res = await ctx.super.media.upload(target, contact.peer, m.kind, url, false)
+    items.push(ctx.super.qq.media(res.file_info))
   }
 
   return flushQQ(ctx, contact, grouping, items)
@@ -178,8 +178,8 @@ const flushQQ = async (
   const result = ctx.initSendMsgResults()
   const passive = buildPassiveQQ(contact.scene, grouping)
   const send = contact.scene === 'friend'
-    ? (peer: string, item: SendQQMsg) => ctx.super.sendFriendMsg(peer, item)
-    : (peer: string, item: SendQQMsg) => ctx.super.sendGroupMsg(peer, item)
+    ? (peer: string, item: SendQQMsg) => ctx.super.messages.sendFriendMsg(peer, item)
+    : (peer: string, item: SendQQMsg) => ctx.super.messages.sendGroupMsg(peer, item)
 
   let replyHandled = false
   for (const item of items) {

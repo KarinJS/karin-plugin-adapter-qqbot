@@ -14,7 +14,7 @@ import type { InteractionEvent } from '@/types/event'
  */
 export const onInteraction = (client: AdapterQQBot, ev: InteractionEvent): void => {
   // 先 ack，避免客户端 loading
-  client.super.ackInteraction(ev.id, 0).catch(err => {
+  client.super.interaction.ack(ev.id, 0).catch(err => {
     client.logger('warn', '[INTERACTION] ack 失败:', err)
   })
 
