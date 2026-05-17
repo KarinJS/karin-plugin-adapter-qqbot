@@ -50,36 +50,50 @@ export const dispatch = (client: AdapterQQBot, ev: Event): void => {
       return client.logger('info', 'WebSocket 连接已恢复')
 
     case EventEnum.GROUP_AT_MESSAGE_CREATE:
-      return onGroupMsg(client, ev, { forceAtSelf: true })
+      onGroupMsg(client, ev, { forceAtSelf: true })
+      return
     case EventEnum.GROUP_MESSAGE_CREATE:
-      return onGroupMsg(client, ev, { forceAtSelf: false })
+      onGroupMsg(client, ev, { forceAtSelf: false })
+      return
     case EventEnum.C2C_MESSAGE_CREATE:
-      return onFriendMsg(client, ev)
+      onFriendMsg(client, ev)
+      return
     case EventEnum.MESSAGE_CREATE:
     case EventEnum.AT_MESSAGE_CREATE:
-      return onChannelMsg(client, ev)
+      onChannelMsg(client, ev)
+      return
     case EventEnum.DIRECT_MESSAGE_CREATE:
-      return onDirectMsg(client, ev)
+      onDirectMsg(client, ev)
+      return
 
     case EventEnum.GROUP_ADD_ROBOT:
-      return onGroupAddRobot(client, ev)
+      onGroupAddRobot(client, ev)
+      return
     case EventEnum.GROUP_DEL_ROBOT:
-      return onGroupDelRobot(client, ev)
+      onGroupDelRobot(client, ev)
+      return
     case EventEnum.GROUP_MSG_RECEIVE:
-      return onGroupMsgReceive(client, ev)
+      onGroupMsgReceive(client, ev)
+      return
     case EventEnum.GROUP_MSG_REJECT:
-      return onGroupMsgReject(client, ev)
+      onGroupMsgReject(client, ev)
+      return
     case EventEnum.FRIEND_ADD:
-      return onFriendAdd(client, ev)
+      onFriendAdd(client, ev)
+      return
     case EventEnum.FRIEND_DEL:
-      return onFriendDel(client, ev)
+      onFriendDel(client, ev)
+      return
     case EventEnum.C2C_MSG_RECEIVE:
-      return onC2CMsgReceive(client, ev)
+      onC2CMsgReceive(client, ev)
+      return
     case EventEnum.C2C_MSG_REJECT:
-      return onC2CMsgReject(client, ev)
+      onC2CMsgReject(client, ev)
+      return
 
     case EventEnum.INTERACTION_CREATE:
-      return onInteraction(client, ev)
+      onInteraction(client, ev)
+      return
 
     case EventEnum.MESSAGE_AUDIT_PASS:
       return client.logger('debug', `消息审核通过: audit_id=${ev.d.audit_id}`)

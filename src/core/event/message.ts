@@ -20,13 +20,13 @@ interface GroupOptions {
 export const onGroupMsg = (client: AdapterQQBot, ev: GroupMsgEvent, opts: GroupOptions) => {
   const selfId = client.selfId
   const userId = ev.d.author.member_openid || ev.d.author.id
-  const username = ev.d.author.username
+  const username = ev.d.author.username || ''
   if (userId && username) client.nicknameCache.set(userId, username)
   ev.d.mentions?.forEach((m) => {
     if (m.member_openid && m.username) client.nicknameCache.set(m.member_openid, m.username)
   })
   const contact = karin.contactGroup(ev.d.group_openid || ev.d.group_id)
-  const sender = karin.groupSender(userId, 'unknown', username)
+  const sender = karin.groupSender(userId, 'member', username)
 
   const e = createGroupMessage({
     bot: client,
@@ -40,6 +40,8 @@ export const onGroupMsg = (client: AdapterQQBot, ev: GroupMsgEvent, opts: GroupO
     sender,
     srcReply: (elements) => client.srcReply(e, [...elements, segment.pasmsg(ev.d.id)]),
   })
+
+  return e
 }
 
 /**
@@ -65,6 +67,8 @@ export const onFriendMsg = (client: AdapterQQBot, ev: C2CMsgEvent) => {
     sender,
     srcReply: (elements) => client.srcReply(e, [...elements, segment.pasmsg(ev.d.id)]),
   })
+
+  return e
 }
 
 /**
@@ -74,7 +78,7 @@ export const onChannelMsg = (client: AdapterQQBot, ev: GuildMsgEvent) => {
   const selfId = client.selfId
   const userId = ev.d.author.id
   const contact = karin.contact('guild', ev.d.guild_id, ev.d.channel_id)
-  const sender = karin.groupSender(userId, 'unknown', ev.d.author.username)
+  const sender = karin.groupSender(userId, 'unknown', ev.d.author.username || '')
 
   const e = createGuildMessage({
     bot: client,
@@ -88,6 +92,8 @@ export const onChannelMsg = (client: AdapterQQBot, ev: GuildMsgEvent) => {
     sender,
     srcReply: (elements) => client.srcReply(e, [...elements, segment.pasmsg(ev.d.id)]),
   })
+
+  return e
 }
 
 /**
@@ -97,7 +103,7 @@ export const onDirectMsg = (client: AdapterQQBot, ev: DirectMsgEvent) => {
   const selfId = client.selfId
   const userId = ev.d.author.id
   const contact = karin.contact('direct', ev.d.guild_id, ev.d.channel_id)
-  const sender = karin.friendSender(userId, ev.d.author.username)
+  const sender = karin.friendSender(userId, ev.d.author.username || '')
 
   const e = createDirectMessage({
     bot: client,
@@ -112,4 +118,6 @@ export const onDirectMsg = (client: AdapterQQBot, ev: DirectMsgEvent) => {
     srcGuildId: ev.d.src_guild_id,
     srcReply: (elements) => client.srcReply(e, [...elements, segment.pasmsg(ev.d.id)]),
   })
+
+  return e
 }
