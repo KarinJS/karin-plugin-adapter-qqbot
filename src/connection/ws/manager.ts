@@ -90,12 +90,16 @@ const summarize = (appId: string, finalIntents: number, success: boolean) => {
       if (diff & Number(bit)) removed.push(name.trim())
     }
   }
+  const removedBlock = removed.length
+    ? '  └─ 被移除 / Removed:\n' + removed.map(n => `      ${n.trim()}`).join('\n')
+    : '  └─ 被移除 / Removed: 无'
+
   log('debug', [
     `${appId}: intents ${success ? '探测完成 | Probe Done' : '探测失败 | Probe Failed'}`,
     `  ├─ 初始 / Initial: ${initial}`,
     `  ├─ 最终 / Final  : ${finalIntents}`,
     formatIntentNames(finalIntents, '  │   '),
-    `  └─ 被移除 / Removed: ${removed.join(', ') || '无'}`,
+    removedBlock,
   ].join('\n'))
   conn.intentHistory = []
 }
