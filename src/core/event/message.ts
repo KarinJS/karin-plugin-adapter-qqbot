@@ -21,6 +21,10 @@ export const onGroupMsg = (client: AdapterQQBot, ev: GroupMsgEvent, opts: GroupO
   const selfId = client.selfId
   const userId = ev.d.author.member_openid || ev.d.author.id
   const username = ev.d.author.username
+  if (userId && username) client.nicknameCache.set(userId, username)
+  ev.d.mentions?.forEach((m) => {
+    if (m.member_openid && m.username) client.nicknameCache.set(m.member_openid, m.username)
+  })
   const contact = karin.contactGroup(ev.d.group_openid || ev.d.group_id)
   const sender = karin.groupSender(userId, 'unknown', username)
 
@@ -45,6 +49,7 @@ export const onFriendMsg = (client: AdapterQQBot, ev: C2CMsgEvent) => {
   const selfId = client.selfId
   const userId = ev.d.author.user_openid || ev.d.author.id
   const username = ev.d.author.username || ''
+  if (userId && username) client.nicknameCache.set(userId, username)
   const contact = karin.contactFriend(userId)
   const sender = karin.friendSender(userId, username)
 

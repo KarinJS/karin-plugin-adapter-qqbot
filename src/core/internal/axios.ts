@@ -1,5 +1,6 @@
-import axios from 'node-karin/axios'
+import axios, { AxiosError } from 'node-karin/axios'
 import { log } from '@/utils/logger'
+import { formatOpenAPIError } from '@/core/api/error'
 
 /**
  * 每个 appId 一份 token 状态
@@ -35,7 +36,17 @@ export const getAccessToken = async (
       clientSecret: secret,
     })
   } catch (err) {
-    log('error', `[${appId}] 获取 access_token 失败:`, err)
+    if (axios.isAxiosError(err)) {
+      const response = (err as AxiosError).response
+      const status = response?.status ?? 0
+      const data = response?.data as Record<string, unknown> | undefined
+      const code = typeof data?.code === 'number' ? data.code : undefined
+      const msg = typeof data?.message === 'string' ? data.message : undefined
+      const detail = formatOpenAPIError(status, code, msg)
+      log('error', `[${appId}] 获取 access_token 失败 | ${detail}`)
+    } else {
+      log('error', `[${appId}] 获取 access_token 失败:`, err)
+    }
     throw err
   }
 

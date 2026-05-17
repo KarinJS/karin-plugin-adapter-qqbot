@@ -2,6 +2,7 @@ import os from 'node:os'
 import { WebSocket } from 'node-karin/ws'
 import { log } from '@/utils/logger'
 import { Opcode } from '@/types/opcode'
+import { formatWSClose } from './error'
 import type { Event } from '@/types/event'
 
 /** 关闭原因 */
@@ -62,7 +63,9 @@ export class WSClient {
     })
 
     ws.on('close', (code, reason) => {
-      log('debug', `${this.opts.appId}: WebSocket close code=${code} reason=${reason?.toString() || '(empty)'}`)
+      const reasonStr = reason?.toString() || '(empty)'
+      const closeInfo = formatWSClose(code, reasonStr)
+      log('error', `${this.opts.appId}: WebSocket 关闭 | ${closeInfo}`)
       if (this.closed) return
       this.close('closed')
     })

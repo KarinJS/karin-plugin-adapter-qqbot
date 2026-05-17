@@ -1,7 +1,8 @@
-import axios from 'node-karin/axios'
+import axios, { AxiosError } from 'node-karin/axios'
 import { log } from '@/utils/logger'
 import { random } from '@/utils/common'
 import { getBotAccessToken } from '@/core/internal/axios'
+import { formatOpenAPIError } from '@/core/api/error'
 import { dispatch } from '@/connection/transport'
 import { WSClient, type CloseReason } from './client'
 import { computeMax, computeFallback, formatIntentNames, intentBitMap } from './intents'
@@ -55,9 +56,18 @@ const fetchGateway = async (cfg: QQBotConfig): Promise<string> => {
     log('warn', `${cfg.appId}: /gateway 返回为空，使用硬编码 WSS ${fallback}`)
     return fallback
   } catch (err: any) {
-    const data = err?.response?.data
-    const reason = data?.message || err?.message || 'unknown'
-    log('warn', `${cfg.appId}: /gateway 调用失败 (${reason})，使用硬编码 WSS ${fallback}`)
+    if (axios.isAxiosError(err)) {
+      const response = (err as AxiosError).response
+      const status = response?.status ?? 0
+      const data = response?.data as Record<string, unknown> | undefined
+      const code = typeof data?.code === 'number' ? data.code : undefined
+      const msg = typeof data?.message === 'string' ? data.message : undefined
+      const detail = formatOpenAPIError(status, code, msg)
+      log('warn', `${cfg.appId}: /gateway 调用失败 | ${detail}，使用硬编码 WSS ${fallback}`)
+    } else {
+      const reason = err?.message || 'unknown'
+      log('warn', `${cfg.appId}: /gateway 调用失败 (${reason})，使用硬编码 WSS ${fallback}`)
+    }
     return fallback
   }
 }

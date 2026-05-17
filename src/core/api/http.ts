@@ -1,20 +1,38 @@
 import axios, { AxiosError } from 'node-karin/axios'
 import lodash from 'node-karin/lodash'
+import { formatOpenAPIError } from './error'
 import type { createAxiosInstance } from '@/core/internal/axios'
 
 export type AxiosInstance = ReturnType<typeof createAxiosInstance>
 
 /**
  * 包装 axios 错误为可读多行 message
+ * 如果响应中包含 QQ 官方错误码(code)，会自动映射为中文描述
  */
 const formatError = (path: string, options: unknown, err: unknown): Error => {
   if (axios.isAxiosError(err)) {
-    return new Error([
-      '[axios] 请求失败',
-      `请求路径: ${path}`,
-      `请求数据: ${lodash.truncate(JSON.stringify(options), { length: 500 })}`,
-      `响应数据: ${JSON.stringify((err as AxiosError).response?.data)}`,
-    ].join('\n'))
+    const response = (err as AxiosError).response
+    const status = response?.status ?? 0
+    const data = response?.data as Record<string, unknown> | undefined
+
+    // 尝试提取 QQ 官方错误码
+    const code = typeof data?.code === 'number' ? data.code : undefined
+    const msg = typeof data?.message === 'string' ? data.message : undefined
+
+    const lines: string[] = []
+    lines.push('[axios] 请求失败')
+    lines.push(`请求路径: ${path}`)
+    lines.push(`请求数据: ${lodash.truncate(JSON.stringify(options), { length: 500 })}`)
+
+    // 使用映射表格式化错误
+    if (code !== undefined || status > 0) {
+      lines.push(`错误详情: ${formatOpenAPIError(status, code, msg)}`)
+    }
+
+    // 原始响应数据兜底
+    lines.push(`响应数据: ${JSON.stringify(data)}`)
+
+    return new Error(lines.join('\n'))
   }
   if (err instanceof Error) return err
   return new Error(typeof err === 'string' ? err : JSON.stringify(err))
@@ -24,7 +42,7 @@ const formatError = (path: string, options: unknown, err: unknown): Error => {
  * Http 基础类，子模块继承此类共享 axios 实例与错误格式化
  */
 export class Http {
-  constructor (public readonly axios: AxiosInstance) {}
+  constructor (public readonly axios: AxiosInstance) { }
 
   protected async get<T> (path: string): Promise<T> {
     try {
