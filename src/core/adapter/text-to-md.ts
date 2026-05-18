@@ -37,17 +37,14 @@ export const extractUrlButtons = (
  * 将图片列表合并到一段 markdown 文本内（每张图占一行）
  */
 export const imagesToMarkdown = async (urls: string[]): Promise<string[]> => {
-  const lines: string[] = []
-  await Promise.all(urls.map(async (file) => {
+  return Promise.all(urls.map(async (file) => {
     if (file.startsWith('http')) {
       const { width, height } = await getImageSize(file)
-      lines.push(`![karin #${width}px #${height}px](${file})`)
-      return
+      return `![karin #${width}px #${height}px](${file})`
     }
     const { url, width, height } = await fileToUrl('image', file, 'image.jpg')
-    lines.push(`![karin #${width}px #${height}px](${url})`)
+    return `![karin #${width}px #${height}px](${url})`
   }))
-  return lines
 }
 
 /**
