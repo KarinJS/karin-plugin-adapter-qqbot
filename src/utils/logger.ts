@@ -1,27 +1,26 @@
 import { logger, type LogMethodNames } from 'node-karin'
 
-/** QQBot日志 - 包装logger以添加前缀 */
-const logMethods = {
-  trace: (...args: any[]) => logger.trace('[QQBot]', ...args),
-  debug: (...args: any[]) => logger.debug('[QQBot]', ...args),
-  info: (...args: any[]) => logger.info('[QQBot]', ...args),
-  warn: (...args: any[]) => logger.warn('[QQBot]', ...args),
-  error: (...args: any[]) => logger.error('[QQBot]', ...args),
-  fatal: (...args: any[]) => logger.fatal('[QQBot]', ...args),
-  mark: (...args: any[]) => logger.mark('[QQBot]', ...args),
+const PREFIX = '[QQ Official Bot]'
+
+const m = {
+  trace: (...a: any[]) => logger.trace(PREFIX, ...a),
+  debug: (...a: any[]) => logger.debug(PREFIX, ...a),
+  info: (...a: any[]) => logger.info(PREFIX, ...a),
+  warn: (...a: any[]) => logger.warn(PREFIX, ...a),
+  error: (...a: any[]) => logger.error(PREFIX, ...a),
+  fatal: (...a: any[]) => logger.fatal(PREFIX, ...a),
+  mark: (...a: any[]) => logger.mark(PREFIX, ...a),
 }
 
-/** 
- * QQBot日志函数
- * 支持两种调用方式：
- * 1. log('info', '消息') - 传入日志级别和参数
- * 2. log.info('消息') - 直接调用方法
- * @param level 日志级别
- * @param args 日志参数
+/**
+ * QQBot 日志函数
+ * - log('info', '消息')
+ * - log.info('消息')
+ *
+ * 日志级别由 karin 框架的 log.level 控制
  */
 export function log (level: LogMethodNames, ...args: any[]): void {
-  logMethods[level](...args)
+  m[level](...args)
 }
 
-// 添加方法属性以支持两种调用方式
-Object.assign(log, logMethods)
+Object.assign(log, m)

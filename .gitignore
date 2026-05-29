@@ -1,3 +1,6 @@
+# AI
+.claude
+
 # 包管理器文件
 .npmrc
 yarn.lock
@@ -16,6 +19,7 @@ lerna-debug.log*
 # 临时文件
 /logs/
 /temp/
+wiki/
 
 # 配置
 /lib
@@ -28,6 +32,10 @@ pnpm-workspace.yaml
 @karinjs/
 1.js
 src/test.ts
-src/apps/
 test.js
 dist
+
+api-v2
+
+src/apps/fileToUrl.js
+src/apps/test.ts

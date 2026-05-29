@@ -1,102 +1,105 @@
-import { sign } from '@/core/api/sign'
-import { logger } from 'node-karin'
+import { sign, verifySignature } from '@/core/api/sign'
 import { getConfig } from '@/utils/config'
-import { event, fakeEvent } from '@/utils/common'
-import { RequestHandler } from 'node-karin/express'
+import { fakeEvent } from '@/utils/common'
+import { log } from '@/utils/logger'
+import { Opcode } from '@/types/opcode'
+import { dispatch } from '@/connection/transport'
+import type { RequestHandler, Request, Response } from 'node-karin/express'
 
-import type { Request, Response } from 'express'
+interface ParsedRequest {
+  appid: string
+  rawBody: string
+  body: Record<string, any>
+}
 
 /**
- * 端到端webhook路由
- * @param req 请求
- * @param res 响应
+ * 解析请求：读 rawBody + JSON + 字段校验
+ * 失败返回 null，并已写入日志
  */
-export const webhookRouting: RequestHandler = async (req, res) => {
-  const data = await checkAppid(req, res)
-  if (!data) return
+const parseRequest = async (req: Request): Promise<ParsedRequest | null> => {
+  const ip = req.socket.remoteAddress
+  const rawBody = await new Promise<string>((resolve) => {
+    const chunks: string[] = []
+    req.on('data', (chunk) => chunks.push(chunk))
+    req.on('end', () => resolve(chunks.join('')))
+  })
 
-  const cfg = getConfig(data.appid)
+  const appid = req.headers['x-bot-appid'] as string
+  if (!appid) {
+    fakeEvent(`未找到 x-bot-appid: ${ip} body: ${rawBody}`)
+    return null
+  }
+
+  if (req.headers['user-agent'] !== 'QQBot-Callback') {
+    fakeEvent(`User-Agent 非 QQBot-Callback: ${ip} body: ${rawBody}`)
+    return null
+  }
+
+  let body: Record<string, any>
+  try {
+    body = JSON.parse(rawBody) || {}
+  } catch {
+    fakeEvent(`非法 JSON: ${ip} body: ${rawBody}`)
+    return null
+  }
+
+  if (typeof body.op !== 'number') {
+    fakeEvent(`缺少 op 字段: ${ip} body: ${rawBody}`)
+    return null
+  }
+
+  return { appid, rawBody, body }
+}
+
+/**
+ * QQ 官方 webhook 路由
+ * POST /qqbot/webhook
+ */
+export const webhookRouting: RequestHandler = async (req: Request, res: Response) => {
+  const parsed = await parseRequest(req)
+  if (!parsed) {
+    res.status(200).end()
+    return
+  }
+
+  const cfg = getConfig(parsed.appid)
   if (!cfg) {
-    logger.error(`[配置错误][${data.appid}] 配置文件中未找到对应的appid，请检查配置文件`)
+    log('error', `[webhook][${parsed.appid}] 配置文件中未找到对应 appId`)
+    res.status(200).end()
     return
   }
-
   if (cfg.event.type !== 1) {
-    logger.error(`[配置错误][${data.appid}] webhook未启用，请检查配置文件`)
+    log('error', `[webhook][${parsed.appid}] webhook 未启用`)
+    res.status(200).end()
     return
   }
 
-  /** 接口初始化 鉴权回调 */
-  if (data.body.op === 13) {
-    const eventTs = data.body?.d?.event_ts
-    const plainToken = data.body?.d?.plain_token
-
+  // op:13 鉴权回调（不能先返回 200）
+  if (parsed.body.op === Opcode.WebhookValidation) {
+    const eventTs = parsed.body?.d?.event_ts
+    const plainToken = parsed.body?.d?.plain_token
     if (!eventTs || !plainToken) {
-      logger.error(`[请求数据错误][${data.appid}] 未找到 event_ts 或 plain_token: ${data.rawBody}`)
+      log('error', `[webhook][${parsed.appid}] 缺少 event_ts/plain_token: ${parsed.rawBody}`)
+      res.status(200).end()
       return
     }
-
     const signature = sign(cfg.secret, eventTs, plainToken)
-    logger.mark(`[signature][${data.appid}] ${signature}`)
+    log('mark', `[webhook][${parsed.appid}] sign=${signature}`)
     res.setHeader('Content-Type', 'application/json')
     res.status(200).end(JSON.stringify({ plain_token: plainToken, signature }))
     return
   }
 
-  /** 非回调事件 进行鉴权验证 */
-  const ed25519 = req.headers['x-signature-ed25519']
-  const signature = sign(cfg.secret, req.headers['x-signature-timestamp'] as string, data.rawBody)
-  if (ed25519 !== signature) {
-    fakeEvent(`签名验证失败:\nappid: ${data.appid}\ned25519: ${ed25519}\n实际签名: ${signature}\nbody: ${data.rawBody}`)
+  // 校验 ed25519
+  const ed25519 = req.headers['x-signature-ed25519'] as string
+  const timestamp = req.headers['x-signature-timestamp'] as string
+  if (!verifySignature(cfg.secret, timestamp, parsed.rawBody, ed25519)) {
+    fakeEvent(`签名验证失败 appid=${parsed.appid} headerSig=${ed25519} body=${parsed.rawBody}`)
+    res.status(200).end()
     return
   }
 
-  event.emit(data.appid, data.body)
-}
-
-/**
- * 判断请求是否合规并返回appid
- * @param req 请求
- * @param res 响应
- */
-export const checkAppid = async (req: Request, res: Response): Promise<{
-  appid: string
-  rawBody: string
-  body: Record<string, any>
-} | undefined> => {
-  let response = true
-  try {
-    const ip = req.socket.remoteAddress
-    const appid = req.headers['x-bot-appid'] as string
-    const rawBody = await new Promise<string>((resolve) => {
-      const raw: string[] = []
-      req.on('data', (chunk) => raw.push(chunk))
-      req.on('end', () => resolve(raw.join('')))
-    })
-
-    if (!appid) {
-      fakeEvent(`未找到 x-bot-appid: ${ip} body: ${rawBody}`)
-      return
-    }
-
-    const userAgent = req.headers['user-agent']
-    if (userAgent !== 'QQBot-Callback') {
-      fakeEvent(`未找到 User-Agent: ${ip} body: ${rawBody}`)
-      return
-    }
-
-    const body = JSON.parse(rawBody) || {}
-    if (typeof body.op !== 'number') {
-      fakeEvent(`非法请求体，未找到 op: ${ip} body: ${rawBody}`)
-      return
-    } else if (body.op === 13) {
-      /** op13是计算sign返回  不可以直接返回状态码 */
-      response = false
-    }
-
-    return { appid, rawBody, body }
-  } finally {
-    /** 根据文档 返回200或者204都可以 必须在3秒内完成 */
-    response && res.status(200).end()
-  }
+  // 必须在 3 秒内返回
+  res.status(200).end()
+  dispatch(parsed.appid, parsed.body as any)
 }

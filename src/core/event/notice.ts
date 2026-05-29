@@ -1,4 +1,4 @@
-import { AdapterQQBot } from '@/core/adapter/adapter'
+import type { AdapterQQBot } from '@/core/adapter/base'
 import {
   karin,
   SrcReply,
@@ -17,7 +17,7 @@ import type {
   FriendDelEvent,
   C2CMsgRejectEvent,
   C2CMsgReceiveEvent,
-} from '../../types/event'
+} from '@/types/event'
 
 /**
  * 机器人加入群聊事件

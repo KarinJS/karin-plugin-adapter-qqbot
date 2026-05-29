@@ -9,10 +9,9 @@
     "allowSyntheticDefaultImports": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "baseUrl": ".",
     "paths": {
       "@/*": [
-        "src/*"
+        "./src/*"
       ],
     },
     "types": [

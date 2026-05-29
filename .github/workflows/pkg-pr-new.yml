@@ -1,0 +1,135 @@
+name: Preview Release (pkg.pr.new)
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '!**'
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 设置 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: 设置 Node.js 环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --ignore-scripts
+
+      - name: 构建输出
+        run: pnpm run build
+
+      # 使用 pkg.pr.new 发布预览版
+      # 注意：需要先在 https://github.com/apps/pkg-pr-new 安装 GitHub App
+      - name: 发布预览版
+        run: npx pkg-pr-new publish --json output.json
+        id: publish
+
+      - name: 解析发布信息
+        id: parse
+        shell: node {0}
+        run: |
+          const fs = require('fs');
+          const data = JSON.parse(fs.readFileSync('output.json', 'utf8'));
+          const urls = data.packages.map(p => p.url).join(' ');
+          const sha = process.env.GITHUB_SHA?.slice(0, 7) || '';
+          const cmds = data.packages.map(p => `pnpm add ${p.url} -w`).join('\n');
+          const out = process.env.GITHUB_OUTPUT;
+          fs.appendFileSync(out, `urls=${urls}\n`);
+          fs.appendFileSync(out, `sha=${sha}\n`);
+          fs.appendFileSync(out, `install_cmds<<EOF\n${cmds}\nEOF\n`);
+
+      - name: 生成工作流摘要
+        shell: bash
+        run: |
+          URLS="${{ steps.parse.outputs.urls }}"
+          SHA="${{ steps.parse.outputs.sha }}"
+
+          # 获取提交信息（PR 和普通 push 的字段不同）
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            COMMIT_MSG="${{ github.event.pull_request.head.sha }}"
+            COMMIT_AUTHOR="${{ github.event.pull_request.user.login }}"
+            COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
+            COMMIT_TYPE="PR #${{ github.event.pull_request.number }}"
+          else
+            COMMIT_MSG='${{ github.event.head_commit.message }}'
+            COMMIT_AUTHOR="${{ github.event.head_commit.author.name }}"
+            COMMIT_SHA="${{ github.sha }}"
+            # 判断是否为 PR merge
+            PR_NUM=$(echo "$COMMIT_MSG" | sed -n 's/Merge pull request #\([0-9]*\).*/\1/p')
+            if [ -n "$PR_NUM" ]; then
+              COMMIT_TYPE="PR Merge (#${PR_NUM})"
+            else
+              COMMIT_TYPE="直接提交"
+            fi
+          fi
+
+          {
+            echo "## 📦 预览版已发布"
+            echo ""
+            echo "### 提交信息"
+            echo ""
+            echo "| 项目 | 值 |"
+            echo "|------|-----|"
+            echo "| **类型** | ${COMMIT_TYPE} |"
+            echo "| **提交信息** | ${COMMIT_MSG} |"
+            echo "| **提交者** | ${COMMIT_AUTHOR} |"
+            echo "| **完整 SHA** | \`${COMMIT_SHA}\` |"
+            echo "| **短 SHA** | \`${SHA}\` |"
+            echo "| **分支** | \`${{ github.ref_name }}\` |"
+            echo ""
+            echo "### 📥 安装命令"
+            echo ""
+            echo "\`\`\`bash"
+            cat <<'INSTALL_EOF'
+          ${{ steps.parse.outputs.install_cmds }}
+          INSTALL_EOF
+            echo "\`\`\`"
+            echo ""
+            echo "### 所有包 URL"
+            echo ""
+            echo "\`\`\`"
+            for url in $URLS; do
+              echo "$url"
+            done
+            echo "\`\`\`"
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: 💬 发布 PR 评论
+        if: github.event_name == 'pull_request'
+        uses: thollander/actions-comment-pull-request@v3
+        with:
+          message: |
+            ## 📦 预览包发布成功
+
+            ### 🏷️ 包信息
+            - **版本:** `${{ github.sha }}`
+            - **提交:** [`${{ steps.parse.outputs.sha }}`](https://github.com/${{ github.repository }}/tree/${{ github.sha }})
+
+            ### 📥 安装命令
+            ```bash
+            ${{ steps.parse.outputs.install_cmds }}
+            ```
+          comment-tag: published-packages
+          mode: upsert
+          reactions: rocket
