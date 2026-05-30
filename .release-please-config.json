@@ -1,8 +1,7 @@
 {
   "packages": {
     ".": {
-      "release-type": "node",
-      "release-as": "2.0.0"
+      "release-type": "node"
     }
   }
 }
