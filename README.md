@@ -1,29 +1,6 @@
 # @karinjs/adapter-qqbot
 
-[![npm](https://img.shields.io/npm/v/@karinjs/adapter-qqbot?style=flat-square)](https://www.npmjs.com/package/@karinjs/adapter-qqbot)
-[![license](https://img.shields.io/npm/l/@karinjs/adapter-qqbot?style=flat-square)](./LICENSE)
-
-为 [Karin](https://github.com/KarinJS/Karin) 框架提供 QQ 官方机器人接入能力。
-
-> **2.0 已发布**：完整重写，对齐 QQ 开放平台 2026 年起的新事件协议
-> （`GROUP_MESSAGE_CREATE` 全量群聊消息 + `mentions` 数组），并适配
-> Markdown / Keyboard 全量开放后的发送方式。
-
----
-
-## 特性
-
-- 🌐 **完整事件支持**：群聊（@/全量）、单聊、频道、频道私信、按钮点击、机器人入退群、主动消息开关
-- 📨 **双发送通道**：自动选择「经典通道」（text + media）或「Markdown 通道」（msg_type=2 + keyboard），按消息内容与配置开关
-- 🔌 **双接入方式**：WebSocket（推荐，无需公网）/ Webhook（QQ 主动推送）
-- ♻️ **WebSocket Resume**：断网自动重连，携带 `session_id` / `seq` 通过 `op:6` 恢复，减少消息丢失
-- 🔑 **扫码登录**：插件首次启动自动二维码引导，授权后写回 `config.json`
-- 🧩 **按钮回调**：完整接入 `INTERACTION_CREATE`，自动 ack 并以普通消息事件投递给业务层
-- 🛡️ **签名校验**：webhook 入口自动用 ed25519 校验
-- 📐 **完整 TypeScript 类型**
-- 🧹 **零 1.x 残留**：不再依赖 Markdown 模板 / keyboard 模板 / 中转服务
-
----
+Karin 的 QQ 官方机器人适配器。
 
 ## 安装
 
@@ -31,59 +8,13 @@
 pnpm add @karinjs/adapter-qqbot
 ```
 
-> 要求 Node.js >= 18，Karin >= 1.15
+要求：Node.js >= 22、Karin >= 1.15
 
----
+## 配置
 
-## 快速开始
+首次启动没有 QQBot 配置时，使用**任意已连接的机器人**或在**控制台中**发送 `#QQ登录` 完成扫码授权。
 
-### 方式 A：扫码登录（推荐）
-
-启动后没有任何已配置的 QQBot 时，控制台只打印一行提示：
-
-```
-  ==========================================
-  未检测到 QQBot 配置
-  请使用任意可用 bot（如 OneBot / Console 适配器）
-  对机器人发送指令： #QQ登录
-  扫码授权完成后会自动写入配置并完成初始化
-
-  ⚠ 注意：扫码授权会刷新该机器人的 secret，旧 secret 立即失效
-  ==========================================
-```
-
-按提示，在**任意已连接的 bot 适配器**（OneBot、Console、Discord …）下，给机器人发送：
-
-```
-#QQ登录       # 或 #qq登录 / #qqlogin / #QQLogin
-```
-
-服务端控制台随后弹出 ASCII 二维码：
-
-```
-  ▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢
-  ▢ ASCII QR ▢▢▢▢▢▢▢
-  ▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢▢
-
-  请使用 QQ 扫描上方二维码，或在手机 QQ 打开链接：
-  https://q.qq.com/qqbot/openclaw/connect.html?task_id=...
-```
-
-手机 QQ 扫码授权后，插件自动：
-
-1. 从平台拉取 `appId` + 加密的 `secret`
-2. 本地 AES-256-GCM 解密
-3. 调 `/users/@me` 获取昵称
-4. 写入 `${karin-base}/@karinjs-adapter-qqbot/config/config.json`
-5. `watch` 回调自动初始化 bot，无需重启
-
-> 该指令同样可用于**新增账号**和**刷新已有账号的 secret**。
-
-### 方式 B：手动配置
-
-在 [QQ 开放平台](https://bot.q.qq.com/) 创建机器人，记录 `AppID` 与 `Secret`，然后编辑：
-
-`@karinjs/adapter-qqbot/config/config.json`：
+也可以访问 Karin WebUI 可视化编辑 或者 手动编辑：`@karinjs-adapter-qqbot/config/config.json`。
 
 ```json
 [
@@ -91,235 +22,70 @@ pnpm add @karinjs/adapter-qqbot
     "name": "我的机器人",
     "appId": "1234567890",
     "secret": "your-secret",
-    "prodApi": "https://api.sgroup.qq.com",
-    "sandboxApi": "https://sandbox.api.sgroup.qq.com",
-    "tokenApi": "https://bots.qq.com/app/getAppAccessToken",
     "sandbox": false,
     "qqEnable": true,
     "guildEnable": true,
     "guildMode": 0,
-    "regex": [{ "reg": "^/", "rep": "#" }],
-    "markdown": { "enable": false },
     "keyboard": { "enable": true },
     "event": { "type": 2 }
   }
 ]
 ```
 
-保存即生效（`watch` 自动重载）。
+- `event.type`: `0` 关闭、`1` Webhook、`2` WebSocket（默认）。
+- `guildMode`: `0` 公域，只收 @ 消息；`1` 私域，接收全部频道消息。
+- `keyboard.enable`: 自动将文本中的 URL 转为 QQ 按钮。
 
----
+## 发送消息与资源文件
 
-## 配置项详解
+文本、@、图片和按钮都通过 Markdown 发送。视频、语音和文件会先上传，再发送 QQ 富媒体消息。
 
-| 字段 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `name` | string | `""` | 机器人显示名（扫码登录会自动获取） |
-| `appId` | string | — | 机器人 AppID（**必填**） |
-| `secret` | string | — | 机器人 Secret（**必填**） |
-| `prodApi` | string | `https://api.sgroup.qq.com` | 正式环境 API 基址 |
-| `sandboxApi` | string | `https://sandbox.api.sgroup.qq.com` | 沙盒环境 API 基址 |
-| `tokenApi` | string | `https://bots.qq.com/app/getAppAccessToken` | access_token 获取接口 |
-| `sandbox` | boolean | `false` | 是否启用沙盒环境 |
-| `qqEnable` | boolean | `true` | 是否处理单聊 / 群聊 |
-| `guildEnable` | boolean | `true` | 是否处理频道消息 |
-| `guildMode` | `0` \| `1` | `0` | `0` 公域（只接 @ 消息）/ `1` 私域（所有消息） |
-| `regex` | object[] | `[{reg:"^/", rep:"#"}]` | 收到消息后对文本执行的正则替换 |
-| `keyboard.enable` | boolean | `true` | 是否将文本中的 URL **自动**转为 keyboard 按钮 |
-| `event.type` | `0` \| `1` \| `2` | `2` | 事件接收方式：0 关闭 / 1 webhook / 2 WebSocket |
+发送本地文件、Base64 或 Buffer 时，需要你自己提供图床或对象存储。适配器目前暂不内置公共上传服务。
 
----
+你需要在自己的 Karin 插件中编写一个 Handler 插件并注册：
 
-## 事件接收方式
+```js
+// plugins/karin-plugin-example/fileToUrl.js
+import karin, { common } from 'node-karin'
+import size from 'image-size'
 
-### WebSocket（推荐，`event.type: 2`）
+export const uploadResource = karin.handler('fileToUrl', async (args) => {
+  const { file, type, filename } = args
+  const buffer = await common.buffer(file)
 
-- 主动连接 QQ 官方 `wss://api.sgroup.qq.com/websocket/`
-- 无需公网 IP / HTTPS 证书
-- intents 自动探测，从最大权限位逐级回退到可用集合
-- **自动 Resume**：断网时记录 `session_id` / `seq`，下次连接走 `op:6` 让服务端补发丢失的事件；服务端拒绝 Resume 时降级 Identify
-- 指数退避重连：`1.5s × 2^n + jitter`，上限 30s
+  // 由你实现：上传到图床/对象存储，返回可公开访问的 URL。
+  const url = await uploadToYourStorage(buffer, filename || 'file.bin')
 
-### Webhook（`event.type: 1`）
+  if (type !== 'image') return { url }
 
-- QQ 主动推送 `POST /qqbot/webhook` 到你的服务
-- 自动处理 `op:13` 鉴权回调（签名回包）
-- 普通事件用 ed25519 校验签名
-- 需要公网 HTTPS：在 QQ 开放平台后台配置「统一回调地址」为 `https://your-domain/qqbot/webhook`
-
----
-
-## 发送通道
-
-**所有 QQ / 频道消息一律走 `msg_type=2` Markdown 通道**（官方已全量开放），不再
-按内容选择通道：
-
-- 文本 / `segment.at(...)` 通过 markdown content 渲染（at 用 `<qqbot-at-user id="..."/>` 内嵌标签）
-- 图片合并为 `![karin #宽px #高px](url)` 内嵌到同一条 markdown
-- `segment.button(...)` / `segment.keyboard(...)` 自动挂到 `keyboard.content.rows`，与 markdown 同条下发
-- 文本中 URL（开启 `keyboard.enable` 时）自动 `extractUrlButtons` 转 keyboard 按钮
-- 视频 / 语音 / 文件不能进 markdown，由 pipeline 自动以 `msg_type=7` 紧随 markdown 主消息**并发补发**
-
----
-
-## 按钮回调（INTERACTION_CREATE）
-
-收到按钮点击时，适配器：
-
-1. 立即 `PUT /interactions/{id}` `code=0` 回 ack，防止客户端 loading
-2. 将事件转为对应场景的消息事件投递：
-   - `chat_type=0` → guild message
-   - `chat_type=1` → group message
-   - `chat_type=2` → friend message
-3. 消息 elements 结构：
-
-```ts
-[
-  segment.at(selfId),       // 群 / 单聊场景自动补
-  segment.text(button_data),
-  segment.json('{"tag":"qqbot-button-click","button_id":"...","button_data":"...",...}'),
-  // srcReply 末尾自动追加 segment.pasmsg(id, 'event')
-]
-```
-
-业务层通过 `e.rawEvent.t === 'INTERACTION_CREATE'` 区分普通消息与按钮点击。
-
----
-
-## 群聊消息事件
-
-QQ 官方 2026 起的新版 `GROUP_MESSAGE_CREATE` 报文：
-
-```json
-{
-  "op": 0, "t": "GROUP_MESSAGE_CREATE",
-  "d": {
-    "author": {
-      "id": "...", "member_openid": "...", "union_openid": "",
-      "username": "小布丁qwq", "bot": false
-    },
-    "content": " /分布 ",
-    "group_id": "...", "group_openid": "...",
-    "id": "ROBOT1.0_...",
-    "mentions": [
-      { "is_you": true, "scope": "single", "username": "方舟生存飞升", "...": "..." }
-    ],
-    "message_scene": { "ext": ["msg_idx=REFIDX_..."], "source": "default" },
-    "message_type": 0,
-    "timestamp": "2026-05-08T13:24:53+08:00"
+  const dimension = size(buffer) // 获取图片宽高
+  return {
+    url,
+    width: dimension.width || 100,
+    height: dimension.height || 100
   }
-}
+})
 ```
 
-适配器行为：
+> **注意：Handler 插件的 key 必须精确为 `fileToUrl`。**
+>
+> 图片必须返回 `{ url, width, height }`；其他资源返回 `{ url }`。
 
-- 当 `mentions[].is_you === true` 时，elements 头部自动补 `segment.at(self)`
-- `author.username` 写入 `sender.nick`
-- `cfg.regex` 应用到 content 拆分后的每个文本段
-- 原始报文完整保留在 `e.rawEvent`，业务层可访问 `mentions` / `message_scene` / `message_type`
+未注册 `fileToUrl` 的 Handler 时，适配器无法上传本地资源，资源消息会发送失败。
 
----
+## 事件
 
-## 撤回 / 引用回复 / 被动消息
-
-- **撤回**：`bot.recallMsg(contact, messageId)` —— 自动按场景调用 `/v2/users` / `/v2/groups` / `/channels` / `/dms`
-- **引用回复**：传入 `segment.reply(messageId)`，仅附加在第一条消息上
-- **被动消息白名单**：
-  - 单聊 `event_id` 接受：`INTERACTION_CREATE` / `C2C_MSG_RECEIVE` / `FRIEND_ADD`
-  - 群聊 `event_id` 接受：`INTERACTION_CREATE` / `GROUP_ADD_ROBOT` / `GROUP_MSG_RECEIVE`
-
----
-
-## Web 配置面板
-
-Karin 内置 Web 面板可视化编辑 `config.json`，本插件提供以下控件：
-
-- 基础字段：name / appId / secret / prodApi / sandboxApi / tokenApi
-- 沙盒、QQ 场景、频道场景、频道私域模式开关
-- 正则规则列表（每行 `<regex> <replacement>`）
-- **URL 自动按钮** 开关（`keyboard.enable`）
-- 事件接收方式（关闭 / Webhook / WebSocket）
-
----
+- 支持 QQ 单聊、群聊、频道、频道私信和按钮回调。
+- 支持 `GROUP_MESSAGE_CREATE` 全量群消息和 `author.member_role` 身份字段。
+- 支持 `GROUP_MEMBER_ADD`、`GROUP_MEMBER_REMOVE` 群成员进退群事件。
+- 单聊同一 `msg_id` 最多回复 4 次；群聊规则保持官方限制。
 
 ## 开发
 
 ```bash
-git clone https://github.com/KarinJS/karin-plugin-adapter-qqbot.git
-cd karin-plugin-adapter-qqbot
 pnpm install
-pnpm dev          # tsx watch
-pnpm build        # tsc + tsdown
+pnpm build
 ```
-
-源码结构（2.0）：
-
-```
-src/
-├── connection/
-│   ├── routing.ts          express 路由聚合
-│   ├── webhook.ts          POST /qqbot/webhook
-│   ├── transport.ts        事件总线（appId → 业务）
-│   └── ws/
-│       ├── client.ts       单连接生命周期 + 心跳 + Resume
-│       ├── intents.ts      intents 探测与回退
-│       └── manager.ts      多 bot 连接管理
-├── core/
-│   ├── index.ts            createBot / destroyBot / initQQBotAdapter
-│   ├── api/                QQBotApi 门面 + http/messages/media/interaction/meta/builders
-│   ├── internal/axios.ts   access_token 缓存 + 自动刷新
-│   ├── adapter/
-│   │   ├── base.ts         AdapterQQBot
-│   │   ├── grouping.ts     消息归类
-│   │   ├── pipeline-qq.ts  QQ 单聊/群聊发送管线
-│   │   ├── pipeline-guild.ts 频道发送管线
-│   │   └── text-to-md.ts   URL→ 按钮、图片→ markdown
-│   ├── event/
-│   │   ├── dispatcher.ts   事件分发器
-│   │   ├── message.ts      群/单/频道/私信消息
-│   │   ├── notice.ts       入退群/好友/主动消息开关
-│   │   ├── interaction.ts  按钮回调
-│   │   └── conver.ts       报文 → karin elements
-│   └── onboard/
-│       ├── crypto.ts       AES-256-GCM 解密
-│       ├── portal.ts       q.qq.com 接口
-│       ├── qr.ts           终端二维码 + 轮询
-│       └── index.ts        runQrOnboard / needQrOnboard
-├── apps/                   karin app 插件
-│   └── login.ts            #QQ登录 指令
-├── types/                  事件、配置、opcode 类型
-└── utils/                  日志、配置读写、文本工具
-
-demo/                       示例 / 烟测 app（不进 npm 包，不自动加载）
-└── qqtest.ts               QQBot 2.0 真号烟测命令集合
-```
-
-### 调试
-
-WS 入站消息、bus 派发、dispatcher 路由等关键链路均通过 `logger.debug` 输出。
-诊断「事件收不到」类问题时，把 karin 的 `log.level` 改成 `debug` 即可看到完整链路。
-
----
-
-## 从 1.x 升级
-
-2.0 是破坏式重写，**不提供配置自动迁移**。需要手动调整：
-
-| 1.x | 2.0 |
-| --- | --- |
-| `markdown.mode: 0/1/2/3/4/5`（模式选择 / 模板） | 全部删除，永远默认走 markdown 通道 |
-| `event.wsUrl` / `event.wsToken` | 删除（中转方案已废弃） |
-| 新增 | `keyboard.enable: true`（默认，URL 自动转按钮） |
-
-完整改动详见 [CHANGELOG.md](./CHANGELOG.md) 2.0.0 段落。
-
----
-
-## 反馈
-
-- Issue：https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues
-
----
 
 ## License
 

@@ -71,6 +71,8 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
 
   /**
    * 撤回消息
+   *
+   * 群聊中机器人被群主设为管理员后，也可撤回成员消息；平台仍限制消息发送后两分钟内。
    */
   async recallMsg (contact: Contact, messageId: string): Promise<void> {
     try {

@@ -26,7 +26,8 @@ export const onGroupMsg = (client: AdapterQQBot, ev: GroupMsgEvent, opts: GroupO
     if (m.member_openid && m.username) client.nicknameCache.set(m.member_openid, m.username)
   })
   const contact = karin.contactGroup(ev.d.group_openid || ev.d.group_id)
-  const sender = karin.groupSender(userId, 'member', username)
+  // `member_role` 是 QQ 官方在群消息事件中下发的真实身份；旧报文不含时保留为未知。
+  const sender = karin.groupSender(userId, ev.d.author.member_role || 'unknown', username)
 
   const e = createGroupMessage({
     bot: client,

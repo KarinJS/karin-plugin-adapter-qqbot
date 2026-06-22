@@ -11,6 +11,8 @@ import {
 import type {
   GroupAddRobotEvent,
   GroupDelRobotEvent,
+  GroupMemberAddEvent,
+  GroupMemberRemoveEvent,
   GroupMsgRejectEvent,
   GroupMsgReceiveEvent,
   FriendAddEvent,
@@ -68,6 +70,60 @@ export const onGroupDelRobot = (client: AdapterQQBot, event: GroupDelRobotEvent)
     rawEvent: event,
     time: event.d.timestamp,
     content: { operatorId: userId, targetId: selfId, type: 'kick' },
+  })
+}
+
+/**
+ * 群成员加入事件。
+ *
+ * QQ 官方仅下发加入成员，未提供操作人和加入方式；Karin 的通知模型要求
+ * `type`，因此以 `approve` 表示已加入，并将 `operatorId` 留空。
+ * 该事件不能作为 QQ 被动消息的 `event_id`，回复会按普通消息发送。
+ *
+ * @param client 机器人实例
+ * @param event 官方群成员加入事件
+ */
+export const onGroupMemberAdd = (client: AdapterQQBot, event: GroupMemberAddEvent) => {
+  const memberId = event.d.member_openid
+  const contact = karin.contactGroup(event.d.group_openid)
+  const sender = karin.groupSender(memberId, 'unknown')
+
+  createGroupMemberAddNotice({
+    contact,
+    eventId: event.id,
+    sender,
+    srcReply: (elements) => client.sendMsg(contact, elements),
+    bot: client,
+    rawEvent: event,
+    time: event.d.timestamp,
+    content: { operatorId: '', targetId: memberId, type: 'approve' },
+  })
+}
+
+/**
+ * 群成员退出事件。
+ *
+ * QQ 官方仅下发退出成员，未提供操作人和退出原因；Karin 的通知模型要求
+ * `type`，因此以 `leave` 表示成员已离开，并将 `operatorId` 留空。
+ * 该事件不能作为 QQ 被动消息的 `event_id`，回复会按普通消息发送。
+ *
+ * @param client 机器人实例
+ * @param event 官方群成员退出事件
+ */
+export const onGroupMemberRemove = (client: AdapterQQBot, event: GroupMemberRemoveEvent) => {
+  const memberId = event.d.member_openid
+  const contact = karin.contactGroup(event.d.group_openid)
+  const sender = karin.groupSender(memberId, 'unknown')
+
+  createGroupMemberDelNotice({
+    contact,
+    eventId: event.id,
+    sender,
+    srcReply: (elements) => client.sendMsg(contact, elements),
+    bot: client,
+    rawEvent: event,
+    time: event.d.timestamp,
+    content: { operatorId: '', targetId: memberId, type: 'leave' },
   })
 }
 

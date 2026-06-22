@@ -5,7 +5,7 @@ import {
   onGroupMsg, onFriendMsg, onChannelMsg, onDirectMsg,
 } from './message'
 import {
-  onGroupAddRobot, onGroupDelRobot, onGroupMsgReceive, onGroupMsgReject,
+  onGroupAddRobot, onGroupDelRobot, onGroupMemberAdd, onGroupMemberRemove, onGroupMsgReceive, onGroupMsgReject,
   onFriendAdd, onFriendDel, onC2CMsgReceive, onC2CMsgReject,
 } from './notice'
 import { onInteraction } from './interaction'
@@ -24,6 +24,8 @@ const eventLabel: Record<string, string> = {
   [EventEnum.DIRECT_MESSAGE_CREATE]: '频道私信',
   [EventEnum.GROUP_ADD_ROBOT]: '机器人入群',
   [EventEnum.GROUP_DEL_ROBOT]: '机器人退群',
+  [EventEnum.GROUP_MEMBER_ADD]: '群成员加入',
+  [EventEnum.GROUP_MEMBER_REMOVE]: '群成员退出',
   [EventEnum.GROUP_MSG_RECEIVE]: '群聊开启通知',
   [EventEnum.GROUP_MSG_REJECT]: '群聊关闭通知',
   [EventEnum.FRIEND_ADD]: '添加好友',
@@ -71,6 +73,12 @@ export const dispatch = (client: AdapterQQBot, ev: Event): void => {
       return
     case EventEnum.GROUP_DEL_ROBOT:
       onGroupDelRobot(client, ev)
+      return
+    case EventEnum.GROUP_MEMBER_ADD:
+      onGroupMemberAdd(client, ev)
+      return
+    case EventEnum.GROUP_MEMBER_REMOVE:
+      onGroupMemberRemove(client, ev)
       return
     case EventEnum.GROUP_MSG_RECEIVE:
       onGroupMsgReceive(client, ev)

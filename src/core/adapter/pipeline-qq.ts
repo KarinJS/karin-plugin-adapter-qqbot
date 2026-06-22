@@ -6,6 +6,9 @@ import type { AdapterQQBot } from './base'
 import type { Grouping } from './grouping'
 import type { SendQQMsg, SendQQMsgResponse } from '@/core/api/types'
 
+/** QQ 官方限制：单聊中同一 `msg_id` 最多发送四次被动回复。 */
+const C2C_PASSIVE_REPLY_LIMIT = 4
+
 /** 群聊 event_id 白名单 */
 const GROUP_EVENT_WHITELIST = new Set([
   'INTERACTION_CREATE', 'GROUP_ADD_ROBOT', 'GROUP_MSG_RECEIVE',
@@ -128,8 +131,19 @@ const flushQQ = async (
     ? (peer: string, item: SendQQMsg) => ctx.super.messages.sendFriendMsg(peer, item)
     : (peer: string, item: SendQQMsg) => ctx.super.messages.sendGroupMsg(peer, item)
 
+  /**
+   * 仅单聊 `msg_id` 回复受四次上限约束。`event_id` 事件回复和群聊不适用该限制。
+   * 这是 QQ 官方 2026-01-10 更新后的限制，超出部分不请求平台接口。
+   */
+  const maxItems = contact.scene === 'friend' && grouping.pasmsg.type === 'msg' && grouping.pasmsg.id
+    ? C2C_PASSIVE_REPLY_LIMIT
+    : Infinity
+  if (items.length > maxItems) {
+    ctx.logger('warn', `单聊被动回复最多 ${C2C_PASSIVE_REPLY_LIMIT} 条，已跳过 ${items.length - maxItems} 条`)
+  }
+
   let replyHandled = false
-  for (const item of items) {
+  for (const item of items.slice(0, maxItems)) {
     passive(item)
     if (!replyHandled && grouping.reply.messageId) {
       item.message_reference = { message_id: grouping.reply.messageId }

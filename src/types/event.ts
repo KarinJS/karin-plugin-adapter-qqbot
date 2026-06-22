@@ -42,6 +42,10 @@ export const enum EventEnum {
   GROUP_AT_MESSAGE_CREATE = 'GROUP_AT_MESSAGE_CREATE',
   /** 群聊普通消息（需开通对应 intents） */
   GROUP_MESSAGE_CREATE = 'GROUP_MESSAGE_CREATE',
+  /** 群成员加入 */
+  GROUP_MEMBER_ADD = 'GROUP_MEMBER_ADD',
+  /** 群成员退出 */
+  GROUP_MEMBER_REMOVE = 'GROUP_MEMBER_REMOVE',
   /** 用户添加机器人 */
   FRIEND_ADD = 'FRIEND_ADD',
   /** 用户删除机器人 */
@@ -77,6 +81,11 @@ export interface QQAuthor {
   user_openid?: string
   /** 群聊场景 */
   member_openid?: string
+  /**
+   * 消息发送者在群内的身份。
+   * 仅群聊消息事件提供，取值由 QQ 官方定义。
+   */
+  member_role?: 'owner' | 'admin' | 'member'
   /** 互联应用 openid，未开通为空字符串 */
   union_openid?: string
   /** 群/QQ 昵称 */
@@ -277,6 +286,36 @@ export interface GroupDelRobotEvent extends BaseEvent {
 }
 
 /**
+ * 群成员加入事件。
+ *
+ * 官方事件只提供加入成员的 `member_openid`，不提供操作人或加入方式。
+ */
+export interface GroupMemberAddEvent extends BaseEvent {
+  t: EventEnum.GROUP_MEMBER_ADD
+  id: string
+  d: {
+    timestamp: number
+    group_openid: string
+    member_openid: string
+  }
+}
+
+/**
+ * 群成员退出事件。
+ *
+ * 官方事件只提供退出成员的 `member_openid`，不提供操作人或退出原因。
+ */
+export interface GroupMemberRemoveEvent extends BaseEvent {
+  t: EventEnum.GROUP_MEMBER_REMOVE
+  id: string
+  d: {
+    timestamp: number
+    group_openid: string
+    member_openid: string
+  }
+}
+
+/**
  * 群拒绝机器人主动消息
  */
 export interface GroupMsgRejectEvent extends BaseEvent {
@@ -430,6 +469,8 @@ export type Event =
   | DirectMsgEvent
   | GroupAddRobotEvent
   | GroupDelRobotEvent
+  | GroupMemberAddEvent
+  | GroupMemberRemoveEvent
   | GroupMsgRejectEvent
   | GroupMsgReceiveEvent
   | FriendAddEvent
