@@ -28,7 +28,7 @@
   },
   "dependencies": {
     "@karinjs/geturls": "^1.0.2",
-    "form-data": "^4.0.5",
+    "form-data": "^4.0.6",
     "image-size": "^2.0.2",
     "qrcode": "^1.5.4",
     "silk-wasm": "^3.7.1",
@@ -36,23 +36,18 @@
   },
   "devDependencies": {
     "@types/express": "5.0.6",
-    "@types/node": "^24.12.4",
+    "@types/node": "^24.13.2",
     "@types/qrcode": "^1.5.6",
     "eslint": "^9.39.4",
     "neostandard": "^0.13.0",
     "node-karin": "^1.15.5",
-    "tsdown": "^0.22.0",
-    "tsx": "^4.22.0",
+    "tsdown": "^0.22.3",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.3"
   },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org"
-  },
-  "pnpm": {
-    "overrides": {
-      "yaml@>=2.0.0 <2.8.3": "^2.8.3"
-    }
   },
   "karin": {
     "main": "src/index.ts",
