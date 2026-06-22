@@ -11,7 +11,7 @@
 
 当 http code 不是 2XX 的时候，http 的 responese body 中还会有平台的错误码信息。
 
-如： ![错误码](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.7.0/images/api-231017/error.png)
+如： ![错误码](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/error.592db73d.png)
 
 ### [#](#http状态码) HTTP状态码
 

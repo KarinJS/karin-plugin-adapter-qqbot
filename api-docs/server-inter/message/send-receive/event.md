@@ -14,8 +14,6 @@
 |intents|1<<25|
 |事件类型|C2C\_MESSAGE\_CREATE|
 |触发场景|用户在单聊发送消息给机器人|
-|权限要求|无特殊要求|
-|推送方式|Websocket|
 
 * **事件字段**
 
@@ -86,8 +84,6 @@ attachment对象
 |intents|1<<25|
 |事件类型|GROUP\_AT\_MESSAGE\_CREATE|
 |触发场景|用户在群聊@机器人发送消息|
-|权限要求|无特殊要求|
-|推送方式|Websocket|
 
 * **事件字段**
 
@@ -100,11 +96,13 @@ attachment对象
 |group\_openid|string|群聊的 openid|
 |attachments|object\[\]|富媒体文件附件，文件类型："图片，语音，视频，文件"|
 
-author对象
+author 对象
 
 |**属性**|**类型**|**说明**|
 |---|---|---|
 |member\_openid|string|用户在本群的 member\_openid|
+|member\_role|string|消息发送者在群内的身份，枚举值：owner、admin、member|
+|bot|bool|是否是机器人|
 
 * **事件示例**
 
@@ -136,6 +134,66 @@ author对象
 
 为了确保消息可到达，极端情况下，相同的 msg\_id 的消息会有概率重复推送，当开发者在做“被动回复消息”响应业务的时候，如果开发者不对 msg\_id 的回复做存储排重后的回复逻辑，很可能会回复了两条相同的消息给用户，这里我们引入了一个 `msg_seq` 的字段，便于过滤重复消息响应，可参考消息发送接口 msg\_seq 的用法。
 
+## [#](#群聊全量消息) 群聊全量消息
+
+说明
+
+当群主设定允许该机器人接收群内全部消息时，机器人可接收到群内所有成员在群内的发言消息。
+
+* **基本概况**
+
+||
+|---|
+|基本|
+|intents|1<<25|
+|事件类型|GROUP\_MESSAGE\_CREATE|
+|触发场景|用户在群聊@机器人发送消息|
+
+* **事件字段**
+
+|**属性**|**类型**|**说明**|
+|---|---|---|
+|id|string|平台方消息 ID，可以用于被动消息发送|
+|author|object|发送者|
+|content|string|消息内容|
+|timestamp|string|消息生产时间（RFC3339）|
+|group\_openid|string|群聊的 openid|
+|attachments|object\[\]|富媒体文件附件，文件类型："图片，语音，视频，文件"|
+
+author 对象
+
+|**属性**|**类型**|**说明**|
+|---|---|---|
+|member\_openid|string|用户在本群的 member\_openid|
+|member\_role|string|消息发送者在群内的身份，枚举值：owner、admin、member|
+|bot|bool|是否是机器人|
+
+* **事件示例**
+
+```json
+// Websocket
+{
+  "author": {
+      "member_openid": "E4F4AEA33253A2797FB897C50B81D7ED"
+  },
+  "content": " 123",
+  "group_openid": "C9F778FE6ADF9D1D1DBE395BF744A33A",
+  "id": "ROBOT1.0_eBIyWnxpmSu6uLQ7u7fU0eGloKGYg4eEa737vRyKnMCgyZjKi7JLYkQ9B0VapbiY",
+  "timestamp": "2023-11-06T13:37:18+08:00"
+}
+```
+
+1  
+2  
+3  
+4  
+5  
+6  
+7  
+8  
+9  
+10
+
 ## [#](#频道私信消息) 频道私信消息
 
 用户在频道私信给机器人发送的消息
@@ -147,8 +205,6 @@ author对象
 |基本|
 |事件类型|DIRECT\_MESSAGE\_CREATE|
 |触发场景|用户在频道私信内发送消息给机器人|
-|权限要求|无特殊要求|
-|推送方式|Websocket|
 
 ### [#](#发送时机) 发送时机
 
@@ -214,8 +270,6 @@ author对象
 |基本|
 |事件类型|AT\_MESSAGE\_CREATE|
 |触发场景|用户在频道私信内发送消息给机器人|
-|权限要求|无特殊要求|
-|推送方式|Websocket|
 
 ### [#](#发送时机-2) 发送时机
 
@@ -279,8 +333,6 @@ author对象
 |基本|
 |事件类型|MESSAGE\_CREATE|
 |触发场景|用户在频道私信内发送消息给机器人|
-|权限要求|无特殊要求|
-|推送方式|Websocket|
 
 ### [#](#发送时机-3) 发送时机
 

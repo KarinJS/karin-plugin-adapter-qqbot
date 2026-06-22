@@ -15,7 +15,7 @@ POST /guilds/{guild_id}/api_permission/demand
 * 每天只能在一个频道内发 `3` 条（默认值）频道权限授权链接。
 
 ## [#](#示例图) 示例图
-![创建频道API接口权限授权](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.7.0/images/api-231017/post_api_permission_demand.png)
+![创建频道API接口权限授权](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/post_api_permission_demand.0e7274cb.png)
 ## [#](#content-type) Content-Type
 
 ```http

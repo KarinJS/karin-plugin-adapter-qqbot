@@ -1,7 +1,7 @@
 # [#](#_24-文本-缩略图模板) 24 文本+缩略图模板
 
 ### [#](#样式) 样式
-![24](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.7.0/images/api-231017/24.png)
+![24](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/24.4656049a.png)
 
 模板 id=24。
 

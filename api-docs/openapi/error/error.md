@@ -8,7 +8,7 @@
 * http body 返回的 json 中的 code
 * 其中有一些错误会在 http body 返回的 json 中的 [data](/wiki/develop/api-v2/openapi/error/data/model.html) 中，返回业务具体信息。例如 [主动消息审核](/wiki/develop/api-v2/server-inter/message/post_messages.html)
 
-如： ![错误码](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.7.0/images/api-231017/error.png)
+如： ![错误码](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/error.592db73d.png)
 
 ### [#](#http-状态码) http 状态码
 
