@@ -112,10 +112,29 @@ export interface QQMention {
  * 消息场景
  */
 export interface MessageScene {
-  /** 形如 ['msg_idx=REFIDX_xxx'] */
+  /**
+   * QQ 消息索引。
+   *
+   * - `msg_idx=REFIDX_xxx`：当前消息可被引用时使用的索引；
+   * - `ref_msg_idx=REFIDX_xxx`：当前消息引用的目标索引。
+   */
   ext?: string[]
   /** 'default' | 其他 */
   source?: string
+}
+
+/**
+ * QQ 在引用消息事件中附带的引用上下文。
+ *
+ * 官方报文只提供 `msg_idx`，不会提供被引用消息的正式消息 ID 与发送时间；
+ * 适配器以该索引作为 `bot.getMsg` 的可查询消息 ID。
+ */
+export interface QQReferencedMessageElement {
+  author?: Pick<QQAuthor, 'bot' | 'username'>
+  content: string
+  message_type?: number
+  msg_idx: string
+  attachments?: Attachment[]
 }
 
 /**
@@ -165,6 +184,8 @@ export interface C2CMsgEvent extends BaseEvent {
     timestamp: string
     attachments?: Attachment[]
     message_scene?: MessageScene
+    /** 引用消息的上下文，仅在当前消息引用其他消息时下发 */
+    msg_elements?: QQReferencedMessageElement[]
     /** 0 普通消息 */
     message_type?: number
   }
@@ -191,6 +212,8 @@ export interface GroupMsgEvent extends BaseEvent {
     /** GROUP_MESSAGE_CREATE 必带；GROUP_AT_MESSAGE_CREATE 也开始下发 */
     mentions?: QQMention[]
     message_scene?: MessageScene
+    /** 引用消息的上下文，仅在当前消息引用其他消息时下发 */
+    msg_elements?: QQReferencedMessageElement[]
     /** 0 普通消息 */
     message_type?: number
   }

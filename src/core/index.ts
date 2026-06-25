@@ -88,7 +88,9 @@ export const createBot = async (bot: QQBotConfig): Promise<void> => {
     client.account.subId.appid = appId
     client.account.subId.union_openid = me.union_openid
 
-    bus.on(appId, (ev: Event) => dispatchEvent(client, ev))
+    bus.on(appId, (ev: Event) => {
+      dispatchEvent(client, ev)
+    })
 
     client.adapter.address = baseUrl
     client.adapter.secret = bot.secret

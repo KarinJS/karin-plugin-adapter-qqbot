@@ -2,6 +2,7 @@ import { AdapterBase, logger, buttonHandle, segment, fileToUrl } from 'node-kari
 import { QQBotApi } from '@/core/api'
 import { sendQQ } from './pipeline-qq'
 import { sendGuild } from './pipeline-guild'
+import { getMessageStore, type MessageStore } from '@/core/storage/message'
 import { getImageSize } from '@/utils/common'
 import type {
   LogMethodNames, Contact, ElementTypes, Message, SendMsgResults,
@@ -27,11 +28,14 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
   public cfg: QQBotConfig
   /** openId / member_openid -> 昵称 缓存 */
   public nicknameCache = new Map<string, string>()
+  /** 接收消息的三天热缓存 + SQLite 缓存，用于实现 Karin 标准 `getMsg`。 */
+  public readonly messageStore: MessageStore
 
   constructor (cfg: QQBotConfig, api: QQBotApi) {
     super()
     this.cfg = cfg
     this.super = api
+    this.messageStore = getMessageStore()
     this.adapter.name = 'QQ Official Bot'
     this.adapter.protocol = 'qqbot'
     this.adapter.platform = 'qq'
@@ -237,19 +241,29 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
   }
 
   /**
-   * 获取消息
+   * 按消息 ID 获取已接收的消息。
+   *
+   * QQ 官方 Bot API 没有历史消息查询接口，因此仅从本地缓存读取。
+   * 消息在接收时已转换为 Karin elements，最长保留三天；引用消息的 `REFIDX`
+   * 索引同样可作为 `messageId` 查询。
+   *
+   * @param input OneBot v11 标准单参 messageId，或用于限定查询范围的 Contact。
+   * @param messageId 当 input 是 Contact 时传入的目标消息 ID。
+   * @returns 命中的消息；未命中时返回空消息结构。
    */
-  async getMsg (_contact: Contact | string, _messageId?: string): Promise<MessageResponse> {
-    // TODO: QQ 官方 Bot API 暂不支持获取消息内容
-    this.logger('warn', '[getMsg] QQ Official Bot API 暂不支持获取消息内容')
-    const contact = typeof _contact === 'string'
-      ? { scene: 'group' as const, peer: _contact, subPeer: '', name: '' }
-      : _contact
+  async getMsg (input: Contact | string, messageId?: string): Promise<MessageResponse> {
+    /** OneBot v11 标准单参形式：bot.getMsg(messageId)。 */
+    const targetId = typeof input === 'string' ? input : messageId || ''
+    const contact = typeof input === 'string' ? undefined : input
+    const cached = await this.messageStore.get(String(this.cfg.appId), targetId, contact)
+    if (cached) return cached
+
+    this.logger('debug', `[getMsg] 本地三天消息缓存未命中: ${targetId || '(empty)'}`)
     return {
       time: 0,
-      messageId: _messageId || '',
+      messageId: targetId,
       messageSeq: 0,
-      contact,
+      contact: contact || { scene: 'group', peer: '', subPeer: '', name: '' },
       sender: { userId: '', nick: '', name: '', role: 'member' },
       elements: [],
     }
