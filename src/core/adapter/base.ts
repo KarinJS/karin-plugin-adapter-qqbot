@@ -1,7 +1,8 @@
-import { AdapterBase, logger, buttonHandle, segment, fileToUrl, karin } from 'node-karin'
+import { AdapterBase, logger, buttonHandle, segment, fileToUrl } from 'node-karin'
 import { QQBotApi } from '@/core/api'
 import { sendQQ } from './pipeline-qq'
 import { sendGuild } from './pipeline-guild'
+import { cacheSelfMessage, prepareSelfMessageCache, shouldCacheSelfMessage } from './self-message-cache'
 import { getMessageStore, type MessageStore } from '@/core/storage/message'
 import { getImageSize } from '@/utils/common'
 import type {
@@ -14,18 +15,6 @@ import type {
   AdapterType,
 } from 'node-karin'
 import type { QQBotConfig } from '@/types/config'
-
-const cacheableSelfElementTypes = new Set<ElementTypes['type']>([
-  'text',
-  'at',
-  'reply',
-  'face',
-  'image',
-  'video',
-  'record',
-  'file',
-  'markdown',
-])
 
 /**
  * QQ Official Bot 适配器
@@ -79,17 +68,21 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
     _retryCount?: number
   ): Promise<SendMsgResults> {
     if (contact.scene === 'direct' || contact.scene === 'guild') {
-      const promise = sendGuild(this, contact as Contact<'guild' | 'direct'>, elements)
-      if (!this.shouldCacheSelfMessage()) return promise
-      const result = await promise
-      this.cacheSelfMessage(contact, elements, result)
+      if (!shouldCacheSelfMessage(this)) {
+        return sendGuild(this, contact as Contact<'guild' | 'direct'>, elements)
+      }
+      const prepared = await prepareSelfMessageCache(this, elements)
+      const result = await sendGuild(this, contact as Contact<'guild' | 'direct'>, prepared.sendElements)
+      cacheSelfMessage(this, contact, prepared.cacheElements, result)
       return result
     }
     if (contact.scene === 'group' || contact.scene === 'friend') {
-      const promise = sendQQ(this, contact as Contact<'friend' | 'group'>, elements)
-      if (!this.shouldCacheSelfMessage()) return promise
-      const result = await promise
-      this.cacheSelfMessage(contact, elements, result)
+      if (!shouldCacheSelfMessage(this)) {
+        return sendQQ(this, contact as Contact<'friend' | 'group'>, elements)
+      }
+      const prepared = await prepareSelfMessageCache(this, elements)
+      const result = await sendQQ(this, contact as Contact<'friend' | 'group'>, prepared.sendElements)
+      cacheSelfMessage(this, contact, prepared.cacheElements, result)
       return result
     }
     throw new Error(`不支持的消息场景: ${contact.scene}`)
@@ -141,74 +134,6 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
     data.time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp
     data.messageTime = data.time
     return data
-  }
-
-  /**
-   * 发送成功后缓存机器人自己的消息，供 bot.getMsg(messageId) 查询。
-   */
-  private cacheSelfMessage (
-    contact: Contact,
-    elements: ElementTypes[],
-    result: SendMsgResults
-  ): void {
-    if (!this.shouldCacheSelfMessage()) return
-
-    const rawData = Array.isArray(result.rawData) ? result.rawData : [result.rawData]
-    const responses = rawData.filter(item => item?.id)
-    if (!responses.length) return
-
-    const sender = this.selfSender(contact)
-    const cachedElements = elements.filter(element => cacheableSelfElementTypes.has(element.type))
-    const seen = new Set<string>()
-    for (const response of responses) {
-      const messageId = String(response.id)
-      if (!messageId || seen.has(messageId)) continue
-      seen.add(messageId)
-
-      this.messageStore
-        .save(String(this.cfg.appId), {
-          messageId,
-          messageSeq: 0,
-          time: this.responseTime(response.timestamp),
-          contact,
-          sender,
-          elements: cachedElements,
-        })
-        .catch(err => this.logger('warn', `[getMsg] 写入自己消息缓存失败: ${messageId}`, err))
-    }
-  }
-
-  /**
-   * 只有两个缓存开关同时开启时才需要等待发送结果并缓存自己消息。
-   */
-  private shouldCacheSelfMessage (): boolean {
-    return this.cfg.messageCache.enable && this.cfg.messageCache.self
-  }
-
-  /**
-   * 构造机器人自己的 sender。
-   */
-  private selfSender (contact: Contact) {
-    const userId = this.selfSubId('id') || this.selfId
-    const name = this.selfName || this.cfg.name || ''
-    if (contact.scene === 'friend' || contact.scene === 'direct') {
-      return karin.friendSender(userId, name)
-    }
-    return karin.groupSender(userId, 'member', name)
-  }
-
-  /**
-   * QQ / 频道发送接口 timestamp 格式不同，统一转成毫秒时间戳。
-   */
-  private responseTime (timestamp: unknown): number {
-    if (typeof timestamp === 'string') {
-      const time = new Date(timestamp).getTime()
-      return Number.isFinite(time) ? time : Date.now()
-    }
-    if (typeof timestamp === 'number') {
-      return timestamp < 1e12 ? timestamp * 1000 : timestamp
-    }
-    return Date.now()
   }
 
   // ==================== 以下方法为 AdapterBase 缺失补全 ====================
