@@ -34,6 +34,8 @@ export default defineConfig({
         guildMode: item.guildMode === 1,
         regex: item.regex.map((r: any) => `${r.reg} ${r.rep}`),
         'keyboard:enable': item.keyboard?.enable !== false,
+        'messageCache:enable': item.messageCache?.enable === true,
+        'messageCache:self': item.messageCache?.self === true,
         'event:type': String(item.event?.type ?? 2),
       })
     })
@@ -111,6 +113,16 @@ export default defineConfig({
                 description: '将文本中的链接自动转为 keyboard 按钮',
                 defaultSelected: true,
               }),
+              components.switch.create('messageCache:enable', {
+                label: '启用数据库缓存消息',
+                description: '用于 bot.getMsg 查询最近三天消息，关闭后不写入消息缓存数据库',
+                defaultSelected: false,
+              }),
+              components.switch.create('messageCache:self', {
+                label: '缓存自己消息',
+                description: '仅在启用数据库缓存消息时生效，发送成功后缓存机器人自己的消息',
+                defaultSelected: false,
+              }),
               components.radio.group('event:type', {
                 label: '事件接收方式',
                 description: '选择 QQ 官方推送事件的方式',
@@ -153,6 +165,8 @@ export default defineConfig({
       guildMode: boolean
       regex: string[]
       'keyboard:enable': boolean
+      'messageCache:enable': boolean
+      'messageCache:self': boolean
       'event:type': string
     }>
   }) => {
@@ -183,6 +197,10 @@ export default defineConfig({
         guildMode,
         regex,
         keyboard: { enable: item['keyboard:enable'] !== false },
+        messageCache: {
+          enable: !!item['messageCache:enable'],
+          self: !!item['messageCache:self'],
+        },
         event: { type: eventType },
       }
     })

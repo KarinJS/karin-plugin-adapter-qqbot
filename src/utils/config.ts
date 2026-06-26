@@ -73,6 +73,7 @@ export const formatConfig = (user: Config): Config => {
     ...def,
     ...item,
     keyboard: { ...def.keyboard, ...item.keyboard },
+    messageCache: { ...def.messageCache, ...item.messageCache },
     event: { ...def.event, ...item.event },
   }))
 }
@@ -96,6 +97,7 @@ export const getDefaultConfig = (): Config => [
       { reg: '^/', rep: '#' },
     ],
     keyboard: { enable: true },
+    messageCache: { enable: false, self: false },
     event: { type: 2 },
   },
 ]

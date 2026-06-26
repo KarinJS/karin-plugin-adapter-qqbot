@@ -123,15 +123,39 @@ export const convertToKarin = (
 
   /** mentions 索引 id -> displayName */
   const mentionMap = new Map<string, string>()
+  const selfMentionIds = new Set<string>([appid, selfSubId].filter(Boolean))
   if (ev.t === EventEnum.MESSAGE_CREATE || ev.t === EventEnum.AT_MESSAGE_CREATE) {
     (ev.d.mentions as GuildUser[] | undefined)?.forEach(v => {
       mentionMap.set(v.id, v.username)
+      if (v.id === selfSubId) selfMentionIds.add(v.id)
     })
   } else if (ev.t === EventEnum.GROUP_MESSAGE_CREATE || ev.t === EventEnum.GROUP_AT_MESSAGE_CREATE) {
     (ev.d.mentions as QQMention[] | undefined)?.forEach(v => {
       mentionMap.set(v.id, v.username)
       mentionMap.set(v.member_openid, v.username)
+      if (v.is_you) {
+        selfMentionIds.add(v.id)
+        selfMentionIds.add(v.member_openid)
+      }
     })
+  }
+
+  const isSelfAt = (element: ElementTypes): boolean =>
+    element.type === 'at' && selfMentionIds.has(element.targetId)
+
+  const hasSelfAt = (): boolean => elements.some(isSelfAt)
+
+  const pushAt = (id: string, name = ''): void => {
+    const targetId = selfMentionIds.has(id) ? appid : id
+    if (targetId === appid && hasSelfAt()) {
+      const prev = elements.at(-1)
+      const beforePrev = elements.at(-2)
+      if (prev?.type === 'text' && !prev.text.trim() && beforePrev && isSelfAt(beforePrev)) {
+        elements.pop()
+      }
+      return
+    }
+    elements.push(segment.at(targetId, name))
   }
 
   /** 将 QQ 附件转换为 Karin 元素。 */
@@ -180,14 +204,14 @@ export const convertToKarin = (
       // QQ 群聊下发 `<@openid>`；频道沿用 `<@!id>`。两者都转换为 Karin at 元素。
       const id = tok.replace(/^<@!?|>$/g, '')
       const name = mentionMap.get(id) || ''
-      elements.push(segment.at(id === selfSubId ? appid : id, name))
+      pushAt(id, name)
       continue
     }
     if (tok.startsWith('<qqbot-at-user')) {
       const m = tok.match(/id="([^"]+)"/)
       const id = m?.[1] || ''
       const name = mentionMap.get(id) || ''
-      elements.push(segment.at(id === selfSubId ? appid : id, name))
+      pushAt(id, name)
       continue
     }
     if (tok.startsWith('<qqbot-at-everyone')) {

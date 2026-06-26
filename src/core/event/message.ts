@@ -31,6 +31,7 @@ const cacheMessage = (
   },
   aliases: string[] = []
 ) => {
+  if (!client.cfg.messageCache.enable) return
   client.messageStore
     .save(String(client.cfg.appId), { ...message, messageSeq: 0 }, aliases)
     .catch(err => log('warn', `[getMsg] 写入消息缓存失败: ${message.messageId}`, err))
@@ -47,6 +48,7 @@ const cacheReference = (
     elements: ElementTypes[]
   }
 ) => {
+  if (!client.cfg.messageCache.enable) return
   client.messageStore
     .saveReferenceIfAbsent(String(client.cfg.appId), { ...message, messageSeq: 0 })
     .catch(err => log('warn', `[getMsg] 写入引用上下文失败: ${message.messageId}`, err))

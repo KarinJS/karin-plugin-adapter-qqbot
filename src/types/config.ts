@@ -29,6 +29,13 @@ export interface QQBotConfig {
     /** 是否将文本中的 URL 自动转换为 keyboard 按钮 */
     enable: boolean
   }
+  /** 消息缓存配置 */
+  messageCache: {
+    /** 是否启用数据库消息缓存，用于 bot.getMsg */
+    enable: boolean
+    /** 是否缓存机器人自己发送的消息 */
+    self: boolean
+  }
   /** 事件接收配置 */
   event: {
     /** 接收方式 0 关闭 / 1 webhook / 2 ws */
