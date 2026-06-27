@@ -1,13 +1,15 @@
 import fs from 'node:fs'
-import { dirPath } from '@/root'
 import {
   watch,
-  basePath,
+  karinPathBase,
   requireFileSync,
   common,
   logger,
 } from 'node-karin'
+import { pluginDirName } from '@/utils/plugin'
 import type { Config, QQBotConfig } from '@/types/config'
+
+export { pkg, pluginDirName } from '@/utils/plugin'
 
 let cache: Config | undefined
 const cacheMap: Record<string, QQBotConfig> = {}
@@ -24,15 +26,8 @@ export const bindHandlers = (
   _destroyBot = destroyBot
 }
 
-/** package.json */
-export const pkg = () => requireFileSync(`${dirPath}/package.json`)
-
-/** npm 包名，如 @karinjs/adapter-qqbot */
-const pluginName: string = pkg().name
-/** 文件系统目录名：把 npm 包名里的 `/` 规范化为 `-`，与 karin 框架对齐 */
-const pluginDirName: string = pluginName.replace(/\//g, '-')
-/** 配置目录：${basePath}/@karinjs-adapter-qqbot/config */
-const dirConfig = `${basePath}/${pluginDirName}/config`
+/** 配置目录：${karinPathBase}/@karinjs-adapter-qqbot/config */
+const dirConfig = `${karinPathBase}/${pluginDirName}/config`
 
 /**
  * 读取配置

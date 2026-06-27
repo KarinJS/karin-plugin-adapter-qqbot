@@ -256,7 +256,12 @@ export interface SendQQMsgResponse {
   /** 消息唯一 ID */
   id: string
   /** 发送时间 */
-  timestamp: number
+  timestamp: number | string
+  /** 扩展信息；部分 QQ 消息发送响应会返回可用于 message_reference 的 REFIDX。 */
+  ext_info?: {
+    /** 当前发送消息可被引用时使用的索引。 */
+    ref_idx?: string
+  }
 }
 
 /** 发送频道消息后响应 */

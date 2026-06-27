@@ -88,6 +88,21 @@ export const SQL = {
     FROM qqbot_message_elements
     WHERE message_ref = ?
     ORDER BY element_index ASC`,
+  /** 查询仍保存远程 URL 的媒体消息，value 只匹配 querystring 编码后的 file 字段。 */
+  selectMessagesWithRemoteMedia: `SELECT DISTINCT ${messageSelectFields()}
+    FROM qqbot_messages m
+    JOIN qqbot_bots b ON b.id = m.bot_ref
+    JOIN qqbot_contacts c ON c.id = m.contact_ref
+    JOIN qqbot_senders s ON s.id = m.sender_ref
+    JOIN qqbot_message_elements e ON e.message_ref = m.id
+    WHERE m.time > ?
+      AND e.element_type IN ('image', 'video', 'record', 'file')
+      AND (
+        e.value LIKE 'file=http%3A%2F%2F%' OR e.value LIKE 'file=https%3A%2F%2F%'
+        OR e.value LIKE 'file=%2F%2F%'
+      )
+    ORDER BY m.time DESC, m.id DESC
+    LIMIT ?`,
   selectAlias: `SELECT a.message_ref
     FROM qqbot_message_aliases a
     JOIN qqbot_bots b ON b.id = a.bot_ref
@@ -106,6 +121,7 @@ export const SQL = {
           AND scene = ? AND peer = ? AND sub_peer = ?
       )
       AND alias_message_id = ?`,
+  /** 判断消息是否包含指定 reply 段，value 参数必须使用 elements.replyElementValue 编码。 */
   hasReply: `SELECT 1 AS found FROM qqbot_message_elements
     WHERE message_ref = ? AND element_type = 'reply' AND value = ?
     LIMIT 1`,

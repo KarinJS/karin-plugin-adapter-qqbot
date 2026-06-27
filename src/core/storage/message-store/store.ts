@@ -5,9 +5,11 @@ import { karinPathBase } from 'node-karin'
 import { log } from '@/utils/logger'
 import {
   CLEANUP_INTERVAL, DATABASE_VERSION, FLUSH_BATCH_SIZE, FLUSH_INTERVAL,
-  MAX_WRITE_QUEUE, MESSAGE_TTL,
+  MAX_MEDIA_LOCALIZE_QUEUE, MAX_WRITE_QUEUE, MEDIA_LOCALIZE_CONCURRENCY,
+  MEDIA_LOCALIZE_INTERVAL, MEDIA_RECOVERY_LIMIT, MESSAGE_TTL,
 } from './constants'
-import { loadElements, saveElement } from './elements'
+import { loadElements, replyElementValue, saveElement } from './elements'
+import { cleanupMessageMediaCache, hasRemoteFileElement, localizeFileElements } from './media'
 import { migrations } from './migrations'
 import { SQL } from './sql'
 import type { Contact, GroupSender, MessageResponse, Sender } from 'node-karin'
@@ -18,6 +20,18 @@ interface PendingWrite {
   message: CachedMessage
   aliases: string[]
   referenceOnly: boolean
+}
+
+/** 待本地化的媒体缓存任务。 */
+interface PendingMediaLocalize {
+  /** 当前 QQBot appId。 */
+  botId: string
+  /** 包含远程媒体 URL 的消息快照。 */
+  message: CachedMessage
+  /** 这条消息的额外查询 alias，成功本地化后需要一并回写。 */
+  aliases: string[]
+  /** 会话级去重 key，避免同一消息重复排队下载。 */
+  key: string
 }
 
 /**
@@ -35,8 +49,12 @@ export class MessageStore {
   private shouldVacuum = false
   private flushTimer?: NodeJS.Timeout
   private flushing = false
+  private mediaTimer?: NodeJS.Timeout
+  private mediaActive = 0
 
   private readonly pending: PendingWrite[] = []
+  private readonly pendingMedia: PendingMediaLocalize[] = []
+  private readonly pendingMediaKeys = new Set<string>()
   private readonly memory = new Map<string, CachedMessage>()
   private readonly directIndex = new Map<string, string>()
   private readonly aliasIndex = new Map<string, string>()
@@ -47,6 +65,18 @@ export class MessageStore {
 
   constructor () {
     this.ready = this.initialize()
+  }
+
+  /**
+   * 立即执行一次过期消息和本地媒体缓存清理。
+   *
+   * 该方法交给 Karin `task` 调度调用；类内部只保留清理能力，不自行维护常驻定时器。
+   *
+   * @returns 清理完成 Promise。
+   */
+  async cleanupExpired (): Promise<void> {
+    await this.ready
+    await this.cleanup()
   }
 
   /**
@@ -66,6 +96,7 @@ export class MessageStore {
     const cached = this.cloneMessage(message)
     this.putMemory(botId, cached, aliases)
     this.enqueue({ botId, message: cached, aliases, referenceOnly: false })
+    this.enqueueMediaLocalize(botId, cached, aliases)
   }
 
   /**
@@ -83,6 +114,7 @@ export class MessageStore {
     const cached = this.cloneMessage(message)
     this.putMemory(botId, cached)
     this.enqueue({ botId, message: cached, aliases: [], referenceOnly: true })
+    this.enqueueMediaLocalize(botId, cached, [])
   }
 
   /**
@@ -174,7 +206,7 @@ export class MessageStore {
   }
 
   /**
-   * 初始化 SQLite 连接、表结构和定时清理任务。
+   * 初始化 SQLite 连接、表结构，并执行启动清理和媒体本地化补救。
    *
    * @returns 初始化完成 Promise。
    */
@@ -192,11 +224,7 @@ export class MessageStore {
     await this.run('PRAGMA busy_timeout = 5000')
     await this.migrate()
     await this.cleanup()
-
-    const timer = setInterval(() => {
-      this.cleanup().catch(err => log('warn', '[getMsg] 清理消息缓存失败', err))
-    }, CLEANUP_INTERVAL)
-    timer.unref()
+    await this.recoverRemoteMedia()
   }
 
   /**
@@ -301,6 +329,150 @@ export class MessageStore {
     for (let index = this.pending.length - 1; index >= 0; index--) {
       if (this.pending[index].message.time <= deadline) this.pending.splice(index, 1)
     }
+  }
+
+  /**
+   * 投递媒体本地化任务。
+   *
+   * 原消息会先保留短期 URL 写入缓存；本地化成功后再覆盖同一条消息。队列会按
+   * message scoped key 去重，避免高频更新同一条消息时重复下载。
+   *
+   * @param botId 当前 QQBot appId。
+   * @param message 可能包含远程媒体 URL 的消息快照。
+   * @param aliases 该消息可被查询到的额外 alias。
+   */
+  private enqueueMediaLocalize (botId: string, message: CachedMessage, aliases: string[]): void {
+    if (!hasRemoteFileElement(message.elements)) return
+    if (this.isExpired(message)) return
+
+    const key = this.scopedKey(botId, message.contact, message.messageId)
+    if (this.pendingMediaKeys.has(key)) return
+
+    const item = {
+      botId,
+      message: this.cloneMessage(message),
+      aliases,
+      key,
+    }
+    this.pendingMedia.push(item)
+    this.pendingMediaKeys.add(key)
+
+    if (this.pendingMedia.length > MAX_MEDIA_LOCALIZE_QUEUE) {
+      this.prunePendingMedia()
+      if (this.pendingMedia.length > MAX_MEDIA_LOCALIZE_QUEUE) {
+        const dropped = this.pendingMedia.splice(0, this.pendingMedia.length - MAX_MEDIA_LOCALIZE_QUEUE)
+        dropped.forEach(item => this.pendingMediaKeys.delete(item.key))
+        log('warn', `[getMsg] 媒体本地缓存队列过长，已丢弃 ${dropped.length} 条最旧任务`)
+      }
+    }
+
+    this.scheduleMediaLocalize()
+  }
+
+  /**
+   * 安排媒体本地化队列处理。
+   *
+   * @returns 已存在定时器或队列为空时直接返回。
+   */
+  private scheduleMediaLocalize (): void {
+    if (this.mediaTimer) return
+    if (!this.pendingMedia.length) return
+    this.mediaTimer = setTimeout(() => {
+      this.mediaTimer = undefined
+      this.drainMediaLocalizeQueue()
+    }, MEDIA_LOCALIZE_INTERVAL)
+    this.mediaTimer.unref()
+  }
+
+  /**
+   * 按固定并发处理媒体本地化任务。
+   *
+   * @returns 队列为空或达到并发上限时返回。
+   */
+  private drainMediaLocalizeQueue (): void {
+    while (
+      this.mediaActive < MEDIA_LOCALIZE_CONCURRENCY &&
+      this.pendingMedia.length
+    ) {
+      const item = this.pendingMedia.shift()!
+      this.mediaActive++
+      this.localizeMediaItem(item)
+        .catch(err => log('warn', `[getMsg] 媒体本地缓存失败: ${item.message.messageId}`, err))
+        .finally(() => {
+          this.mediaActive--
+          this.pendingMediaKeys.delete(item.key)
+          if (this.pendingMedia.length) this.scheduleMediaLocalize()
+        })
+    }
+  }
+
+  /**
+   * 本地化单条消息中的远程媒体字段，并在成功后覆盖内存与 SQLite。
+   *
+   * @param item 待处理的媒体本地化任务。
+   * @returns 本地化与回写完成 Promise。
+   */
+  private async localizeMediaItem (item: PendingMediaLocalize): Promise<void> {
+    if (this.isExpired(item.message)) return
+
+    const result = await localizeFileElements(item.message.elements)
+    for (const failure of result.failures) {
+      log('debug', `[getMsg] 媒体本地缓存跳过: ${item.message.messageId} ${failure}`)
+    }
+    if (!result.changed) return
+
+    const localized = this.cloneMessage({
+      ...item.message,
+      elements: result.elements,
+    })
+    this.putMemory(item.botId, localized, item.aliases)
+    this.enqueue({
+      botId: item.botId,
+      message: localized,
+      aliases: item.aliases,
+      referenceOnly: false,
+    })
+  }
+
+  /**
+   * 清理已经过期的媒体本地化待处理任务。
+   *
+   * @returns 无返回值；会同步维护 pendingMediaKeys。
+   */
+  private prunePendingMedia (): void {
+    const deadline = Date.now() - MESSAGE_TTL
+    for (let index = this.pendingMedia.length - 1; index >= 0; index--) {
+      const item = this.pendingMedia[index]
+      if (item.message.time > deadline) continue
+      this.pendingMedia.splice(index, 1)
+      this.pendingMediaKeys.delete(item.key)
+    }
+  }
+
+  /**
+   * 启动时扫描 SQLite 中尚未本地化的远程媒体 URL，并重新投递队列补救。
+   *
+   * @returns 扫描和投递完成 Promise。
+   */
+  private async recoverRemoteMedia (): Promise<void> {
+    const rows = await this.getRows<MessageRow>(SQL.selectMessagesWithRemoteMedia, [
+      Date.now() - MESSAGE_TTL,
+      MEDIA_RECOVERY_LIMIT,
+    ])
+    if (!rows.length) return
+
+    for (const row of rows) {
+      const response = await this.rowToResponse(row)
+      this.enqueueMediaLocalize(row.bot_id, {
+        messageId: response.messageId,
+        messageSeq: response.messageSeq,
+        time: response.time,
+        contact: response.contact,
+        sender: response.sender,
+        elements: response.elements,
+      }, [])
+    }
+    log('debug', `[getMsg] 已投递 ${rows.length} 条远程媒体缓存补救任务`)
   }
 
   /**
@@ -665,7 +837,7 @@ export class MessageStore {
    * @returns true 表示该消息包含对应 reply 段。
    */
   private async hasReplyTo (messageRef: number, replyId: string): Promise<boolean> {
-    return !!await this.getRow<{ found: number }>(SQL.hasReply, [messageRef, replyId])
+    return !!await this.getRow<{ found: number }>(SQL.hasReply, [messageRef, replyElementValue(replyId)])
   }
 
   /**
@@ -694,6 +866,7 @@ export class MessageStore {
   private async cleanup (): Promise<void> {
     this.cleanupMemory()
     await this.run(SQL.cleanup, [Date.now() - MESSAGE_TTL])
+    await cleanupMessageMediaCache()
     this.lastCleanup = Date.now()
   }
 

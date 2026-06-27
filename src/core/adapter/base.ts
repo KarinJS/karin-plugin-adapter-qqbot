@@ -2,6 +2,7 @@ import { AdapterBase, logger, buttonHandle, segment, fileToUrl } from 'node-kari
 import { QQBotApi } from '@/core/api'
 import { sendQQ } from './pipeline-qq'
 import { sendGuild } from './pipeline-guild'
+import { isOwnMessageId, resolveApiMessageId } from './message-id-map'
 import { cacheSelfMessage, prepareSelfMessageCache, shouldCacheSelfMessage } from './self-message-cache'
 import { getMessageStore, type MessageStore } from '@/core/storage/message'
 import { getImageSize } from '@/utils/common'
@@ -94,15 +95,20 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
    * 群聊中机器人被群主设为管理员后，也可撤回成员消息；平台仍限制消息发送后两分钟内。
    */
   async recallMsg (contact: Contact, messageId: string): Promise<void> {
+    const apiMessageId = resolveApiMessageId(this, contact, messageId)
     try {
       if (contact.scene === 'friend') {
-        await this.super.messages.recall('user', contact.peer, messageId)
+        if (!isOwnMessageId(this, contact, apiMessageId)) {
+          this.logger('warn', `[recallMsg] QQ 单聊只能撤回机器人自己发送的消息，已跳过撤回: ${messageId}`)
+          return
+        }
+        await this.super.messages.recall('user', contact.peer, apiMessageId)
       } else if (contact.scene === 'group') {
-        await this.super.messages.recall('group', contact.peer, messageId)
+        await this.super.messages.recall('group', contact.peer, apiMessageId)
       } else if (contact.scene === 'direct') {
-        await this.super.messages.recall('dms', contact.peer, messageId)
+        await this.super.messages.recall('dms', contact.peer, apiMessageId)
       } else if (contact.scene === 'guild') {
-        await this.super.messages.recall('channels', contact.peer, messageId)
+        await this.super.messages.recall('channels', contact.peer, apiMessageId)
       }
     } catch (err) {
       logger.error('撤回消息失败:', err)

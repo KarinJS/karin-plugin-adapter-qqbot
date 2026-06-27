@@ -89,31 +89,48 @@ const flushGuild = async (
     : (peer: string, _subPeer: string, item: SendGuildMsg | FormData) =>
         ctx.super.messages.sendDmsMsg(peer, item)
 
-  let replyHandled = false
   for (const item of items) {
     passive(item)
-    if (!replyHandled && grouping.reply.messageId && !(item instanceof FormData)) {
-      item.message_reference = { message_id: grouping.reply.messageId }
-      replyHandled = true
-    }
     const res: SendGuildResponse = await send(contact.peer, contact.subPeer!, item)
     result.rawData.push(res)
   }
   return ctx.handleResponse(result)
 }
 
-const buildPassiveGuild = (grouping: Grouping<'guild'>) => {
-  if (!grouping.pasmsg.id) return (_item: SendGuildMsg | FormData) => undefined
+/**
+ * 解析频道/私信场景的被动回复来源。
+ *
+ * openclaw 的 qqbot 适配器对 channel/dm 也只传 `msg_id`。这里让显式
+ * `segment.reply` 优先，其次使用事件入口追加的 pasmsg。
+ *
+ * @param grouping 已归类的消息段。
+ * @returns 被动回复来源；没有可用来源时返回 undefined。
+ */
+const resolvePassiveGuild = (grouping: Grouping<'guild'>) => {
+  if (grouping.reply.messageId) return { type: 'msg' as const, id: grouping.reply.messageId }
+  if (grouping.pasmsg.id) return grouping.pasmsg
+  return undefined
+}
 
-  if (grouping.pasmsg.type === 'event') {
+/**
+ * 构造频道/私信被动消息附加器。
+ *
+ * @param grouping 已归类的消息段。
+ * @returns 可直接修改发送体或 FormData 的附加函数。
+ */
+const buildPassiveGuild = (grouping: Grouping<'guild'>) => {
+  const source = resolvePassiveGuild(grouping)
+  if (!source?.id) return (_item: SendGuildMsg | FormData) => undefined
+
+  if (source.type === 'event') {
     return (item: SendGuildMsg | FormData) => {
-      if (item instanceof FormData) item.append('event_id', grouping.pasmsg.id)
-      else item.event_id = grouping.pasmsg.id
+      if (item instanceof FormData) item.append('event_id', source.id)
+      else item.event_id = source.id
     }
   }
 
   return (item: SendGuildMsg | FormData) => {
-    if (item instanceof FormData) item.append('msg_id', grouping.pasmsg.id)
-    else item.msg_id = grouping.pasmsg.id
+    if (item instanceof FormData) item.append('msg_id', source.id)
+    else item.msg_id = source.id
   }
 }

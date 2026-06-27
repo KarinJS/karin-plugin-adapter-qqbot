@@ -4,6 +4,7 @@ import {
   createGroupMessage, createFriendMessage,
   createGuildMessage, createDirectMessage,
 } from 'node-karin'
+import { rememberApiMessageId } from '@/core/adapter/message-id-map'
 import { log } from '@/utils/logger'
 import type { AdapterQQBot } from '@/core/adapter/base'
 import type {
@@ -11,24 +12,38 @@ import type {
 } from '@/types/event'
 import type { Contact, ElementTypes, Sender } from 'node-karin'
 
+/** 群消息事件转换选项。 */
 interface GroupOptions {
   /** AT_MESSAGE 走 true；GROUP_MESSAGE 由 mentions.is_you 自动决定 */
   forceAtSelf: boolean
 }
 
+/** 写入 getMsg/getHistoryMsg 缓存所需的最小消息快照。 */
+interface CacheMessagePayload {
+  /** Karin 侧暴露的消息 ID。 */
+  messageId: string
+  /** 消息时间戳，单位毫秒。 */
+  time: number
+  /** 消息所在会话。 */
+  contact: Contact
+  /** 消息发送者。 */
+  sender: Sender
+  /** 已转换为 Karin 格式的消息段。 */
+  elements: ElementTypes[]
+}
+
 /**
  * 写入 getMsg 热缓存并投递 SQLite 后台队列。
+ *
  * 不等待数据库落库，避免缓存特性拖慢 Karin 消息事件下发。
+ *
+ * @param client 当前 QQBot 适配器实例。
+ * @param message 需要缓存的消息快照。
+ * @param aliases 可用于查询同一消息的 QQ 侧索引，例如 msg_idx。
  */
 const cacheMessage = (
   client: AdapterQQBot,
-  message: {
-    messageId: string
-    time: number
-    contact: Contact
-    sender: Sender
-    elements: ElementTypes[]
-  },
+  message: CacheMessagePayload,
   aliases: string[] = []
 ) => {
   if (!client.cfg.messageCache.enable) return
@@ -37,16 +52,17 @@ const cacheMessage = (
     .catch(err => log('warn', `[getMsg] 写入消息缓存失败: ${message.messageId}`, err))
 }
 
-/** 引用上下文没有正式消息 ID 时，以 QQ 的 `ref_msg_idx` 建立只写入一次的缓存。 */
+/**
+ * 写入引用消息上下文缓存。
+ *
+ * 引用上下文没有正式消息 ID 时，以 QQ 的 `ref_msg_idx` 建立只写入一次的缓存。
+ *
+ * @param client 当前 QQBot 适配器实例。
+ * @param message 以 ref_msg_idx 作为 messageId 的引用消息快照。
+ */
 const cacheReference = (
   client: AdapterQQBot,
-  message: {
-    messageId: string
-    time: number
-    contact: Contact
-    sender: Sender
-    elements: ElementTypes[]
-  }
+  message: CacheMessagePayload
 ) => {
   if (!client.cfg.messageCache.enable) return
   client.messageStore
@@ -71,17 +87,20 @@ export const onGroupMsg = (client: AdapterQQBot, ev: GroupMsgEvent, opts: GroupO
   const elements = convertToKarin(selfId, ev, client.selfSubId('id'), { forceAtSelf: opts.forceAtSelf })
   const messageIndex = getMessageSceneIndex(ev.d.message_scene, 'msg_idx')
   const referenceIndex = getMessageSceneIndex(ev.d.message_scene, 'ref_msg_idx')
+  // Karin 侧 messageId 保持 QQ 官方唯一 ID；msg_idx/REFIDX 只作为引用索引和查询 alias。
+  const karinMessageId = ev.d.id
+  if (messageIndex) rememberApiMessageId(client, contact, messageIndex, ev.d.id)
 
   if (referenceIndex) elements.unshift(segment.reply(referenceIndex))
 
   const time = Number(new Date(ev.d.timestamp).getTime() || ev.d.timestamp)
   cacheMessage(client, {
-    messageId: ev.d.id,
+    messageId: karinMessageId,
     time,
     contact,
     sender,
     elements,
-  }, [messageIndex].filter(id => id && id !== referenceIndex))
+  }, [ev.d.id, messageIndex].filter((id): id is string => !!id && id !== karinMessageId && id !== referenceIndex))
 
   const reference = ev.d.msg_elements?.find(item => item.msg_idx === referenceIndex)
   if (reference && referenceIndex) {
@@ -98,7 +117,7 @@ export const onGroupMsg = (client: AdapterQQBot, ev: GroupMsgEvent, opts: GroupO
     bot: client,
     elements,
     eventId: ev.id,
-    messageId: ev.d.id,
+    messageId: karinMessageId,
     messageSeq: 0,
     rawEvent: ev,
     time,
@@ -123,17 +142,20 @@ export const onFriendMsg = (client: AdapterQQBot, ev: C2CMsgEvent) => {
   const elements = convertToKarin(selfId, ev, client.selfSubId('id'))
   const messageIndex = getMessageSceneIndex(ev.d.message_scene, 'msg_idx')
   const referenceIndex = getMessageSceneIndex(ev.d.message_scene, 'ref_msg_idx')
+  // Karin 侧 messageId 保持 QQ 官方唯一 ID；msg_idx/REFIDX 只作为引用索引和查询 alias。
+  const karinMessageId = ev.d.id
+  if (messageIndex) rememberApiMessageId(client, contact, messageIndex, ev.d.id)
 
   if (referenceIndex) elements.unshift(segment.reply(referenceIndex))
 
   const time = Number(new Date(ev.d.timestamp).getTime() || ev.d.timestamp)
   cacheMessage(client, {
-    messageId: ev.d.id,
+    messageId: karinMessageId,
     time,
     contact,
     sender,
     elements,
-  }, [messageIndex].filter(id => id && id !== referenceIndex))
+  }, [ev.d.id, messageIndex].filter((id): id is string => !!id && id !== karinMessageId && id !== referenceIndex))
 
   const reference = ev.d.msg_elements?.find(item => item.msg_idx === referenceIndex)
   if (reference && referenceIndex) {
@@ -150,7 +172,7 @@ export const onFriendMsg = (client: AdapterQQBot, ev: C2CMsgEvent) => {
     bot: client,
     elements,
     eventId: ev.id,
-    messageId: ev.d.id,
+    messageId: karinMessageId,
     messageSeq: 0,
     rawEvent: ev,
     time,

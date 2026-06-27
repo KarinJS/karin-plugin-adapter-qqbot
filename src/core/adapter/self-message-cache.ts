@@ -1,4 +1,5 @@
 import { fileToUrl, karin } from 'node-karin'
+import { rememberApiMessageId } from './message-id-map'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
 
@@ -63,9 +64,15 @@ export const cacheSelfMessage = (
   const sender = selfSender(ctx, contact)
   const seen = new Set<string>()
   for (const response of responses) {
-    const messageId = String(response.id)
+    const apiMessageId = String(response.id)
+    const referenceMessageId = typeof response.ext_info?.ref_idx === 'string'
+      ? response.ext_info.ref_idx
+      : ''
+    const messageId = apiMessageId
+    const aliases = [referenceMessageId].filter(id => id && id !== messageId)
     if (!messageId || seen.has(messageId)) continue
     seen.add(messageId)
+    if (referenceMessageId) rememberApiMessageId(ctx, contact, referenceMessageId, apiMessageId)
 
     ctx.messageStore
       .save(String(ctx.cfg.appId), {
@@ -75,7 +82,7 @@ export const cacheSelfMessage = (
         contact,
         sender,
         elements: cacheElements,
-      })
+      }, aliases)
       .catch(err => ctx.logger('warn', `[getMsg] 写入自己消息缓存失败: ${messageId}`, err))
   }
 }
