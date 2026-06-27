@@ -75,6 +75,15 @@ export const SQL = {
     JOIN qqbot_contacts c ON c.id = m.contact_ref
     JOIN qqbot_senders s ON s.id = m.sender_ref
     WHERE m.id = ?`,
+  selectHistory: `SELECT ${messageSelectFields()}
+    FROM qqbot_messages m
+    JOIN qqbot_bots b ON b.id = m.bot_ref
+    JOIN qqbot_contacts c ON c.id = m.contact_ref
+    JOIN qqbot_senders s ON s.id = m.sender_ref
+    WHERE b.bot_id = ? AND c.scene = ? AND c.peer = ? AND c.sub_peer = ?
+      AND (m.time < ? OR (m.time = ? AND m.id <= ?))
+    ORDER BY m.time DESC, m.id DESC
+    LIMIT ?`,
   selectElements: `SELECT element_index, element_type, value
     FROM qqbot_message_elements
     WHERE message_ref = ?

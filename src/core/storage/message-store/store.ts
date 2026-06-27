@@ -124,19 +124,53 @@ export class MessageStore {
       return null
     }
 
-    return {
-      messageId: row.message_id,
-      messageSeq: row.message_seq,
-      time: row.time,
-      contact: this.contactFromRow(row),
-      sender: {
-        userId: row.sender_user_id,
-        nick: row.sender_nick,
-        name: row.sender_name,
-        role: row.sender_role,
-      },
-      elements: await loadElements((sql, params) => this.getRows(sql, params), row.message_ref),
+    return this.rowToResponse(row)
+  }
+
+  /**
+   * 按起始消息 ID 读取同一会话内的历史缓存消息。
+   *
+   * QQ 官方 Bot 没有 seq 历史查询能力；这里以本地缓存中命中的起始消息为锚点，
+   * 按时间倒序返回最近的 `count` 条消息，包含起始消息本身。
+   *
+   * @param botId 当前 QQBot appId。
+   * @param contact 查询限定的会话。
+   * @param startMsgId 起始消息 ID 或 QQ `REFIDX` 引用索引。
+   * @param count 获取消息数量。
+   * @returns 命中的历史消息数组；未命中或已过期时返回空数组。
+   */
+  async getHistory (
+    botId: string,
+    contact: Contact,
+    startMsgId: string,
+    count: number
+  ): Promise<MessageResponse[]> {
+    const limit = Math.trunc(count || 1)
+    if (!startMsgId || limit <= 0) return []
+
+    await this.ready
+    await this.cleanupIfDue()
+    await this.flushQueue()
+
+    const anchor = await this.resolveMessageRow(botId, contact, startMsgId)
+    if (!anchor) return []
+    if (this.isExpired(anchor)) {
+      await this.cleanup()
+      return []
     }
+
+    const rows = await this.getRows<MessageRow>(SQL.selectHistory, [
+      botId,
+      contact.scene,
+      contact.peer,
+      contact.subPeer || '',
+      anchor.time,
+      anchor.time,
+      anchor.message_ref,
+      limit,
+    ])
+
+    return Promise.all(rows.map(row => this.rowToResponse(row)))
   }
 
   /**
@@ -521,6 +555,58 @@ export class MessageStore {
       case 'direct': return { scene: 'direct', ...common, subPeer: row.sub_peer, subName: row.contact_sub_name }
       case 'groupTemp': return { scene: 'groupTemp', ...common, subPeer: row.sub_peer }
     }
+  }
+
+  /**
+   * 将数据库行还原为 Karin `MessageResponse`。
+   *
+   * @param row 消息主查询结果。
+   * @returns Karin 标准消息查询结果。
+   */
+  private async rowToResponse (row: MessageRow): Promise<MessageResponse> {
+    return {
+      messageId: row.message_id,
+      messageSeq: row.message_seq,
+      time: row.time,
+      contact: this.contactFromRow(row),
+      sender: {
+        userId: row.sender_user_id,
+        nick: row.sender_nick,
+        name: row.sender_name,
+        role: row.sender_role,
+      },
+      elements: await loadElements((sql, params) => this.getRows(sql, params), row.message_ref),
+    }
+  }
+
+  /**
+   * 在指定会话中解析消息 ID 或 alias 到消息主表行。
+   *
+   * @param botId 当前 QQBot appId。
+   * @param contact Karin 会话对象。
+   * @param messageId 真实消息 ID 或 alias。
+   * @returns 命中的消息行；未命中时返回 null。
+   */
+  private async resolveMessageRow (
+    botId: string,
+    contact: Contact,
+    messageId: string
+  ): Promise<MessageRow | null> {
+    const key = this.contactKey(botId, contact, messageId)
+    const direct = await this.getRow<MessageRow>(SQL.selectMessage, key)
+    const alias = direct
+      ? undefined
+      : await this.getRow<MessageAliasRow>(SQL.selectAlias, key)
+    if (!direct && !alias) return null
+
+    const row = direct || await this.getRow<MessageRow>(SQL.selectMessageByRef, [alias!.message_ref])
+    if (!row) return null
+
+    if (!direct && await this.hasReplyTo(row.message_ref, messageId)) {
+      await this.deleteAlias(botId, this.contactFromRow(row), messageId)
+      return null
+    }
+    return row
   }
 
   /**

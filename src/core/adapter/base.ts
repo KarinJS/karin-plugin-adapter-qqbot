@@ -297,18 +297,30 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
   }
 
   /**
-   * 获取历史消息（通过消息 ID）
+   * 获取本地缓存历史消息（仅支持 message_id）
    */
-  async getHistoryMsg (_contact: Contact, _startMsgId: string, _count: number): Promise<Array<MessageResponse>>
+  async getHistoryMsg (contact: Contact, startMsgId: string, count: number): Promise<Array<MessageResponse>>
   /**
-   * 获取历史消息（通过消息序列号）
+   * 获取本地缓存历史消息（message_seq 暂不支持）
    */
-  async getHistoryMsg (_contact: Contact, _startMsgSeq: number, _count: number): Promise<Array<MessageResponse>>
+  async getHistoryMsg (contact: Contact, startMsgSeq: number, count: number): Promise<Array<MessageResponse>>
   /** @internal */
-  async getHistoryMsg (_contact: Contact, _start: string | number, _count: number): Promise<Array<MessageResponse>> {
-    // TODO: QQ 官方 Bot API 暂不支持获取历史消息
-    this.logger('warn', '[getHistoryMsg] QQ Official Bot API 暂不支持获取历史消息')
-    return []
+  async getHistoryMsg (contact: Contact, start: string | number, count = 1): Promise<Array<MessageResponse>> {
+    if (typeof start === 'number') {
+      this.logger('warn', '[getHistoryMsg] QQ Official Bot 仅支持通过 message_id 获取历史消息，不支持 message_seq')
+      return []
+    }
+
+    if (!this.cfg.messageCache.enable) {
+      this.logger('warn', '[getHistoryMsg] 历史消息缓存为空，请打开“启用数据库缓存消息”开关后再记录历史消息')
+      return []
+    }
+
+    const history = await this.messageStore.getHistory(String(this.cfg.appId), contact, start, count)
+    if (!history.length) {
+      this.logger('debug', `[getHistoryMsg] 本地三天历史消息缓存未命中: ${start || '(empty)'}`)
+    }
+    return history
   }
 
   /**
