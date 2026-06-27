@@ -115,7 +115,7 @@ export default defineConfig({
               }),
               components.switch.create('messageCache:enable', {
                 label: '启用数据库缓存消息',
-                description: '用于 bot.getMsg 查询最近三天消息，关闭后不写入消息缓存数据库',
+                description: '用于 bot.getMsg 查询最近一天消息，关闭后不写入消息缓存数据库',
                 defaultSelected: false,
               }),
               components.switch.create('messageCache:self', {

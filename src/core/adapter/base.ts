@@ -40,7 +40,7 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
     this.adapter.standard = 'other'
   }
 
-  /** 接收消息的三天热缓存 + SQLite 缓存，用于实现 Karin 标准 `getMsg`。 */
+  /** 接收消息的一天热缓存 + SQLite 缓存，用于实现 Karin 标准 `getMsg`。 */
   public get messageStore (): MessageStore {
     return getMessageStore()
   }
@@ -259,7 +259,7 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
    * 按消息 ID 获取已接收的消息。
    *
    * QQ 官方 Bot API 没有历史消息查询接口，因此仅从本地缓存读取。
-   * 消息在接收时已转换为 Karin elements，最长保留三天；引用消息的 `REFIDX`
+   * 消息在接收时已转换为 Karin elements，最长保留一天；引用消息的 `REFIDX`
    * 索引同样可作为 `messageId` 查询。
    *
    * @param input OneBot v11 标准单参 messageId，或用于限定查询范围的 Contact。
@@ -285,7 +285,7 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
     const cached = await this.messageStore.get(String(this.cfg.appId), targetId, contact)
     if (cached) return cached
 
-    this.logger('debug', `[getMsg] 本地三天消息缓存未命中: ${targetId || '(empty)'}`)
+    this.logger('debug', `[getMsg] 本地一天消息缓存未命中: ${targetId || '(empty)'}`)
     return {
       time: 0,
       messageId: targetId,
@@ -318,7 +318,7 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
 
     const history = await this.messageStore.getHistory(String(this.cfg.appId), contact, start, count)
     if (!history.length) {
-      this.logger('debug', `[getHistoryMsg] 本地三天历史消息缓存未命中: ${start || '(empty)'}`)
+      this.logger('debug', `[getHistoryMsg] 本地一天历史消息缓存未命中: ${start || '(empty)'}`)
     }
     return history
   }

@@ -356,7 +356,7 @@ export class MessageStore {
   }
 
   /**
-   * 清理三天前的内存消息，并同步清理失效索引。
+   * 清理一天前的内存消息，并同步清理失效索引。
    */
   private cleanupMemory (): void {
     const deadline = Date.now() - MESSAGE_TTL
@@ -672,7 +672,7 @@ export class MessageStore {
    * 判断消息是否已经超过本地缓存 TTL。
    *
    * @param row 带 `time` 字段的消息对象。
-   * @returns true 表示已经超过三天缓存窗口。
+   * @returns true 表示已经超过一天缓存窗口。
    */
   private isExpired (row: Pick<CachedMessage | MessageRow, 'time'>): boolean {
     return row.time <= Date.now() - MESSAGE_TTL
@@ -687,7 +687,7 @@ export class MessageStore {
   }
 
   /**
-   * 清理三天前的缓存消息。
+   * 清理一天前的缓存消息。
    *
    * SQLite 只删除主消息表，消息段和 alias 通过外键级联删除。
    */
