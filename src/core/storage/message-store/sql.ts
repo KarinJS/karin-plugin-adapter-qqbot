@@ -88,7 +88,7 @@ export const SQL = {
     FROM qqbot_message_elements
     WHERE message_ref = ?
     ORDER BY element_index ASC`,
-  /** 查询仍保存远程 URL 的媒体消息，value 只匹配 querystring 编码后的 file 字段。 */
+  /** 查询仍保存远程 URL 的媒体消息，value 只匹配 URLSearchParams 编码后的 file 字段。 */
   selectMessagesWithRemoteMedia: `SELECT DISTINCT ${messageSelectFields()}
     FROM qqbot_messages m
     JOIN qqbot_bots b ON b.id = m.bot_ref

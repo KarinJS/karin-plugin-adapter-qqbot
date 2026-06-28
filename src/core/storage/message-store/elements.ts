@@ -1,4 +1,3 @@
-import querystring from 'node:querystring'
 import { SQL } from './sql'
 import type { ElementTypes } from 'node-karin'
 import type { GetRows, RunSql, StoredElementRow } from './types'
@@ -60,7 +59,7 @@ export const loadElements = async (
  * @returns 可还原的 Karin 消息段；未知类型返回空数组。
  */
 const elementFromRow = (row: StoredElementRow): ElementTypes[] => {
-  const value = parseElementValue(row.value)
+  const value = new URLSearchParams(row.value)
 
   switch (row.element_type) {
     case 'text': return [{ type: 'text', text: stringValue(value, 'text') }]
@@ -108,11 +107,11 @@ const elementFromRow = (row: StoredElementRow): ElementTypes[] => {
 /**
  * 提取并编码消息段缓存值。
  *
- * 数据库只保存 `element_type + value`，其中 value 统一为 querystring。每种消息段
+ * 数据库只保存 `element_type + value`，其中 value 统一为 URLSearchParams。每种消息段
  * 只保留 getMsg/getHistoryMsg 还原所需的最小字段。
  *
  * @param element Karin 消息段。
- * @returns querystring 编码后的最小字段；不支持缓存的类型返回 undefined。
+ * @returns URLSearchParams 编码后的最小字段；不支持缓存的类型返回 undefined。
  */
 export const elementValue = (element: ElementTypes): string | undefined => {
   if (!storableTypes.has(element.type)) return undefined
@@ -145,7 +144,7 @@ export const elementValue = (element: ElementTypes): string | undefined => {
 /**
  * 编码 reply 段的数据库 value。
  *
- * `hasReply` 查询需要和写入时使用完全一致的 querystring 格式，单独导出这个
+ * `hasReply` 查询需要和写入时使用完全一致的 URLSearchParams 格式，单独导出这个
  * helper 可以避免查询侧再手写一份 `messageId=...`。
  *
  * @param messageId 被引用的消息 ID。
@@ -157,47 +156,32 @@ export const replyElementValue = (messageId: string): string =>
 /**
  * 将消息段字段编码成数据库 value。
  *
- * 所有消息段都统一使用 querystring，避免不同类型混用裸字符串和结构化值。空值
+ * 所有消息段都统一使用 URLSearchParams，避免不同类型混用裸字符串和结构化值。空值
  * 不写入，减少缓存字段噪声。
  *
  * @param data 需要保留的最小消息段字段。
- * @returns querystring 编码后的 value。
+ * @returns URLSearchParams 编码后的 value。
  */
 const encodeElementValue = (data: Record<string, unknown>): string => {
-  const value: Record<string, string> = {}
+  const value = new URLSearchParams()
   for (const [key, item] of Object.entries(data)) {
     if (item === undefined || item === null || item === '') continue
-    value[key] = String(item)
+    value.set(key, String(item))
   }
-  return querystring.stringify(value)
+  return value.toString()
 }
-
-/**
- * 解析数据库中保存的消息段 value。
- *
- * 当前草案不兼容旧裸值格式，读取侧只按 querystring 解析。
- *
- * @param value `qqbot_message_elements.value` 原始字符串。
- * @returns querystring 解析后的字段表。
- */
-const parseElementValue = (value: string): querystring.ParsedUrlQuery =>
-  querystring.parse(value)
 
 /**
  * 从解析后的 value 中读取字符串字段。
  *
- * querystring 允许重复 key，这里固定取首个值，保证还原结果稳定。
+ * URLSearchParams 允许重复 key，这里固定取首个值，保证还原结果稳定。
  *
  * @param value 已解析的 value。
  * @param key 字段名。
  * @returns 字符串字段；不存在时返回空字符串。
  */
-const stringValue = (value: querystring.ParsedUrlQuery, key: string): string => {
-  const item = value[key]
-  if (Array.isArray(item)) return item[0] || ''
-  if (typeof item === 'string') return item
-  return ''
-}
+const stringValue = (value: URLSearchParams, key: string): string =>
+  value.get(key) || ''
 
 /**
  * 从解析后的 value 中读取正数字段。
@@ -208,7 +192,7 @@ const stringValue = (value: querystring.ParsedUrlQuery, key: string): string => 
  * @param key 字段名。
  * @returns 正数值；不存在或非法时返回 undefined。
  */
-const numberValue = (value: querystring.ParsedUrlQuery, key: string): number | undefined => {
+const numberValue = (value: URLSearchParams, key: string): number | undefined => {
   const num = Number(stringValue(value, key))
   return Number.isFinite(num) && num > 0 ? num : undefined
 }

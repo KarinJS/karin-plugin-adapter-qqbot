@@ -77,7 +77,7 @@ const pushQQMarkdown = (text: string, elements: ElementTypes[]): boolean => {
  */
 const tokenizeContent = (content = ''): string[] => {
   const tokens: string[] = []
-  const knownTag = /<faceType=\d+,faceId="\d+",ext="[^"]+">|<qqbot-at-user id="[^"]+"\s*\/?>|<qqbot-at-everyone\s*\/?>|<@!?[A-Za-z0-9]+>/g
+  const knownTag = /<faceType=\d+,faceId="[^"]*",ext="[^"]*">|<qqbot-at-user id="[^"]+"\s*\/?>|<qqbot-at-everyone\s*\/?>|<@!?[A-Za-z0-9]+>/g
   let lastIndex = 0
   let match: RegExpExecArray | null
 
@@ -100,6 +100,25 @@ const tokenizeContent = (content = ''): string[] => {
  */
 const shouldUseMarkdown = (messageType: number | undefined, fromBot: boolean, text: string): boolean => {
   return (messageType === 103 || fromBot) && isNativeMarkdown(text)
+}
+
+/**
+ * 从 QQ 表情标签的 base64 ext 中提取可读文本。
+ *
+ * faceType=4 的表情包套图没有图片附件，只能通过 ext 中的 JSON 文本展示。
+ *
+ * @param ext QQ 表情标签里的 base64 字段。
+ * @returns ext JSON 中的 text；解析失败时返回空字符串。
+ */
+const getFaceExtText = (ext: string): string => {
+  if (!ext) return ''
+  try {
+    const decoded = Buffer.from(ext, 'base64').toString('utf-8')
+    const payload = JSON.parse(decoded) as { text?: unknown }
+    return typeof payload.text === 'string' ? payload.text : ''
+  } catch {
+    return ''
+  }
 }
 
 /**
@@ -185,18 +204,36 @@ export const convertToKarin = (
 
   for (const tok of tokens) {
     if (tok.startsWith('<faceType=')) {
-      const m = tok.match(/faceId="(\d+)"/)
-      const faceId = Number(m?.[1])
+      const m = tok.match(/faceType=(\d+),faceId="([^"]*)",ext="([^"]*)"/)
+      const faceType = Number(m?.[1])
+      const faceIdText = m?.[2] || ''
+      const faceId = Number(faceIdText)
       const attachment = attachments[attachmentIndex]
+      if (!faceIdText) {
+        if (attachment?.content_type.startsWith('image/')) {
+          pushAttachment(attachment)
+          attachmentIndex++
+        } else {
+          const text = getFaceExtText(m?.[3] || '')
+          if (text) elements.push(segment.text(text))
+        }
+        continue
+      }
       /**
        * QQ 将用户收藏表情图片编码为 `faceId=0` + 图片附件。附件在 content 中
        * 没有独立标签，必须在这个占位符位置消费，才能保留原始元素顺序。
        */
-      if (messageType === 103 && faceId === 0 && attachment?.content_type.startsWith('image/')) {
+      if (
+        faceId === 0 &&
+        (messageType === 103 || faceType === 6) &&
+        attachment?.content_type.startsWith('image/')
+      ) {
         pushAttachment(attachment)
         attachmentIndex++
+      } else if (faceType === 6 && faceId === 0) {
+        // faceType=6 的零 ID 表情不是 QQ 内置表情，没有图片附件时不能还原为 face(0)。
       } else if (m) {
-        elements.push(segment.face(faceId))
+        elements.push(segment.face(faceId, faceType === 3))
       }
       continue
     }
