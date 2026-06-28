@@ -1,5 +1,6 @@
-import { fileToUrl, karinToQQBot } from 'node-karin'
+import { karinToQQBot } from 'node-karin'
 import { groupElements } from './grouping'
+import { resolvePreferredMediaSource } from './media-source'
 import { rememberApiMessageId, rememberOwnMessageId, resolveReferenceMessageId } from './message-id-map'
 import { extractUrlButtons, imagesToMarkdown } from './text-to-md'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
@@ -40,9 +41,10 @@ export const sendQQ = async (
 
   /**
    * 默认走 markdown 通道：
-   * text / at / image 通过 markdown content 渲染（at 用内嵌标签），视频 / 语音 / 文件
-   * 由 sendQQMarkdown 内部以 msg_type=7 并发补发。只有显式引用的纯文本消息会降级
-   * 为 msg_type=0，以保证 QQ 客户端能稳定显示引用气泡。
+   * text / at / 可转换为公网 URL 的图片通过 markdown content 渲染；无法转换的图片
+   * 与视频 / 语音 / 文件由 sendQQMarkdown 内部以 msg_type=7 单独补发。所有富媒体
+   * 都会优先通过 fileToUrl 取得公网地址，QQ 上传只做兜底。只有显式引用的
+   * 纯文本消息会降级为 msg_type=0，以保证 QQ 客户端能稳定显示引用气泡。
    */
   return sendQQMarkdown(ctx, contact, grouping, target)
 }
@@ -58,23 +60,10 @@ const sendQQMarkdown = async (
 ): Promise<SendMsgResults> => {
   const items: SendQQMsg[] = []
 
-  // 1) 把文本 + 图片合并为一段 markdown content
+  // 1) 把文本 + 可公网访问的图片合并为一段 markdown content
   const lines: string[] = []
   if (grouping.text.length) lines.push(grouping.text.join(''))
-  if (grouping.qqImages.length) {
-    // base64 图片要先上传成 URL；http 直接使用
-    const urlImages: string[] = []
-    for (const file of grouping.qqImages) {
-      if (file.startsWith('http')) {
-        urlImages.push(file)
-      } else {
-        const { url } = await fileToUrl('image', file, 'image.jpg')
-        urlImages.push(url)
-      }
-    }
-    const mdImages = await imagesToMarkdown(urlImages)
-    lines.push(...mdImages)
-  }
+  const fallbackImages = await appendMarkdownImages(ctx, lines, grouping.qqImages)
 
   if (grouping.markdowns.length) {
     grouping.markdowns.forEach(m => lines.push(m.markdown))
@@ -91,15 +80,18 @@ const sendQQMarkdown = async (
     }
   }
 
+  // 无法进入 markdown 的图片单独走 QQ 上传 fallback，避免依赖 fileToUrl 处理器。
+  for (const file of fallbackImages) {
+    const res = await ctx.super.media.uploadFallback(target, contact.peer, 'image', file, false)
+    items.push(ctx.super.qq.media(res.file_info))
+  }
+
   // 视频 / 语音 / 文件 → msg_type=7 单独补发
   for (const m of grouping.media) {
-    let url = m.source
-    if (!url.startsWith('http')) {
-      const ext = m.kind === 'record' ? 'mp3' : m.kind === 'video' ? 'mp4' : 'bin'
-      const file = await fileToUrl(m.kind, url, `${m.kind}.${ext}`)
-      url = file.url
-    }
-    const res = await ctx.super.media.upload(target, contact.peer, m.kind, url, false)
+    const source = await resolvePreferredMediaSource(ctx, m.kind, m.source, m.name)
+    const res = source.via === 'fallback'
+      ? await ctx.super.media.uploadFallback(target, contact.peer, m.kind, source.source, false, m.name)
+      : await ctx.super.media.upload(target, contact.peer, m.kind, source.source, false, m.name)
     items.push(ctx.super.qq.media(res.file_info))
   }
 
@@ -108,6 +100,50 @@ const sendQQMarkdown = async (
   }
 
   return flushQQ(ctx, contact, grouping, items)
+}
+
+/**
+ * 将能转成公网 URL 的图片追加到 markdown 行，无法转换的图片返回给富媒体 fallback。
+ *
+ * @param ctx 适配器实例，用于输出降级日志。
+ * @param lines markdown 行数组。
+ * @param files QQ 图片消息段的 file 字段。
+ * @returns 需要改走 msg_type=7 富媒体发送的图片列表。
+ */
+const appendMarkdownImages = async (
+  ctx: AdapterQQBot,
+  lines: string[],
+  files: string[]
+): Promise<string[]> => {
+  const fallback: string[] = []
+
+  for (const file of files) {
+    const resolved = await resolvePreferredMediaSource(ctx, 'image', file)
+    if (resolved.via === 'fallback') {
+      fallback.push(file)
+      continue
+    }
+
+    await appendImageUrlLine(lines, resolved.source)
+  }
+
+  return fallback
+}
+
+/**
+ * 生成单张 markdown 图片行。
+ * 尺寸获取失败时使用保守默认尺寸，保证 fileToUrl 成功的图片仍走 markdown。
+ *
+ * @param lines markdown 行数组。
+ * @param url 图片 URL。
+ */
+const appendImageUrlLine = async (lines: string[], url: string): Promise<void> => {
+  try {
+    const [line] = await imagesToMarkdown([url])
+    lines.push(line)
+  } catch {
+    lines.push(`![karin #300px #300px](${url})`)
+  }
 }
 
 /**

@@ -19,9 +19,9 @@ export const buildQQMsg = {
   ark (ark: SendQQArkMessageRequest['ark']): SendQQArkMessageRequest {
     return { msg_type: 3, ark }
   },
-  /** msg_type=7 时 content 字段必填，传一个空格占位 */
+  /** 构造 msg_type=7 富媒体消息体 */
   media (fileInfo: string): SendQQMediaMessageRequest {
-    return { msg_type: 7, media: { file_info: fileInfo }, content: ' ' }
+    return { msg_type: 7, media: { file_info: fileInfo } }
   },
 }
 

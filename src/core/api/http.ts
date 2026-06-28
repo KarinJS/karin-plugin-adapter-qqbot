@@ -22,7 +22,7 @@ const formatError = (path: string, options: unknown, err: unknown): Error => {
     const lines: string[] = []
     lines.push('[axios] 请求失败')
     lines.push(`请求路径: ${path}`)
-    lines.push(`请求数据: ${lodash.truncate(JSON.stringify(options), { length: 500 })}`)
+    lines.push(`请求数据: ${lodash.truncate(JSON.stringify(redactRequestData(options)), { length: 500 })}`)
 
     // 使用映射表格式化错误
     if (code !== undefined || status > 0) {
@@ -36,6 +36,27 @@ const formatError = (path: string, options: unknown, err: unknown): Error => {
   }
   if (err instanceof Error) return err
   return new Error(typeof err === 'string' ? err : JSON.stringify(err))
+}
+
+/**
+ * 请求失败日志脱敏，避免富媒体 file_data/base64 被完整 stringify。
+ * @param value 请求数据。
+ * @returns 脱敏后的请求数据。
+ */
+const redactRequestData = (value: unknown): unknown => {
+  if (!value || typeof value !== 'object') return value
+  if (Array.isArray(value)) return value.map(item => redactRequestData(item))
+
+  const source = value as Record<string, unknown>
+  const result: Record<string, unknown> = {}
+  for (const [key, item] of Object.entries(source)) {
+    if (key === 'file_data' && typeof item === 'string') {
+      result[key] = `<redacted ${item.length} chars>`
+    } else {
+      result[key] = redactRequestData(item)
+    }
+  }
+  return result
 }
 
 /**
@@ -56,10 +77,11 @@ export class Http {
   protected async post<T> (
     path: string,
     body: unknown = {},
-    headers?: Record<string, string>
+    headers?: Record<string, string>,
+    timeout?: number
   ): Promise<T> {
     try {
-      const { data } = await this.axios.post(path, body, { headers })
+      const { data } = await this.axios.post(path, body, { headers, timeout })
       return data
     } catch (err) {
       throw formatError(path, body, err)

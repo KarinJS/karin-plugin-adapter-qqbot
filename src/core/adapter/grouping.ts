@@ -7,6 +7,8 @@ export interface PendingMedia {
   kind: 'video' | 'record' | 'file'
   /** 来源：http 链接 / base64 / 本地路径，由 pipeline 处理 */
   source: string
+  /** 原始文件名，主要用于 file 消息。 */
+  name?: string
 }
 
 /** 被动消息归一信息 */
@@ -142,13 +144,13 @@ export const groupElements = <T extends 'qq' | 'guild'> (
         g.markdowns.push(v)
         break
       case 'video':
-        g.media.push({ kind: 'video', source: v.file })
+        g.media.push({ kind: 'video', source: v.file, name: v.name })
         break
       case 'record':
-        g.media.push({ kind: 'record', source: v.file })
+        g.media.push({ kind: 'record', source: v.file, name: v.name })
         break
       case 'file':
-        g.media.push({ kind: 'file', source: v.file })
+        g.media.push({ kind: 'file', source: v.file, name: v.name })
         break
       default:
         // 静默忽略，由 pipeline 决定要不要降级

@@ -38,11 +38,25 @@ pnpm add @karinjs/adapter-qqbot
 
 ## 发送消息与资源文件
 
-文本、@、图片和按钮都通过 Markdown 发送。视频、语音和文件会先上传，再发送 QQ 富媒体消息。
+适配器会尽量帮你发送图片、视频、语音和文件。推荐配置 `fileToUrl` 上传处理器，把本地文件、截图、Base64 等资源上传到你的图床、对象存储或 CDN，并返回一个 QQ 能访问的链接。
 
-发送本地文件、Base64 或 Buffer 时，需要你自己提供图床或对象存储。适配器目前暂不内置公共上传服务。
+配置 `fileToUrl` 后：
 
-你需要在自己的 Karin 插件中编写一个 Handler 插件并注册：
+- 本地图片可以正常嵌入 Markdown 消息。
+- 视频、语音和文件会优先使用你返回的链接发送，通常比直接上传给 QQ 更稳定。
+- 如果资源本身已经是 `http` / `https` 链接，适配器会直接使用它。
+
+没有配置 `fileToUrl` 时：
+
+- 单独发送图片、视频、语音、文件时，适配器会尝试直接交给 QQ 发送。
+- 较大的文件会使用 QQ 的大文件上传流程。
+- 直接交给 QQ 只是兜底方案，生产环境仍然建议准备自己的文件服务。
+
+> **注意：Markdown 里的图片必须配置 `fileToUrl`。**
+>
+> 只要你发送的内容包含 Markdown，并且 Markdown 里有图片、本地生成图、Base64 图等资源，就必须配置 `fileToUrl`。因为 Markdown 里的图片只能写成 QQ 能访问的链接，适配器不能把 Markdown 文本里的图片自动当成附件上传。
+
+你可以在自己的 Karin 插件中编写并注册 `fileToUrl` Handler：
 
 ```js
 // plugins/karin-plugin-example/fileToUrl.js
@@ -71,7 +85,7 @@ export const uploadResource = karin.handler('fileToUrl', async (args) => {
 >
 > 图片必须返回 `{ url, width, height }`；其他资源返回 `{ url }`。
 
-未注册 `fileToUrl` 的 Handler 时，适配器无法上传本地资源，资源消息会发送失败。
+建议生产环境都配置 `fileToUrl`。这样图片、视频和文件都可以先上传到你自己的文件服务，再交给 QQ 发送，成功率和可控性都会更好。
 
 ## 事件
 
