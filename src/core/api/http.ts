@@ -23,6 +23,10 @@ const formatError = (path: string, options: unknown, err: unknown): Error => {
     lines.push('[axios] 请求失败')
     lines.push(`请求路径: ${path}`)
     lines.push(`请求数据: ${lodash.truncate(JSON.stringify(redactRequestData(options)), { length: 500 })}`)
+    if (!response) {
+      const reason = [err.code, err.message].filter(Boolean).join(' | ')
+      if (reason) lines.push(`请求错误: ${reason}`)
+    }
 
     // 使用映射表格式化错误
     if (code !== undefined || status > 0) {
@@ -91,10 +95,11 @@ export class Http {
   protected async put<T> (
     path: string,
     body: unknown = {},
-    headers?: Record<string, string>
+    headers?: Record<string, string>,
+    timeout?: number
   ): Promise<T> {
     try {
-      const { data } = await this.axios.put(path, body, { headers })
+      const { data } = await this.axios.put(path, body, { headers, timeout })
       return data
     } catch (err) {
       throw formatError(path, body, err)

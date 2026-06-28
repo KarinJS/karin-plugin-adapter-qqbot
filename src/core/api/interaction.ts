@@ -1,5 +1,8 @@
 import { Http } from './http'
 
+/** QQ 客户端回调按钮需要快速 ACK，超时必须小于平台等待窗口。 */
+const INTERACTION_ACK_TIMEOUT = 2800
+
 /** ack 返回码 */
 export type AckCode = 0 | 1 | 2 | 3 | 4 | 5
 
@@ -12,6 +15,6 @@ export class InteractionApi extends Http {
    * @param code 0 成功 / 1 操作失败 / 2 操作频繁 / 3 重复操作 / 4 无权限 / 5 仅管理员
    */
   async ack (interactionId: string, code: AckCode = 0): Promise<void> {
-    await this.put(`/interactions/${interactionId}`, { code })
+    await this.put(`/interactions/${interactionId}`, { code }, undefined, INTERACTION_ACK_TIMEOUT)
   }
 }

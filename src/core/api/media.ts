@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import axios from 'node-karin/axios'
 import { Http } from './http'
+import { getCachedUpload, setCachedUpload } from './upload-cache'
 import type { Scene, MediaType, UploadMediaResponse } from './types'
 import type { FileHandle } from 'node:fs/promises'
 
@@ -56,6 +57,33 @@ const PART_UPLOAD_TIMEOUT = 300_000
 
 /** 每个分片 PUT 失败后的重试次数。 */
 const PART_UPLOAD_RETRIES = 2
+
+/** upload_part_finish 普通失败重试次数。 */
+const PART_FINISH_RETRIES = 2
+
+/** upload_part_finish 普通失败重试基础间隔。 */
+const PART_FINISH_BASE_DELAY = 1000
+
+/** upload_part_finish 命中这些业务码时，需要按服务端给出的窗口持续重试。 */
+const PART_FINISH_RETRYABLE_CODES = new Set([40093001])
+
+/** 服务端未返回 retry_timeout 时，持续重试的默认时间。 */
+const PART_FINISH_DEFAULT_RETRY_TIMEOUT = 2 * 60 * 1000
+
+/** 持续重试窗口上限，避免服务端返回异常值导致任务长时间占用。 */
+const PART_FINISH_MAX_RETRY_TIMEOUT = 10 * 60 * 1000
+
+/** 持续重试时的固定间隔。 */
+const PART_FINISH_RETRY_INTERVAL = 1000
+
+/** 分片完成接口失败重试次数。 */
+const COMPLETE_UPLOAD_RETRIES = 2
+
+/** 分片完成接口失败重试基础间隔。 */
+const COMPLETE_UPLOAD_BASE_DELAY = 2000
+
+/** upload_prepare 返回该业务码时表示大文件上传额度受限。 */
+const UPLOAD_PREPARE_DAILY_LIMIT_CODE = 40093002
 
 /** QQ 没返回建议并发数时的默认并发。 */
 const DEFAULT_PART_CONCURRENCY = 1
@@ -423,6 +451,55 @@ const runWithConcurrency = async (tasks: Array<() => Promise<void>>, concurrency
 }
 
 /**
+ * 等待指定时间。
+ * @param ms 毫秒数。
+ */
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
+
+/**
+ * 从 axios 原始错误或已格式化错误文本里提取 QQ 业务错误码。
+ * @param err 待检查的错误。
+ * @returns 业务错误码。
+ */
+const openApiCode = (err: unknown): number | undefined => {
+  if (axios.isAxiosError(err)) {
+    const data = err.response?.data as Record<string, unknown> | undefined
+    const code = typeof data?.code === 'number'
+      ? data.code
+      : typeof data?.err_code === 'number'
+        ? data.err_code
+        : undefined
+    if (code !== undefined) return code
+  }
+
+  if (err instanceof Error) {
+    const match = err.message.match(/\[Code\s+(\d+)\]/)
+    if (match) return Number(match[1])
+  }
+
+  return undefined
+}
+
+/**
+ * 判断 upload_part_finish 是否命中需要持续重试的服务端状态。
+ * @param err 请求错误。
+ * @returns 是否需要持续重试。
+ */
+const shouldRetryPartFinishPersistently = (err: unknown): boolean => {
+  const code = openApiCode(err)
+  return code !== undefined && PART_FINISH_RETRYABLE_CODES.has(code)
+}
+
+/**
+ * 将未知错误重新抛出为 Error。
+ * @param err 原始错误。
+ */
+const throwError = (err: unknown): never => {
+  if (err instanceof Error) throw err
+  throw new Error(typeof err === 'string' ? err : JSON.stringify(err))
+}
+
+/**
  * 富媒体上传
  */
 export class MediaApi extends Http {
@@ -491,9 +568,17 @@ export class MediaApi extends Http {
   ): Promise<UploadMediaResponse> {
     const fallbackSource = await buildFallbackSource(type, source, fileName)
     assertUploadSize(type, fallbackSource.size)
+    const hashes = !srvSendMsg ? await computeUploadHashes(fallbackSource) : undefined
+
+    if (hashes) {
+      const cached = getCachedUpload(scene, peer, type, hashes.md5)
+      if (cached) return cached
+    }
 
     if (!srvSendMsg && fallbackSource.size >= LARGE_UPLOAD_THRESHOLD) {
-      return this.uploadChunked(scene, peer, type, fallbackSource)
+      const response = await this.uploadChunked(scene, peer, type, fallbackSource, hashes)
+      if (hashes) setCachedUpload(scene, peer, type, hashes.md5, response)
+      return response
     }
 
     const body: Record<string, unknown> = {
@@ -503,7 +588,114 @@ export class MediaApi extends Http {
     }
     if (type === 'file') body.file_name = fallbackSource.fileName
 
-    return this.post(`/v2/${scene}s/${peer}/files`, body, undefined, MEDIA_UPLOAD_TIMEOUT)
+    const response = await this.post<UploadMediaResponse>(`/v2/${scene}s/${peer}/files`, body, undefined, MEDIA_UPLOAD_TIMEOUT)
+    if (hashes) setCachedUpload(scene, peer, type, hashes.md5, response)
+    return response
+  }
+
+  /**
+   * 确认单个分片已完成上传。
+   *
+   * QQ 有时会在分片刚 PUT 完时短暂返回 40093001，此时需要在服务端给出的
+   * retry_timeout 窗口内持续重试，而不是直接判定整个大文件上传失败。
+   *
+   * @param scene user(单聊) / group(群聊)
+   * @param peer openid 或 group_openid
+   * @param body upload_part_finish 请求体
+   * @param retryTimeout 服务端返回的持续重试秒数
+   */
+  private async finishUploadPart (
+    scene: Scene,
+    peer: string,
+    body: Record<string, unknown>,
+    retryTimeout?: number
+  ): Promise<void> {
+    let lastError: unknown
+
+    for (let attempt = 0; attempt <= PART_FINISH_RETRIES; attempt++) {
+      try {
+        await this.post(`/v2/${scene}s/${peer}/upload_part_finish`, body, undefined, MEDIA_UPLOAD_TIMEOUT)
+        return
+      } catch (err) {
+        if (shouldRetryPartFinishPersistently(err)) {
+          await this.retryUploadPartFinish(scene, peer, body, retryTimeout)
+          return
+        }
+
+        lastError = err
+        if (attempt < PART_FINISH_RETRIES) {
+          await sleep(PART_FINISH_BASE_DELAY * 2 ** attempt)
+        }
+      }
+    }
+
+    throwError(lastError)
+  }
+
+  /**
+   * 持续重试 upload_part_finish 的短暂服务端状态。
+   *
+   * @param scene user(单聊) / group(群聊)
+   * @param peer openid 或 group_openid
+   * @param body upload_part_finish 请求体
+   * @param retryTimeout 服务端返回的持续重试秒数
+   */
+  private async retryUploadPartFinish (
+    scene: Scene,
+    peer: string,
+    body: Record<string, unknown>,
+    retryTimeout?: number
+  ): Promise<void> {
+    const retryTimeoutMs = retryTimeout
+      ? Math.min(Number(retryTimeout) * 1000, PART_FINISH_MAX_RETRY_TIMEOUT)
+      : PART_FINISH_DEFAULT_RETRY_TIMEOUT
+    const deadline = Date.now() + retryTimeoutMs
+    let attempts = 0
+    let lastError: unknown
+
+    while (Date.now() < deadline) {
+      try {
+        await this.post(`/v2/${scene}s/${peer}/upload_part_finish`, body, undefined, MEDIA_UPLOAD_TIMEOUT)
+        return
+      } catch (err) {
+        lastError = err
+        if (!shouldRetryPartFinishPersistently(err)) throwError(err)
+        attempts += 1
+        await sleep(Math.min(PART_FINISH_RETRY_INTERVAL, Math.max(0, deadline - Date.now())))
+      }
+    }
+
+    throw new Error(`upload_part_finish 持续重试超时：${Math.round(retryTimeoutMs / 1000)}s，已重试 ${attempts} 次，最后错误：${lastError instanceof Error ? lastError.message : String(lastError)}`)
+  }
+
+  /**
+   * 完成 QQ 分片上传，并对短暂失败做有限重试。
+   *
+   * @param scene user(单聊) / group(群聊)
+   * @param peer openid 或 group_openid
+   * @param uploadId upload_prepare 返回的上传任务 ID
+   * @returns 上传结果
+   */
+  private async completeChunkedUpload (
+    scene: Scene,
+    peer: string,
+    uploadId: string
+  ): Promise<UploadMediaResponse> {
+    let lastError: unknown
+    const body = { upload_id: uploadId }
+
+    for (let attempt = 0; attempt <= COMPLETE_UPLOAD_RETRIES; attempt++) {
+      try {
+        return await this.post(`/v2/${scene}s/${peer}/files`, body, undefined, MEDIA_UPLOAD_TIMEOUT)
+      } catch (err) {
+        lastError = err
+        if (attempt < COMPLETE_UPLOAD_RETRIES) {
+          await sleep(COMPLETE_UPLOAD_BASE_DELAY * 2 ** attempt)
+        }
+      }
+    }
+
+    return throwError(lastError)
   }
 
   /**
@@ -515,15 +707,17 @@ export class MediaApi extends Http {
    * @param peer openid 或 group_openid
    * @param type 文件类型
    * @param source 已归一化的 fallback 来源
+   * @param preparedHashes 预计算的文件 hash
    * @returns 上传结果，包含后续发送消息所需的 file_info
    */
   private async uploadChunked (
     scene: Scene,
     peer: string,
     type: MediaType,
-    source: ChunkableSource
+    source: ChunkableSource,
+    preparedHashes?: UploadPrepareHashes
   ): Promise<UploadMediaResponse> {
-    const hashes = await computeUploadHashes(source)
+    const hashes = preparedHashes || await computeUploadHashes(source)
     const prepareBody: Record<string, unknown> = {
       file_type: FILE_TYPE[type],
       file_name: source.fileName,
@@ -538,7 +732,12 @@ export class MediaApi extends Http {
       prepareBody,
       undefined,
       MEDIA_UPLOAD_TIMEOUT
-    )
+    ).catch((err): never => {
+      if (openApiCode(err) === UPLOAD_PREPARE_DAILY_LIMIT_CODE) {
+        throw new Error(`QQ 大文件上传额度已达上限，${MEDIA_TYPE_LABEL[type]}暂时无法通过 fallback 直传：${source.fileName} (${formatBytes(source.size)})`)
+      }
+      return throwError(err)
+    })
 
     if (!prepare.parts.length) {
       throw new Error('分片上传准备失败：QQ 未返回分片信息')
@@ -559,16 +758,16 @@ export class MediaApi extends Http {
         const md5 = crypto.createHash('md5').update(data).digest('hex')
 
         await putPart(part.presigned_url, data, part.index, prepare.parts.length)
-        await this.post(
-          `/v2/${scene}s/${peer}/upload_part_finish`,
+        await this.finishUploadPart(
+          scene,
+          peer,
           {
             upload_id: prepare.upload_id,
             part_index: part.index,
             block_size: data.length,
             md5,
           },
-          undefined,
-          MEDIA_UPLOAD_TIMEOUT
+          prepare.retry_timeout
         )
       })
 
@@ -577,15 +776,6 @@ export class MediaApi extends Http {
       await handle?.close().catch(() => undefined)
     }
 
-    const completeBody = {
-      upload_id: prepare.upload_id,
-    }
-
-    return this.post(
-      `/v2/${scene}s/${peer}/files`,
-      completeBody,
-      undefined,
-      MEDIA_UPLOAD_TIMEOUT
-    )
+    return this.completeChunkedUpload(scene, peer, prepare.upload_id)
   }
 }

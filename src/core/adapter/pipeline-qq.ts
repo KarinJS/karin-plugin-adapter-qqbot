@@ -10,6 +10,11 @@ import type { SendQQMsg, SendQQMsgResponse } from '@/core/api/types'
 
 /** QQ 官方限制：单聊中同一 `msg_id` 最多发送四次被动回复。 */
 const C2C_PASSIVE_REPLY_LIMIT = 4
+/** QQ keyboard 限制：最多 5 行，每行最多 5 个按钮。 */
+const KEYBOARD_MAX_ROWS = 5
+const KEYBOARD_MAX_BUTTONS_PER_ROW = 5
+/** 只有按钮没有文本时仍需提供非空 markdown 内容。 */
+const BUTTON_ONLY_MARKDOWN = '\u200b'
 
 /** 群聊 event_id 白名单 */
 const GROUP_EVENT_WHITELIST = new Set([
@@ -71,11 +76,11 @@ const sendQQMarkdown = async (
 
   // markdown 主消息：有任意可渲染内容才推
   if (lines.length || grouping.buttons.length || grouping.keyboards.length) {
-    const content = lines.join('\n')
     if (shouldUseTextForReference(ctx, contact, grouping)) {
-      items.push(ctx.super.qq.text(content))
+      items.push(ctx.super.qq.text(lines.join('\n')))
     } else {
       const keyboard = buildKeyboard(grouping)
+      const content = lines.length ? lines.join('\n') : BUTTON_ONLY_MARKDOWN
       items.push(ctx.super.qq.markdown({ content }, keyboard))
     }
   }
@@ -185,8 +190,19 @@ const buildKeyboard = (grouping: Grouping<'qq' | 'guild'>) => {
   const rows: ReturnType<typeof karinToQQBot> = []
   grouping.buttons.forEach(b => rows.push(...karinToQQBot(b)))
   grouping.keyboards.forEach(k => rows.push(...karinToQQBot(k)))
-  if (!rows.length) return undefined
-  return { content: { rows } }
+  const normalizedRows: ReturnType<typeof karinToQQBot> = []
+  let id = 0
+
+  for (const row of rows.slice(0, KEYBOARD_MAX_ROWS)) {
+    const buttons = row.buttons.slice(0, KEYBOARD_MAX_BUTTONS_PER_ROW).map(button => ({
+      ...button,
+      id: String(id++),
+    }))
+    if (buttons.length) normalizedRows.push({ buttons })
+  }
+
+  if (!normalizedRows.length) return undefined
+  return { content: { rows: normalizedRows } }
 }
 
 /**
@@ -200,7 +216,7 @@ const flushQQ = async (
 ): Promise<SendMsgResults> => {
   const result = ctx.initSendMsgResults()
   const passiveSource = resolvePassiveQQ(grouping)
-  const passive = buildPassiveQQ(contact.scene, grouping)
+  const passive = buildPassiveQQ(ctx, contact.scene, grouping)
   const send = contact.scene === 'friend'
     ? (peer: string, item: SendQQMsg) => ctx.super.messages.sendFriendMsg(peer, item)
     : (peer: string, item: SendQQMsg) => ctx.super.messages.sendGroupMsg(peer, item)
@@ -220,12 +236,57 @@ const flushQQ = async (
   for (const item of items.slice(0, maxItems)) {
     passive(item)
     if (!referenceHandled) referenceHandled = attachVisibleReferenceQQ(ctx, contact, item, grouping)
-    const res: SendQQMsgResponse = await send(contact.peer, item)
+    const res: SendQQMsgResponse = await sendQQWithEventFallback(ctx, contact, send, item)
     rememberOwnMessageId(ctx, contact, res.id)
     if (res.ext_info?.ref_idx) rememberApiMessageId(ctx, contact, res.ext_info.ref_idx, res.id)
     result.rawData.push(res)
   }
   return ctx.handleResponse(result)
+}
+
+/**
+ * 发送 QQ 消息，并在平台拒绝 `event_id` 时降级为普通消息重试。
+ *
+ * QQ 文档说明 `INTERACTION_CREATE.d.id` 可用于被动消息发送，但实测群聊接口会出现
+ * 40034025。为了避免按钮回调业务回复把 Karin 命令链路打断，这里只对
+ * `event_id` 参数无效做一次无 `event_id` 重试。
+ *
+ * @param ctx 适配器实例，用于输出降级日志。
+ * @param contact 消息目标。
+ * @param send 当前场景的发送函数。
+ * @param item 即将发送的 QQ 消息体。
+ * @returns QQ 消息发送响应。
+ */
+const sendQQWithEventFallback = async (
+  ctx: AdapterQQBot,
+  contact: Contact<'friend' | 'group'>,
+  send: (peer: string, item: SendQQMsg) => Promise<SendQQMsgResponse>,
+  item: SendQQMsg
+): Promise<SendQQMsgResponse> => {
+  try {
+    return await send(contact.peer, item)
+  } catch (err) {
+    if (!item.event_id || !isInvalidEventIdError(err)) throw err
+
+    ctx.logger('warn', `event_id 被 QQ 拒绝，已改用普通消息重试: ${item.event_id}`)
+    const retryItem: SendQQMsg = { ...item }
+    delete retryItem.event_id
+    delete retryItem.msg_seq
+    return send(contact.peer, retryItem)
+  }
+}
+
+/**
+ * 判断发送失败是否来自 QQ 对 `event_id` 的参数校验。
+ *
+ * 当前错误由 Http 层格式化为普通 Error，因此这里基于官方错误码和中文错误信息兜底识别。
+ *
+ * @param err 捕获到的发送异常。
+ * @returns 是否可以通过移除 `event_id` 重试。
+ */
+const isInvalidEventIdError = (err: unknown): boolean => {
+  const message = err instanceof Error ? err.message : String(err)
+  return message.includes('40034025') || message.includes('请求参数event_id无效')
 }
 
 /**
@@ -280,6 +341,7 @@ const nextPassiveMsgSeq = (grouping: Grouping<'qq'>): number => {
  * 构造被动消息附加器（含白名单校验）
  */
 const buildPassiveQQ = (
+  ctx: AdapterQQBot,
   scene: 'friend' | 'group',
   grouping: Grouping<'qq'>
 ) => {
@@ -289,10 +351,10 @@ const buildPassiveQQ = (
   const whitelist = scene === 'friend' ? FRIEND_EVENT_WHITELIST : GROUP_EVENT_WHITELIST
 
   if (source.type === 'event') {
-    // 极保守：event_id 不在白名单里也允许（防止误打 warn）
     const eventName = source.id.split(':')[0]
     if (eventName && !whitelist.has(eventName)) {
-      // 仍然交给服务端按 event_id 校验，避免本地误拦截新开放的事件。
+      ctx.logger('warn', `跳过无效 event_id: ${source.id}`)
+      return (_item: SendQQMsg) => undefined
     }
     return (item: SendQQMsg) => {
       item.msg_seq = nextPassiveMsgSeq(grouping)

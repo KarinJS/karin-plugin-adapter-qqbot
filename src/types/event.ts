@@ -423,6 +423,10 @@ export interface InteractionEvent extends BaseEvent {
   d: {
     /** 11 消息按钮，12 单聊快捷菜单 */
     type: number
+    /** 平台方互动事件 ID，用于 ACK；被动回复仍使用 WebSocket 外层事件 ID。 */
+    id: string
+    /** 触发互动事件的应用 ID。 */
+    application_id?: string
     /** c2c / group / guild */
     scene: 'c2c' | 'group' | 'guild' | string
     /** 0 频道，1 群聊，2 单聊 */

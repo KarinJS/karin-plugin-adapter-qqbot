@@ -7,6 +7,12 @@ import type { AdapterQQBot } from './base'
 import type { Grouping } from './grouping'
 import type { SendGuildMsg, SendGuildResponse } from '@/core/api/types'
 
+/** QQ keyboard 限制：最多 5 行，每行最多 5 个按钮。 */
+const KEYBOARD_MAX_ROWS = 5
+const KEYBOARD_MAX_BUTTONS_PER_ROW = 5
+/** 只有按钮没有文本时仍需提供非空 markdown 内容。 */
+const BUTTON_ONLY_MARKDOWN = '\u200b'
+
 /**
  * 处理频道场景（子频道 + 私信）的发送
  *
@@ -57,7 +63,8 @@ const sendGuildMarkdown = async (
 
   if (lines.length || grouping.buttons.length || grouping.keyboards.length) {
     const keyboard = buildKeyboard(grouping)
-    items.push(ctx.super.guild.markdown({ content: lines.join('\n') }, keyboard))
+    const content = lines.length ? lines.join('\n') : BUTTON_ONLY_MARKDOWN
+    items.push(ctx.super.guild.markdown({ content }, keyboard))
   }
 
   if (!items.length) {
@@ -71,8 +78,19 @@ const buildKeyboard = (grouping: Grouping<'guild'>) => {
   const rows: ReturnType<typeof karinToQQBot> = []
   grouping.buttons.forEach(b => rows.push(...karinToQQBot(b)))
   grouping.keyboards.forEach(k => rows.push(...karinToQQBot(k)))
-  if (!rows.length) return undefined
-  return { content: { rows } }
+  const normalizedRows: ReturnType<typeof karinToQQBot> = []
+  let id = 0
+
+  for (const row of rows.slice(0, KEYBOARD_MAX_ROWS)) {
+    const buttons = row.buttons.slice(0, KEYBOARD_MAX_BUTTONS_PER_ROW).map(button => ({
+      ...button,
+      id: String(id++),
+    }))
+    if (buttons.length) normalizedRows.push({ buttons })
+  }
+
+  if (!normalizedRows.length) return undefined
+  return { content: { rows: normalizedRows } }
 }
 
 const flushGuild = async (
