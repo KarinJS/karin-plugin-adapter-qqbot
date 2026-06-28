@@ -470,8 +470,8 @@ export class MediaApi extends Http {
   /**
    * 上传没有公网 URL 处理器可用时的 fallback 富媒体资源。
    *
-   * 大文件会优先使用 QQ 分片上传，小文件继续走普通上传。`srvSendMsg` 为 true
-   * 时保留普通上传路径，避免分片完成接口与服务端直接发送语义冲突。
+   * 较大的 fallback 资源会优先使用 QQ 分片上传，提高直接发送成功率。
+   * `srvSendMsg` 为 true 时保留普通上传路径，避免分片完成接口与服务端直接发送语义冲突。
    *
    * @param scene user(单聊) / group(群聊)
    * @param peer openid 或 group_openid
@@ -492,7 +492,7 @@ export class MediaApi extends Http {
     const fallbackSource = await buildFallbackSource(type, source, fileName)
     assertUploadSize(type, fallbackSource.size)
 
-    if (type === 'file' && !srvSendMsg && fallbackSource.size >= LARGE_UPLOAD_THRESHOLD) {
+    if (!srvSendMsg && fallbackSource.size >= LARGE_UPLOAD_THRESHOLD) {
       return this.uploadChunked(scene, peer, type, fallbackSource)
     }
 
@@ -577,12 +577,9 @@ export class MediaApi extends Http {
       await handle?.close().catch(() => undefined)
     }
 
-    const completeBody: Record<string, unknown> = {
+    const completeBody = {
       upload_id: prepare.upload_id,
-      file_type: FILE_TYPE[type],
-      srv_send_msg: false,
     }
-    if (type === 'file') completeBody.file_name = source.fileName
 
     return this.post(
       `/v2/${scene}s/${peer}/files`,
