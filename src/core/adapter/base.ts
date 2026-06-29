@@ -54,9 +54,7 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
    * 主消息回复入口（karin 调用）
    */
   async srcReply (e: Message, elements: ElementTypes[]): Promise<SendMsgResults> {
-    const extra = this.cfg.keyboard.enable
-      ? await buttonHandle(e.msg, { e })
-      : []
+    const extra = await buttonHandle(e.msg, { e })
     return this.sendMsg(e.contact, [...elements, ...extra])
   }
 

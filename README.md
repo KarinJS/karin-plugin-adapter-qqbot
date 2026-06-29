@@ -34,7 +34,73 @@ pnpm add @karinjs/adapter-qqbot
 
 - `event.type`: `0` 关闭、`1` Webhook、`2` WebSocket（默认）。
 - `guildMode`: `0` 公域，只收 @ 消息；`1` 私域，接收全部频道消息。
-- `keyboard.enable`: 自动将文本中的 URL 转为 QQ 按钮。
+
+## 按钮
+
+按钮一般和 Markdown 一起发送，常用有三种：
+
+- 跳转按钮：点击后打开 `link`。
+- 指令按钮：点击后把 `data` 发送成一条普通消息。
+- 回调按钮：点击后不会在聊天框发消息，但适配器会下发一条 Karin 消息事件，消息内容就是 `data`。
+
+下面这个示例先发送一组按钮，然后分别接住“指令按钮”和“回调按钮”的点击结果：
+
+```ts
+import karin, { segment } from 'node-karin'
+
+export const buttonDemo = karin.command(/^按钮示例$/, async (e) => {
+  await e.reply([
+    segment.markdown('#### 按钮示例\n请选择一个操作：'),
+    segment.button([
+      { text: '打开文档', link: 'https://bot.q.qq.com/wiki/' },
+      { text: '发送指令', data: '按钮示例 帮助', enter: true },
+      { text: '回调确认', callback: true, data: '按钮示例 确认' },
+    ]),
+  ])
+})
+
+export const buttonHelp = karin.command(/^按钮示例 帮助$/, async (e) => {
+  await e.reply('这是指令按钮发送出来的消息。')
+})
+
+export const buttonConfirm = karin.command(/^按钮示例 确认$/, async (e) => {
+  await e.reply(`收到回调按钮：${e.msg}`)
+})
+```
+
+如果你希望回复自动带上一组按钮，可以把按钮单独注册出来。下面这个分页示例会根据当前消息生成“上一页 / 下一页”：
+
+```ts
+import karin, { segment } from 'node-karin'
+
+const getPage = (msg = '') => Number(msg.match(/^菜单(?:\s+(\d+))?$/)?.[1] || 1)
+
+export const menuDemo = karin.command(/^菜单(?:\s+\d+)?$/, async (e) => {
+  const page = getPage(e.msg)
+  await e.reply(segment.markdown(`#### 菜单\n当前第 ${page} 页`))
+})
+
+export const menuKeyboard = karin.button(/^菜单(?:\s+\d+)?$/, (next, args) => {
+  const page = getPage(args?.e?.msg)
+
+  return segment.keyboard([
+    [
+      { text: '上一页', data: `菜单 ${Math.max(1, page - 1)}`, enter: true },
+      { text: '下一页', data: `菜单 ${page + 1}`, enter: true },
+    ],
+  ])
+})
+```
+
+简单理解：`karin.button` 是“自动追加按钮”的规则。适配器回复时会自动用 `buttonHandle(e.msg, { e })` 查找匹配规则，所以用户发送 `菜单 2`，就会命中 `/^菜单(?:\s+\d+)?$/`，按钮函数再通过 `args?.e?.msg` 算出当前页。
+
+自己调用 `buttonHandle` 时只记三点：
+
+- 参数一是匹配文本，通常填 `e.msg`，也可以是 `'菜单'`。
+- 参数二是给按钮函数的上下文，常用 `{ e }`；需要状态可以写 `{ e, page: 2 }`。
+- 一个规则里调用 `next()`，才会继续匹配后面的规则。
+
+回调按钮的 `data` 会变成一条 Karin 消息内容，所以建议直接写成插件能识别的命令，例如 `按钮示例 确认`、`菜单 下一页`。
 
 ## 发送消息与资源文件
 

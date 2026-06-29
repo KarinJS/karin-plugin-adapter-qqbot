@@ -419,33 +419,54 @@ export interface C2CMsgReceiveEvent extends BaseEvent {
  */
 export interface InteractionEvent extends BaseEvent {
   t: EventEnum.INTERACTION_CREATE
+  /** WebSocket Dispatch 外层事件 ID，形如 `INTERACTION_CREATE:uuid`。 */
   id: string
   d: {
-    /** 11 消息按钮，12 单聊快捷菜单 */
+    /** 事件类型：11=消息按钮，12=单聊快捷菜单。 */
     type: number
-    /** 平台方互动事件 ID，用于 ACK；被动回复仍使用 WebSocket 外层事件 ID。 */
+    /** 事件 ID，用于回应交互：PUT /interactions/{id}。 */
     id: string
     /** 触发互动事件的应用 ID。 */
     application_id?: string
-    /** c2c / group / guild */
-    scene: 'c2c' | 'group' | 'guild' | string
-    /** 0 频道，1 群聊，2 单聊 */
-    chat_type: 0 | 1 | 2
-    timestamp: string
+    /** 场景：c2c / group / guild。 */
+    scene?: 'c2c' | 'group' | 'guild' | string
+    /** 场景类型：0=频道，1=群聊，2=单聊。 */
+    chat_type?: 0 | 1 | 2
+    /** 触发时间 RFC3339。 */
+    timestamp?: string
+    /** 频道 openid（仅频道场景）。 */
     guild_id?: string
+    /** 子频道 openid（仅频道场景）。 */
     channel_id?: string
+    /** 单聊用户 openid（仅 c2c 场景）。 */
     user_openid?: string
+    /** 群 openid（仅群聊场景）。 */
     group_openid?: string
+    /** 群内触发用户 openid（仅群聊场景）。 */
     group_member_openid?: string
     data: {
+      /** 事件类型：11=消息按钮，12=单聊快捷菜单。 */
+      type: number
       resolved: {
-        button_data: string
-        button_id: string
+        /** 按钮 action.data 值。 */
+        button_data?: string
+        /** 按钮 id。 */
+        button_id?: string
+        /** 操作用户 userid（仅频道场景）。 */
         user_id?: string
+        /** 自定义菜单 id（仅菜单场景）。 */
         feature_id?: string
+        /** 操作的消息 id（仅频道场景）。 */
         message_id?: string
+        /** 配置更新：群消息模式，mention=@机器人时激活，always=总是激活。 */
+        require_mention?: string
+        /** 配置更新：群消息策略。 */
+        group_policy?: string
+        /** 配置更新：@文本的名称提及 BOT 名，多个使用英文逗号分隔。 */
+        mention_patterns?: string
       }
     }
+    /** 事件版本。 */
     version: number
   }
 }

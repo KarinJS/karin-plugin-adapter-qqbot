@@ -1,4 +1,10 @@
 import { karinToQQBot } from 'node-karin'
+import {
+  collectCommandEnterButtons,
+  formatCommandEnterButtonNames,
+  hasCommandEnterTextChain,
+  normalizeQQBotButton,
+} from './button-enter'
 import { groupElements } from './grouping'
 import { resolvePreferredMediaSource } from './media-source'
 import { rememberApiMessageId, rememberOwnMessageId, resolveReferenceMessageId } from './message-id-map'
@@ -72,6 +78,11 @@ const sendQQMarkdown = async (
 
   if (grouping.markdowns.length) {
     grouping.markdowns.forEach(m => lines.push(m.markdown))
+  }
+
+  if (contact.scene === 'group') {
+    warnUnsupportedCommandEnterButtons(ctx, collectCommandEnterButtons(grouping.buttons, grouping.keyboards))
+    warnUnsupportedCommandEnterMarkdowns(ctx, grouping.markdowns.map(m => m.markdown))
   }
 
   // markdown 主消息：有任意可渲染内容才推
@@ -194,15 +205,43 @@ const buildKeyboard = (grouping: Grouping<'qq' | 'guild'>) => {
   let id = 0
 
   for (const row of rows.slice(0, KEYBOARD_MAX_ROWS)) {
-    const buttons = row.buttons.slice(0, KEYBOARD_MAX_BUTTONS_PER_ROW).map(button => ({
-      ...button,
-      id: String(id++),
-    }))
+    const buttons = row.buttons
+      .slice(0, KEYBOARD_MAX_BUTTONS_PER_ROW)
+      .map(button => normalizeQQBotButton(button, id++))
     if (buttons.length) normalizedRows.push({ buttons })
   }
 
   if (!normalizedRows.length) return undefined
   return { content: { rows: normalizedRows } }
+}
+
+/**
+ * 群聊不支持 `enter: true` 直发按钮，只输出提示，不拦截 keyboard 发送。
+ *
+ * @param ctx 适配器实例，用于输出日志。
+ * @param buttons 本次消息中的直发指令按钮。
+ */
+const warnUnsupportedCommandEnterButtons = (
+  ctx: AdapterQQBot,
+  buttons: ReturnType<typeof collectCommandEnterButtons>
+): void => {
+  if (!buttons.length) return
+  const names = formatCommandEnterButtonNames(buttons)
+  ctx.logger('debug', `群聊不支持 enter: true 直接发送，按钮仍会按原样发送: ${names}`)
+}
+
+/**
+ * 群聊不支持 `<qqbot-cmd-enter>` 文本链，只输出提示，不拦截 markdown 发送。
+ *
+ * @param ctx 适配器实例，用于输出日志。
+ * @param markdowns 本次消息中的 markdown 内容。
+ */
+const warnUnsupportedCommandEnterMarkdowns = (
+  ctx: AdapterQQBot,
+  markdowns: string[]
+): void => {
+  if (!markdowns.some(hasCommandEnterTextChain)) return
+  ctx.logger('debug', '群聊不支持 <qqbot-cmd-enter> 直接发送，markdown 仍会按原样发送')
 }
 
 /**
