@@ -17,6 +17,8 @@ import type {
 } from 'node-karin'
 import type { QQBotConfig } from '@/types/config'
 
+const adapterConfigStore = new WeakMap<object, QQBotConfig>()
+
 /**
  * QQ Official Bot 适配器
  *
@@ -26,19 +28,24 @@ import type { QQBotConfig } from '@/types/config'
 export class AdapterQQBot extends AdapterBase implements AdapterType {
   /** 与官方 API 交互 */
   public super: QQBotApi
-  /** 当前 bot 配置 */
-  public cfg: QQBotConfig
   /** openId / member_openid -> 昵称 缓存 */
   public nicknameCache = new Map<string, string>()
 
   constructor (cfg: QQBotConfig, api: QQBotApi) {
     super()
-    this.cfg = cfg
+    adapterConfigStore.set(this, cfg)
     this.super = api
     this.adapter.name = 'QQ Official Bot'
     this.adapter.protocol = 'qqbot'
     this.adapter.platform = 'qq'
     this.adapter.standard = 'other'
+  }
+
+  /** 当前 bot 配置。真实配置存放在 WeakMap，避免被系统接口序列化整个适配器时带出。 */
+  public get cfg (): QQBotConfig {
+    const cfg = adapterConfigStore.get(this)
+    if (!cfg) throw new Error('QQBot adapter config missing')
+    return cfg
   }
 
   /** 接收消息的一天热缓存 + SQLite 缓存，用于实现 Karin 标准 `getMsg`。 */

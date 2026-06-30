@@ -17,6 +17,8 @@ export type CloseReason =
 export interface WSClientOptions {
   appId: string
   gatewayUrl: string
+  /** WebSocket 握手使用的 User-Agent */
+  userAgent: string
   /** 每次 Identify / Resume 都通过此函数获取最新 token */
   getAccessToken: () => string
   intents: number
@@ -55,7 +57,9 @@ export class WSClient {
   }
 
   start () {
-    const ws = new WebSocket(this.opts.gatewayUrl)
+    const ws = new WebSocket(this.opts.gatewayUrl, {
+      headers: { 'User-Agent': this.opts.userAgent },
+    })
     this.socket = ws
 
     ws.on('open', () => {

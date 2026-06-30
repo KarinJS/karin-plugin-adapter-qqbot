@@ -1,6 +1,7 @@
 import axios, { AxiosError } from 'node-karin/axios'
 import { log } from '@/utils/logger'
 import { formatOpenAPIError } from '@/core/api/error'
+import { getUserAgent } from '@/utils/user-agent'
 
 /**
  * 每个 appId 一份 token 状态
@@ -34,6 +35,8 @@ export const getAccessToken = async (
     res = await axios.post<AccessTokenResponse>(url, {
       appId: String(appId),
       clientSecret: secret,
+    }, {
+      headers: { 'User-Agent': getUserAgent() },
     })
   } catch (err) {
     if (axios.isAxiosError(err)) {
@@ -92,10 +95,16 @@ export const stopTokenRefresh = (appId: string): void => {
 /**
  * 创建 axios 实例，自动从 tokens map 取最新 access_token
  */
-export const createAxiosInstance = (baseURL: string, appId: string) => {
+export const createAxiosInstance = (
+  baseURL: string,
+  appId: string
+) => {
   const instance = axios.create({
     baseURL,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': getUserAgent(),
+    },
     timeout: 5500,
   })
   instance.interceptors.request.use(config => {

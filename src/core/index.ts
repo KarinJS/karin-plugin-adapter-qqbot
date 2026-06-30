@@ -94,7 +94,7 @@ export const createBot = async (bot: QQBotConfig): Promise<void> => {
     })
 
     client.adapter.address = baseUrl
-    client.adapter.secret = bot.secret
+    client.adapter.secret = '*********'
     client.adapter.version = pkg().version
 
     if (bot.event.type === 2) {

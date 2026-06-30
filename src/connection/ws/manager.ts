@@ -1,6 +1,7 @@
 import axios, { AxiosError } from 'node-karin/axios'
 import { log } from '@/utils/logger'
 import { random } from '@/utils/common'
+import { getUserAgent } from '@/utils/user-agent'
 import { getBotAccessToken } from '@/core/internal/axios'
 import { formatOpenAPIError } from '@/core/api/error'
 import { dispatch } from '@/connection/transport'
@@ -49,7 +50,10 @@ const fetchGateway = async (cfg: QQBotConfig): Promise<string> => {
   }
   try {
     const { data } = await axios.get(`${apiUrl}/gateway`, {
-      headers: { Authorization: `QQBot ${accessToken}` },
+      headers: {
+        Authorization: `QQBot ${accessToken}`,
+        'User-Agent': getUserAgent(),
+      },
       timeout: GATEWAY_FETCH_TIMEOUT_MS,
     })
     if (data?.url) return data.url
@@ -165,6 +169,7 @@ const connect = async (
   const client = new WSClient({
     appId: cfg.appId,
     gatewayUrl,
+    userAgent: getUserAgent(),
     getAccessToken: () => getBotAccessToken(cfg.appId) || '',
     intents,
     resume,
