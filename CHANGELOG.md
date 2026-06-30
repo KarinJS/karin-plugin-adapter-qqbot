@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.1.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v2.0.0...adapter-qqbot-v2.1.0) (2026-06-30)
+
+
+### Features
+
+* **storage:** 实现基于SQLite后端的消息缓存 ([#46](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/46)) ([8031e03](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/8031e03b4fbe9d0e9215753cfd814ece27cb0b79))
+* 支持`群成员加入`和`群成员退出`事件 ([16130cd](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/16130cd008108095c65d91aabad21c60db1a5519))
+* 群全量事件添加发送者身份 ([16130cd](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/16130cd008108095c65d91aabad21c60db1a5519))
+
+
+### Bug Fixes
+
+* update readme ([16130cd](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/16130cd008108095c65d91aabad21c60db1a5519))
+* 单聊中同一 `msg_id` 最多发送四次被动回复 ([16130cd](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/16130cd008108095c65d91aabad21c60db1a5519))
+
 ## [2.0.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v1.3.1...adapter-qqbot-v2.0.0) (2026-05-30)
 
 
