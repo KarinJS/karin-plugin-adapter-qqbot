@@ -21,6 +21,7 @@ export interface WSErrorInfo {
 export const wsErrorMap: Record<number, WSErrorInfo> = {
   4001: { message: '无效的 opcode', canResume: false, canIdentify: false },
   4002: { message: '无效的 payload', canResume: false, canIdentify: false },
+  4004: { message: '鉴权失败或 access_token 无效', canResume: false, canIdentify: true },
   4007: { message: 'seq 错误', canResume: false, canIdentify: true },
   4006: { message: '无效的 session id，无法继续 resume，请 identify', canResume: false, canIdentify: true },
   4008: { message: '发送 payload 过快，请重新连接，并遵守连接后返回的频控信息', canResume: true, canIdentify: true },
