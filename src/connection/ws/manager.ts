@@ -1,10 +1,11 @@
 import axios, { AxiosError } from 'node-karin/axios'
 import { log } from '@/utils/logger'
 import { random } from '@/utils/common'
-import { getBotAccessToken } from '@/core/internal/axios'
+import { getUserAgent } from '@/utils/user-agent'
+import { getAccessToken, getBotAccessToken } from '@/core/internal/axios'
 import { formatOpenAPIError } from '@/core/api/error'
 import { dispatch } from '@/connection/transport'
-import { WSClient, type CloseReason } from './client'
+import { WSClient, type WSClientCloseEvent } from './client'
 import { computeMax, computeFallback, formatIntentNames, intentBitMap } from './intents'
 import type { QQBotConfig } from '@/types/config'
 
@@ -15,6 +16,10 @@ interface ManagedConn {
   intents: number
   /** 探测过的 intents 历史 */
   intentHistory: number[]
+  /** 当前连接周期复用的 gateway 地址，避免异常重连时频繁打 /gateway */
+  gatewayUrl?: string
+  /** 短时间断线次数，用于避免异常状态下高频重连 */
+  quickDisconnects: number
   /** 待触发的 reconnect / retry 定时器，stop 时需清理 */
   pendingTimer?: NodeJS.Timeout
   /** stop 后置 true，setTimeout 回调启动时检查并提前退出 */
@@ -25,6 +30,10 @@ const conns = new Map<string, ManagedConn>()
 
 /** /gateway 接口超时（毫秒） */
 const GATEWAY_FETCH_TIMEOUT_MS = 5_000
+const RATE_LIMIT_DELAY_MS = 60_000
+const QUICK_DISCONNECT_THRESHOLD_MS = 5_000
+const QUICK_DISCONNECT_LIMIT = 3
+const QUICK_DISCONNECT_DELAY_MS = 60_000
 
 /**
  * 从 prodApi / sandboxApi 推导兜底的 WSS 地址
@@ -49,7 +58,10 @@ const fetchGateway = async (cfg: QQBotConfig): Promise<string> => {
   }
   try {
     const { data } = await axios.get(`${apiUrl}/gateway`, {
-      headers: { Authorization: `QQBot ${accessToken}` },
+      headers: {
+        Authorization: `QQBot ${accessToken}`,
+        'User-Agent': getUserAgent(),
+      },
       timeout: GATEWAY_FETCH_TIMEOUT_MS,
     })
     if (data?.url) return data.url
@@ -121,6 +133,7 @@ export const start = async (cfg: QQBotConfig): Promise<void> => {
     cfg,
     intents,
     intentHistory: [intents],
+    quickDisconnects: 0,
     aborted: false,
   })
   await connect(cfg, intents, 0)
@@ -157,14 +170,17 @@ const connect = async (
   let conn = conns.get(cfg.appId)
   if (!conn || conn.aborted) return
 
-  const gatewayUrl = await fetchGateway(cfg)
+  let gatewayUrl = conn.gatewayUrl
+  if (!gatewayUrl) gatewayUrl = await fetchGateway(cfg)
 
   conn = conns.get(cfg.appId)
   if (!conn || conn.aborted) return
+  conn.gatewayUrl = gatewayUrl
 
   const client = new WSClient({
     appId: cfg.appId,
     gatewayUrl,
+    userAgent: getUserAgent(),
     getAccessToken: () => getBotAccessToken(cfg.appId) || '',
     intents,
     resume,
@@ -172,7 +188,7 @@ const connect = async (
       if (ev.t === 'READY') summarize(cfg.appId, intents, true)
       dispatch(cfg.appId, ev)
     },
-    onClose: (reason) => onClose(cfg, intents, attempt, reason, client),
+    onClose: (event) => onClose(cfg, intents, attempt, event, client),
   })
 
   conn.client = client
@@ -192,11 +208,11 @@ const onClose = (
   cfg: QQBotConfig,
   intents: number,
   attempt: number,
-  reason: CloseReason,
+  event: WSClientCloseEvent,
   client: WSClient
 ) => {
   // 上层主动 stop()
-  if (reason === 'manual') {
+  if (event.reason === 'manual') {
     log('debug', `${cfg.appId}: WebSocket 已主动关闭`)
     return
   }
@@ -204,10 +220,14 @@ const onClose = (
   const conn = conns.get(cfg.appId)
   if (!conn || conn.aborted) return
 
+  const code = event.code
+  const closeLabel = formatCloseLabel(event)
+
   // intents 不可用 → 回退
-  if (reason === 'auth_fail') {
+  if (event.reason === 'auth_fail' || code === 4013 || code === 4014) {
     const fallback = computeFallback(intents)
     if (fallback && fallback !== intents) {
+      log('warn', `${cfg.appId}: Identify 被拒，尝试降级 intents ${intents} -> ${fallback}`)
       schedule(cfg.appId, 1000, () => connect(cfg, fallback, 0))
       return
     }
@@ -218,14 +238,84 @@ const onClose = (
     return
   }
 
+  if (code === 4914 || code === 4915) {
+    summarize(cfg.appId, intents, false)
+    log('error', `${cfg.appId}: WebSocket 断开 (${closeLabel})，机器人状态不允许连接，已停止自动重连`)
+    conn.aborted = true
+    conns.delete(cfg.appId)
+    return
+  }
+
+  if (event.canResume === false && event.canIdentify === false) {
+    summarize(cfg.appId, intents, false)
+    log('error', `${cfg.appId}: WebSocket 断开 (${closeLabel})，该错误不建议重试，已停止自动重连`)
+    conn.aborted = true
+    conns.delete(cfg.appId)
+    return
+  }
+
+  if (code === 4004) {
+    log('warn', `${cfg.appId}: access_token 已失效，刷新 token 后重连...`)
+    schedule(cfg.appId, 1000, () => {
+      getAccessToken(cfg.tokenApi, cfg.appId, cfg.secret)
+        .then(() => connect(cfg, intents, 0))
+        .catch(() => {
+          log('error', `${cfg.appId}: access_token 刷新失败，${RATE_LIMIT_DELAY_MS}ms 后重试连接...`)
+          schedule(cfg.appId, RATE_LIMIT_DELAY_MS, () => connect(cfg, intents, attempt + 1))
+        })
+    })
+    return
+  }
+
   // 服务端要求重连：尝试 Resume
   // session_lost：清空 sessionId 后重新 Identify
   // closed / error：尝试 Resume，失败再 fresh
   const snap = client.snapshot()
-  const resume = reason === 'session_lost' ? undefined : (snap.sessionId ? snap : undefined)
-  const delay = backoff(attempt)
-  log('error', `${cfg.appId}: WebSocket 断开 (${reason})，${delay}ms 后重连...`)
-  schedule(cfg.appId, delay, () => connect(cfg, intents, attempt + 1, resume))
+  const freshIdentify = event.reason === 'session_lost' || shouldFreshIdentify(code)
+  const resume = freshIdentify ? undefined : (snap.sessionId ? snap : undefined)
+  const delay = reconnectDelay(conn, attempt, event, code === 4008 ? RATE_LIMIT_DELAY_MS : undefined)
+  const nextAttempt = shouldResetAttempt(event) ? 0 : attempt + 1
+  log('error', `${cfg.appId}: WebSocket 断开 (${closeLabel})，${delay}ms 后${resume ? 'Resume' : 'Identify'}重连...`)
+  schedule(cfg.appId, delay, () => connect(cfg, intents, nextAttempt, resume))
+}
+
+const shouldFreshIdentify = (code?: number): boolean => {
+  if (code === 4006 || code === 4007 || code === 4009) return true
+  return typeof code === 'number' && code >= 4900 && code <= 4913
+}
+
+const shouldResetAttempt = (event: WSClientCloseEvent): boolean => {
+  return typeof event.durationMs === 'number' && event.durationMs >= QUICK_DISCONNECT_THRESHOLD_MS
+}
+
+const reconnectDelay = (
+  conn: ManagedConn,
+  attempt: number,
+  event: WSClientCloseEvent,
+  forcedDelay?: number
+): number => {
+  const stable = shouldResetAttempt(event)
+  let delay = forcedDelay ?? backoff(stable ? 0 : attempt)
+  if (typeof event.durationMs !== 'number') return delay
+
+  if (event.durationMs >= QUICK_DISCONNECT_THRESHOLD_MS) {
+    conn.quickDisconnects = 0
+    return delay
+  }
+
+  conn.quickDisconnects += 1
+  if (conn.quickDisconnects >= QUICK_DISCONNECT_LIMIT) {
+    delay = Math.max(delay, QUICK_DISCONNECT_DELAY_MS)
+    log('warn', `${conn.cfg.appId}: WebSocket 连续快速断开 ${conn.quickDisconnects} 次，延长重连间隔到 ${delay}ms`)
+  }
+  return delay
+}
+
+const formatCloseLabel = (event: WSClientCloseEvent): string => {
+  const parts: string[] = [event.reason]
+  if (typeof event.code === 'number') parts.push(String(event.code))
+  if (event.remoteReason) parts.push(event.remoteReason)
+  return parts.join(' / ')
 }
 
 /**

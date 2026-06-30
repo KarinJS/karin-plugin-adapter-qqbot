@@ -1,4 +1,3 @@
-import { logger } from 'node-karin'
 import { log } from '@/utils/logger'
 import { EventEnum } from '@/types/event'
 import {
@@ -109,6 +108,6 @@ export const dispatch = (client: AdapterQQBot, ev: Event): void => {
       return client.logger('debug', `消息审核不通过: audit_id=${ev.d.audit_id}`)
 
     default:
-      logger.debug(`[QQ Official Bot] 未处理事件: ${(ev as any).t}`)
+      client.logger('debug', `[QQ Official Bot] 未处理事件: ${(ev as any).t}`)
   }
 }

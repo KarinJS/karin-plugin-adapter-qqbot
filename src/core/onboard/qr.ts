@@ -36,6 +36,8 @@ export interface QrCodeInfo {
 export interface QrRegisterOptions {
   /** 总超时秒数，默认 600 */
   timeoutSeconds?: number
+  /** 是否把二维码渲染为终端可识别的图形并打印到控制台 */
+  printTerminal?: boolean
   /** 每次产生新二维码时的回调（首次 / 过期刷新都会调用） */
   onQr?: (info: QrCodeInfo) => void | Promise<void>
 }
@@ -57,7 +59,7 @@ const renderQr = async (url: string): Promise<{ ascii: string; base64: string }>
  * 3. 解密返回 secret
  */
 export const qrRegister = async (opts: QrRegisterOptions = {}): Promise<QrRegisterResult | null> => {
-  const { timeoutSeconds = DEFAULT_TIMEOUT_S, onQr } = opts
+  const { timeoutSeconds = DEFAULT_TIMEOUT_S, printTerminal = false, onQr } = opts
   const deadline = Date.now() + timeoutSeconds * 1000
 
   for (let refresh = 0; refresh <= MAX_REFRESHES; refresh++) {
@@ -73,12 +75,13 @@ export const qrRegister = async (opts: QrRegisterOptions = {}): Promise<QrRegist
     const { ascii, base64 } = await renderQr(url)
     const qrDeadline = Date.now() + QR_TTL_MS
 
-    // 终端输出（备用，方便服务端运维）
-    if (ascii) {
-      console.log()
-      console.log(ascii)
+    if (printTerminal) {
+      if (ascii) {
+        console.log()
+        console.log(ascii)
+      }
+      console.log(`  请使用 QQ 扫码（60s 内有效），或在手机 QQ 打开：\n  ${url}\n`)
     }
-    console.log(`  请使用 QQ 扫码（60s 内有效），或在手机 QQ 打开：\n  ${url}\n`)
 
     if (onQr) {
       try {

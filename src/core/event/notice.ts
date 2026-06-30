@@ -31,7 +31,7 @@ export const onGroupAddRobot = (client: AdapterQQBot, event: GroupAddRobotEvent)
   const userId = event.d.op_member_openid
   const groupId = event.d.group_openid
   const contact = karin.contactGroup(groupId)
-  const sender = karin.groupSender(userId, 'unknown')
+  const sender = karin.groupSender(selfId, 'member')
   const eventId = event.id
   const srcReply: SrcReply = (elements) => client.sendMsg(contact, [...elements, segment.pasmsg(eventId, 'event')])
 
@@ -57,7 +57,7 @@ export const onGroupDelRobot = (client: AdapterQQBot, event: GroupDelRobotEvent)
   const userId = event.d.op_member_openid
   const groupId = event.d.group_openid
   const contact = karin.contactGroup(groupId)
-  const sender = karin.groupSender(userId, 'unknown')
+  const sender = karin.groupSender(selfId, 'unknown')
   const eventId = event.id
   const srcReply: SrcReply = (elements) => client.sendMsg(contact, [...elements, segment.pasmsg(eventId, 'event')])
 
@@ -86,7 +86,7 @@ export const onGroupDelRobot = (client: AdapterQQBot, event: GroupDelRobotEvent)
 export const onGroupMemberAdd = (client: AdapterQQBot, event: GroupMemberAddEvent) => {
   const memberId = event.d.member_openid
   const contact = karin.contactGroup(event.d.group_openid)
-  const sender = karin.groupSender(memberId, 'unknown')
+  const sender = karin.groupSender(memberId, 'member')
 
   createGroupMemberAddNotice({
     contact,

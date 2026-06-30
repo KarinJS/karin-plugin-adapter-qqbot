@@ -99,9 +99,7 @@ export interface SendQQMediaMessageRequest extends SendQQMessageRequest, QQMessa
   media: {
     /** 文件信息，用于发消息接口的 media 字段使用 */
     file_info: string
-  },
-  /** 当 msg_type = 7 时，content 字段需要填入一个值，譬如一个空格 “ ”，后续版本会修复该问题。 */
-  content: string
+  }
 }
 
 /** 发送QQ消息请求参数 */
@@ -256,7 +254,12 @@ export interface SendQQMsgResponse {
   /** 消息唯一 ID */
   id: string
   /** 发送时间 */
-  timestamp: number
+  timestamp: number | string
+  /** 扩展信息；部分 QQ 消息发送响应会返回可用于 message_reference 的 REFIDX。 */
+  ext_info?: {
+    /** 当前发送消息可被引用时使用的索引。 */
+    ref_idx?: string
+  }
 }
 
 /** 发送频道消息后响应 */

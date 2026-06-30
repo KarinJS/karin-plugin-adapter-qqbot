@@ -1,4 +1,3 @@
-import { random } from '@/utils/common'
 import type {
   ElementTypes, ButtonElement, KeyboardElement, MarkdownElement,
 } from 'node-karin'
@@ -8,6 +7,8 @@ export interface PendingMedia {
   kind: 'video' | 'record' | 'file'
   /** 来源：http 链接 / base64 / 本地路径，由 pipeline 处理 */
   source: string
+  /** 原始文件名，主要用于 file 消息。 */
+  name?: string
 }
 
 /** 被动消息归一信息 */
@@ -40,7 +41,7 @@ export interface Grouping<T extends 'qq' | 'guild'> {
   markdowns: MarkdownElement[]
   /** 视频 / 语音 / 文件 */
   media: PendingMedia[]
-  /** 引用回复 */
+  /** 显式引用回复；QQ 群聊/单聊发送前会把 API 消息 ID 映射为 msg_idx/REFIDX */
   reply: { messageId: string }
   /** 被动消息 */
   pasmsg: PassiveInfo
@@ -49,6 +50,20 @@ export interface Grouping<T extends 'qq' | 'guild'> {
 
   // 仅类型用，区分 qq / guild
   __scope?: T
+}
+
+/**
+ * 生成 QQ 被动回复使用的 msg_seq 种子。
+ *
+ * QQ 官方使用 `msg_id + msg_seq` 判重。这里和 openclaw qqbot 适配器一样限制在
+ * 16-bit 范围内，后续每发一条再递增取模。
+ *
+ * @returns 0..65535 范围内的初始 msg_seq。
+ */
+const createMsgSeqSeed = (): number => {
+  const timePart = Date.now() % 100_000_000
+  const randomPart = Math.floor(Math.random() * 65536)
+  return (timePart ^ randomPart) % 65536
 }
 
 /**
@@ -67,7 +82,7 @@ export const createGrouping = <T extends 'qq' | 'guild'> (): Grouping<T> => ({
   pasmsg: {
     type: 'msg',
     id: '',
-    seq: random(1, 9999999),
+    seq: createMsgSeqSeed(),
   },
   faces: [],
 })
@@ -129,13 +144,13 @@ export const groupElements = <T extends 'qq' | 'guild'> (
         g.markdowns.push(v)
         break
       case 'video':
-        g.media.push({ kind: 'video', source: v.file })
+        g.media.push({ kind: 'video', source: v.file, name: v.name })
         break
       case 'record':
-        g.media.push({ kind: 'record', source: v.file })
+        g.media.push({ kind: 'record', source: v.file, name: v.name })
         break
       case 'file':
-        g.media.push({ kind: 'file', source: v.file })
+        g.media.push({ kind: 'file', source: v.file, name: v.name })
         break
       default:
         // 静默忽略，由 pipeline 决定要不要降级

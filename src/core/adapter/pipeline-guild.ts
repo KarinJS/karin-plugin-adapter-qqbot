@@ -1,11 +1,23 @@
 import FormData from 'form-data'
 import { karinToQQBot, fileToUrl } from 'node-karin'
+import {
+  collectCommandEnterButtons,
+  formatCommandEnterButtonNames,
+  hasCommandEnterTextChain,
+  normalizeQQBotButton,
+} from './button-enter'
 import { groupElements } from './grouping'
 import { extractUrlButtons, imagesToMarkdown } from './text-to-md'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
 import type { Grouping } from './grouping'
 import type { SendGuildMsg, SendGuildResponse } from '@/core/api/types'
+
+/** QQ keyboard 限制：最多 5 行，每行最多 5 个按钮。 */
+const KEYBOARD_MAX_ROWS = 5
+const KEYBOARD_MAX_BUTTONS_PER_ROW = 5
+/** 只有按钮没有文本时仍需提供非空 markdown 内容。 */
+const BUTTON_ONLY_MARKDOWN = '\u200b'
 
 /**
  * 处理频道场景（子频道 + 私信）的发送
@@ -55,9 +67,13 @@ const sendGuildMarkdown = async (
   }
   grouping.markdowns.forEach(m => lines.push(m.markdown))
 
+  warnUnsupportedCommandEnterButtons(ctx, contact.scene, collectCommandEnterButtons(grouping.buttons, grouping.keyboards))
+  warnUnsupportedCommandEnterMarkdowns(ctx, contact.scene, grouping.markdowns.map(m => m.markdown))
+
   if (lines.length || grouping.buttons.length || grouping.keyboards.length) {
     const keyboard = buildKeyboard(grouping)
-    items.push(ctx.super.guild.markdown({ content: lines.join('\n') }, keyboard))
+    const content = lines.length ? lines.join('\n') : BUTTON_ONLY_MARKDOWN
+    items.push(ctx.super.guild.markdown({ content }, keyboard))
   }
 
   if (!items.length) {
@@ -71,8 +87,53 @@ const buildKeyboard = (grouping: Grouping<'guild'>) => {
   const rows: ReturnType<typeof karinToQQBot> = []
   grouping.buttons.forEach(b => rows.push(...karinToQQBot(b)))
   grouping.keyboards.forEach(k => rows.push(...karinToQQBot(k)))
-  if (!rows.length) return undefined
-  return { content: { rows } }
+  const normalizedRows: ReturnType<typeof karinToQQBot> = []
+  let id = 0
+
+  for (const row of rows.slice(0, KEYBOARD_MAX_ROWS)) {
+    const buttons = row.buttons
+      .slice(0, KEYBOARD_MAX_BUTTONS_PER_ROW)
+      .map(button => normalizeQQBotButton(button, id++))
+    if (buttons.length) normalizedRows.push({ buttons })
+  }
+
+  if (!normalizedRows.length) return undefined
+  return { content: { rows: normalizedRows } }
+}
+
+/**
+ * 频道消息不支持 `enter: true` 直发按钮，只输出提示，不拦截 keyboard 发送。
+ *
+ * @param ctx 适配器实例，用于输出日志。
+ * @param scene 频道消息场景。
+ * @param buttons 本次消息中的直发指令按钮。
+ */
+const warnUnsupportedCommandEnterButtons = (
+  ctx: AdapterQQBot,
+  scene: Contact<'guild' | 'direct'>['scene'],
+  buttons: ReturnType<typeof collectCommandEnterButtons>
+): void => {
+  if (!buttons.length) return
+  const names = formatCommandEnterButtonNames(buttons)
+  const name = scene === 'guild' ? '频道' : '频道私信'
+  ctx.logger('debug', `${name}不支持 enter: true 直接发送，按钮仍会按原样发送: ${names}`)
+}
+
+/**
+ * 频道消息不支持 `<qqbot-cmd-enter>` 文本链，只输出提示，不拦截 markdown 发送。
+ *
+ * @param ctx 适配器实例，用于输出日志。
+ * @param scene 频道消息场景。
+ * @param markdowns 本次消息中的 markdown 内容。
+ */
+const warnUnsupportedCommandEnterMarkdowns = (
+  ctx: AdapterQQBot,
+  scene: Contact<'guild' | 'direct'>['scene'],
+  markdowns: string[]
+): void => {
+  if (!markdowns.some(hasCommandEnterTextChain)) return
+  const name = scene === 'guild' ? '频道' : '频道私信'
+  ctx.logger('debug', `${name}不支持 <qqbot-cmd-enter> 直接发送，markdown 仍会按原样发送`)
 }
 
 const flushGuild = async (
@@ -89,31 +150,48 @@ const flushGuild = async (
     : (peer: string, _subPeer: string, item: SendGuildMsg | FormData) =>
         ctx.super.messages.sendDmsMsg(peer, item)
 
-  let replyHandled = false
   for (const item of items) {
     passive(item)
-    if (!replyHandled && grouping.reply.messageId && !(item instanceof FormData)) {
-      item.message_reference = { message_id: grouping.reply.messageId }
-      replyHandled = true
-    }
     const res: SendGuildResponse = await send(contact.peer, contact.subPeer!, item)
     result.rawData.push(res)
   }
   return ctx.handleResponse(result)
 }
 
-const buildPassiveGuild = (grouping: Grouping<'guild'>) => {
-  if (!grouping.pasmsg.id) return (_item: SendGuildMsg | FormData) => undefined
+/**
+ * 解析频道/私信场景的被动回复来源。
+ *
+ * openclaw 的 qqbot 适配器对 channel/dm 也只传 `msg_id`。这里让显式
+ * `segment.reply` 优先，其次使用事件入口追加的 pasmsg。
+ *
+ * @param grouping 已归类的消息段。
+ * @returns 被动回复来源；没有可用来源时返回 undefined。
+ */
+const resolvePassiveGuild = (grouping: Grouping<'guild'>) => {
+  if (grouping.reply.messageId) return { type: 'msg' as const, id: grouping.reply.messageId }
+  if (grouping.pasmsg.id) return grouping.pasmsg
+  return undefined
+}
 
-  if (grouping.pasmsg.type === 'event') {
+/**
+ * 构造频道/私信被动消息附加器。
+ *
+ * @param grouping 已归类的消息段。
+ * @returns 可直接修改发送体或 FormData 的附加函数。
+ */
+const buildPassiveGuild = (grouping: Grouping<'guild'>) => {
+  const source = resolvePassiveGuild(grouping)
+  if (!source?.id) return (_item: SendGuildMsg | FormData) => undefined
+
+  if (source.type === 'event') {
     return (item: SendGuildMsg | FormData) => {
-      if (item instanceof FormData) item.append('event_id', grouping.pasmsg.id)
-      else item.event_id = grouping.pasmsg.id
+      if (item instanceof FormData) item.append('event_id', source.id)
+      else item.event_id = source.id
     }
   }
 
   return (item: SendGuildMsg | FormData) => {
-    if (item instanceof FormData) item.append('msg_id', grouping.pasmsg.id)
-    else item.msg_id = grouping.pasmsg.id
+    if (item instanceof FormData) item.append('msg_id', source.id)
+    else item.msg_id = source.id
   }
 }

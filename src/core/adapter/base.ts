@@ -2,6 +2,9 @@ import { AdapterBase, logger, buttonHandle, segment, fileToUrl } from 'node-kari
 import { QQBotApi } from '@/core/api'
 import { sendQQ } from './pipeline-qq'
 import { sendGuild } from './pipeline-guild'
+import { isOwnMessageId, resolveApiMessageId } from './message-id-map'
+import { cacheSelfMessage, prepareSelfMessageCache, shouldCacheSelfMessage } from './self-message-cache'
+import { getMessageStore, type MessageStore } from '@/core/storage/message'
 import { getImageSize } from '@/utils/common'
 import type {
   LogMethodNames, Contact, ElementTypes, Message, SendMsgResults,
@@ -14,6 +17,8 @@ import type {
 } from 'node-karin'
 import type { QQBotConfig } from '@/types/config'
 
+const adapterConfigStore = new WeakMap<object, QQBotConfig>()
+
 /**
  * QQ Official Bot 适配器
  *
@@ -23,19 +28,29 @@ import type { QQBotConfig } from '@/types/config'
 export class AdapterQQBot extends AdapterBase implements AdapterType {
   /** 与官方 API 交互 */
   public super: QQBotApi
-  /** 当前 bot 配置 */
-  public cfg: QQBotConfig
   /** openId / member_openid -> 昵称 缓存 */
   public nicknameCache = new Map<string, string>()
 
   constructor (cfg: QQBotConfig, api: QQBotApi) {
     super()
-    this.cfg = cfg
+    adapterConfigStore.set(this, cfg)
     this.super = api
     this.adapter.name = 'QQ Official Bot'
     this.adapter.protocol = 'qqbot'
     this.adapter.platform = 'qq'
     this.adapter.standard = 'other'
+  }
+
+  /** 当前 bot 配置。真实配置存放在 WeakMap，避免被系统接口序列化整个适配器时带出。 */
+  public get cfg (): QQBotConfig {
+    const cfg = adapterConfigStore.get(this)
+    if (!cfg) throw new Error('QQBot adapter config missing')
+    return cfg
+  }
+
+  /** 接收消息的一天热缓存 + SQLite 缓存，用于实现 Karin 标准 `getMsg`。 */
+  public get messageStore (): MessageStore {
+    return getMessageStore()
   }
 
   logger (level: LogMethodNames, ...args: any[]) {
@@ -46,9 +61,7 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
    * 主消息回复入口（karin 调用）
    */
   async srcReply (e: Message, elements: ElementTypes[]): Promise<SendMsgResults> {
-    const extra = this.cfg.keyboard.enable
-      ? await buttonHandle(e.msg, { e })
-      : []
+    const extra = await buttonHandle(e.msg, { e })
     return this.sendMsg(e.contact, [...elements, ...extra])
   }
 
@@ -61,10 +74,22 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
     _retryCount?: number
   ): Promise<SendMsgResults> {
     if (contact.scene === 'direct' || contact.scene === 'guild') {
-      return sendGuild(this, contact as Contact<'guild' | 'direct'>, elements)
+      if (!shouldCacheSelfMessage(this)) {
+        return sendGuild(this, contact as Contact<'guild' | 'direct'>, elements)
+      }
+      const prepared = await prepareSelfMessageCache(this, elements)
+      const result = await sendGuild(this, contact as Contact<'guild' | 'direct'>, prepared.sendElements)
+      cacheSelfMessage(this, contact, prepared.cacheElements, result)
+      return result
     }
     if (contact.scene === 'group' || contact.scene === 'friend') {
-      return sendQQ(this, contact as Contact<'friend' | 'group'>, elements)
+      if (!shouldCacheSelfMessage(this)) {
+        return sendQQ(this, contact as Contact<'friend' | 'group'>, elements)
+      }
+      const prepared = await prepareSelfMessageCache(this, elements)
+      const result = await sendQQ(this, contact as Contact<'friend' | 'group'>, prepared.sendElements)
+      cacheSelfMessage(this, contact, prepared.cacheElements, result)
+      return result
     }
     throw new Error(`不支持的消息场景: ${contact.scene}`)
   }
@@ -75,15 +100,20 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
    * 群聊中机器人被群主设为管理员后，也可撤回成员消息；平台仍限制消息发送后两分钟内。
    */
   async recallMsg (contact: Contact, messageId: string): Promise<void> {
+    const apiMessageId = resolveApiMessageId(this, contact, messageId)
     try {
       if (contact.scene === 'friend') {
-        await this.super.messages.recall('user', contact.peer, messageId)
+        if (!isOwnMessageId(this, contact, apiMessageId)) {
+          this.logger('warn', `[recallMsg] QQ 单聊只能撤回机器人自己发送的消息，已跳过撤回: ${messageId}`)
+          return
+        }
+        await this.super.messages.recall('user', contact.peer, apiMessageId)
       } else if (contact.scene === 'group') {
-        await this.super.messages.recall('group', contact.peer, messageId)
+        await this.super.messages.recall('group', contact.peer, apiMessageId)
       } else if (contact.scene === 'direct') {
-        await this.super.messages.recall('dms', contact.peer, messageId)
+        await this.super.messages.recall('dms', contact.peer, apiMessageId)
       } else if (contact.scene === 'guild') {
-        await this.super.messages.recall('channels', contact.peer, messageId)
+        await this.super.messages.recall('channels', contact.peer, apiMessageId)
       }
     } catch (err) {
       logger.error('撤回消息失败:', err)
@@ -237,37 +267,71 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
   }
 
   /**
-   * 获取消息
+   * 按消息 ID 获取已接收的消息。
+   *
+   * QQ 官方 Bot API 没有历史消息查询接口，因此仅从本地缓存读取。
+   * 消息在接收时已转换为 Karin elements，最长保留一天；引用消息的 `REFIDX`
+   * 索引同样可作为 `messageId` 查询。
+   *
+   * @param input OneBot v11 标准单参 messageId，或用于限定查询范围的 Contact。
+   * @param messageId 当 input 是 Contact 时传入的目标消息 ID。
+   * @returns 命中的消息；未命中时返回空消息结构。
    */
-  async getMsg (_contact: Contact | string, _messageId?: string): Promise<MessageResponse> {
-    // TODO: QQ 官方 Bot API 暂不支持获取消息内容
-    this.logger('warn', '[getMsg] QQ Official Bot API 暂不支持获取消息内容')
-    const contact = typeof _contact === 'string'
-      ? { scene: 'group' as const, peer: _contact, subPeer: '', name: '' }
-      : _contact
+  async getMsg (input: Contact | string, messageId?: string): Promise<MessageResponse> {
+    /** OneBot v11 标准单参形式：bot.getMsg(messageId)。 */
+    const targetId = typeof input === 'string' ? input : messageId || ''
+    const contact = typeof input === 'string' ? undefined : input
+    if (!this.cfg.messageCache.enable) {
+      this.logger('debug', `[getMsg] 消息缓存已关闭: ${targetId || '(empty)'}`)
+      return {
+        time: 0,
+        messageId: targetId,
+        messageSeq: 0,
+        contact: contact || { scene: 'group', peer: '', subPeer: '', name: '' },
+        sender: { userId: '', nick: '', name: '', role: 'member' },
+        elements: [],
+      }
+    }
+
+    const cached = await this.messageStore.get(String(this.cfg.appId), targetId, contact)
+    if (cached) return cached
+
+    this.logger('debug', `[getMsg] 本地一天消息缓存未命中: ${targetId || '(empty)'}`)
     return {
       time: 0,
-      messageId: _messageId || '',
+      messageId: targetId,
       messageSeq: 0,
-      contact,
+      contact: contact || { scene: 'group', peer: '', subPeer: '', name: '' },
       sender: { userId: '', nick: '', name: '', role: 'member' },
       elements: [],
     }
   }
 
   /**
-   * 获取历史消息（通过消息 ID）
+   * 获取本地缓存历史消息（仅支持 message_id）
    */
-  async getHistoryMsg (_contact: Contact, _startMsgId: string, _count: number): Promise<Array<MessageResponse>>
+  async getHistoryMsg (contact: Contact, startMsgId: string, count: number): Promise<Array<MessageResponse>>
   /**
-   * 获取历史消息（通过消息序列号）
+   * 获取本地缓存历史消息（message_seq 暂不支持）
    */
-  async getHistoryMsg (_contact: Contact, _startMsgSeq: number, _count: number): Promise<Array<MessageResponse>>
+  async getHistoryMsg (contact: Contact, startMsgSeq: number, count: number): Promise<Array<MessageResponse>>
   /** @internal */
-  async getHistoryMsg (_contact: Contact, _start: string | number, _count: number): Promise<Array<MessageResponse>> {
-    // TODO: QQ 官方 Bot API 暂不支持获取历史消息
-    this.logger('warn', '[getHistoryMsg] QQ Official Bot API 暂不支持获取历史消息')
-    return []
+  async getHistoryMsg (contact: Contact, start: string | number, count = 1): Promise<Array<MessageResponse>> {
+    if (typeof start === 'number') {
+      this.logger('warn', '[getHistoryMsg] QQ Official Bot 仅支持通过 message_id 获取历史消息，不支持 message_seq')
+      return []
+    }
+
+    if (!this.cfg.messageCache.enable) {
+      this.logger('warn', '[getHistoryMsg] 历史消息缓存为空，请打开“启用数据库缓存消息”开关后再记录历史消息')
+      return []
+    }
+
+    const history = await this.messageStore.getHistory(String(this.cfg.appId), contact, start, count)
+    if (!history.length) {
+      this.logger('debug', `[getHistoryMsg] 本地一天历史消息缓存未命中: ${start || '(empty)'}`)
+    }
+    return history
   }
 
   /**

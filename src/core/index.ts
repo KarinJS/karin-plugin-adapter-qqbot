@@ -39,6 +39,7 @@ const hashConfig = (bot: QQBotConfig): string => JSON.stringify({
   sandbox: bot.sandbox,
   event: bot.event,
   keyboard: bot.keyboard,
+  messageCache: bot.messageCache,
 })
 
 /**
@@ -88,10 +89,12 @@ export const createBot = async (bot: QQBotConfig): Promise<void> => {
     client.account.subId.appid = appId
     client.account.subId.union_openid = me.union_openid
 
-    bus.on(appId, (ev: Event) => dispatchEvent(client, ev))
+    bus.on(appId, (ev: Event) => {
+      dispatchEvent(client, ev)
+    })
 
     client.adapter.address = baseUrl
-    client.adapter.secret = bot.secret
+    client.adapter.secret = '*********'
     client.adapter.version = pkg().version
 
     if (bot.event.type === 2) {

@@ -2,7 +2,7 @@ import os from 'node:os'
 import { WebSocket } from 'node-karin/ws'
 import { log } from '@/utils/logger'
 import { Opcode } from '@/types/opcode'
-import { formatWSClose } from './error'
+import { formatWSClose, getWSErrorInfo } from './error'
 import type { Event } from '@/types/event'
 
 /** 关闭原因 */
@@ -14,16 +14,34 @@ export type CloseReason =
   | 'error'          // 网络异常
   | 'closed'         // 服务端主动 close
 
+export interface WSClientCloseEvent {
+  reason: CloseReason
+  /** WebSocket close code，非远端 close 时为空 */
+  code?: number
+  /** 远端 close reason */
+  remoteReason?: string
+  /** 当前连接打开后的持续时间 */
+  durationMs?: number
+  /** close code 映射出的 Resume 建议 */
+  canResume?: boolean
+  /** close code 映射出的 Identify 建议 */
+  canIdentify?: boolean
+  /** op:9 Invalid Session 中服务端返回的 d 值 */
+  invalidSessionCanResume?: boolean
+}
+
 export interface WSClientOptions {
   appId: string
   gatewayUrl: string
+  /** WebSocket 握手使用的 User-Agent */
+  userAgent: string
   /** 每次 Identify / Resume 都通过此函数获取最新 token */
   getAccessToken: () => string
   intents: number
   /** 收到 Dispatch 事件后回调（s 已自动更新到 client 内部，但回调里也会再传一遍） */
   onEvent: (ev: Event) => void
   /** 关闭时回调，由上层决定要不要重连 */
-  onClose: (reason: CloseReason) => void
+  onClose: (event: WSClientCloseEvent) => void
   /** 上次连接的 session_id 与 seq，传入则尝试 Resume */
   resume?: { sessionId: string; seq: number }
 }
@@ -40,6 +58,8 @@ export class WSClient {
   private seq = 0
   private closed = false
   private closedReason: CloseReason = 'manual'
+  private openedAt = 0
+  private lastAuthAction?: 'identify' | 'resume'
 
   constructor (opts: WSClientOptions) {
     this.opts = opts
@@ -55,25 +75,35 @@ export class WSClient {
   }
 
   start () {
-    const ws = new WebSocket(this.opts.gatewayUrl)
+    const ws = new WebSocket(this.opts.gatewayUrl, {
+      headers: { 'User-Agent': this.opts.userAgent },
+    })
     this.socket = ws
 
     ws.on('open', () => {
+      this.openedAt = Date.now()
       log('debug', `${this.opts.appId}: WebSocket opened (${this.opts.gatewayUrl})`)
     })
 
     ws.on('close', (code, reason) => {
-      const reasonStr = reason?.toString() || '(empty)'
-      const closeInfo = formatWSClose(code, reasonStr)
+      const remoteReason = reason?.toString() || ''
+      const closeInfo = formatWSClose(code, remoteReason)
+      const info = getWSErrorInfo(code)
       log('error', `${this.opts.appId}: WebSocket 关闭 | ${closeInfo}`)
       if (this.closed) return
-      this.close('closed')
+      this.close('closed', {
+        code,
+        remoteReason: remoteReason || undefined,
+        durationMs: this.durationMs(),
+        canResume: info?.canResume,
+        canIdentify: info?.canIdentify,
+      })
     })
 
     ws.on('error', (err) => {
       log('error', `${this.opts.appId}: WebSocket error:`, err)
       if (this.closed) return
-      this.close('error')
+      this.close('error', { durationMs: this.durationMs() })
     })
 
     ws.on('unexpected-response', (_req, res) => {
@@ -90,7 +120,7 @@ export class WSClient {
     this.close('manual')
   }
 
-  private close (reason: CloseReason) {
+  private close (reason: CloseReason, event: Omit<WSClientCloseEvent, 'reason'> = {}) {
     if (this.closed) return
     this.closed = true
     this.closedReason = reason
@@ -102,7 +132,11 @@ export class WSClient {
       this.socket?.removeAllListeners()
       this.socket?.close()
     } catch { /* ignore */ }
-    this.opts.onClose(reason)
+    this.opts.onClose({ reason, ...event })
+  }
+
+  private durationMs (): number | undefined {
+    return this.openedAt ? Date.now() - this.openedAt : undefined
   }
 
   private send (payload: object) {
@@ -122,6 +156,7 @@ export class WSClient {
   }
 
   private identify () {
+    this.lastAuthAction = 'identify'
     this.send({
       op: Opcode.Identify,
       d: {
@@ -139,6 +174,7 @@ export class WSClient {
   }
 
   private resume () {
+    this.lastAuthAction = 'resume'
     this.send({
       op: Opcode.Resume,
       d: {
@@ -182,6 +218,7 @@ export class WSClient {
       case Opcode.Dispatch: {
         if (typeof msg.s === 'number') this.seq = msg.s
         if (msg.t === 'READY') {
+          this.lastAuthAction = undefined
           this.sessionId = msg.d?.session_id || ''
           log('debug', `${this.opts.appId}: READY received, session_id=${this.sessionId}`)
         }
@@ -198,14 +235,27 @@ export class WSClient {
         break
       }
       case Opcode.InvalidSession: {
-        if (this.sessionId) {
-          log('debug', `${this.opts.appId}: invalid session, will retry with fresh identify`)
+        const canResume = msg.d === true
+        if (this.lastAuthAction === 'identify') {
+          log('error', `${this.opts.appId}: identify rejected (op:9), will try fallback intents, canResume=${canResume}`)
+          this.close('auth_fail', {
+            durationMs: this.durationMs(),
+            invalidSessionCanResume: canResume,
+          })
+        } else if (canResume && this.sessionId) {
+          log('debug', `${this.opts.appId}: invalid session, server allows resume`)
+          this.close('reconnect', {
+            durationMs: this.durationMs(),
+            invalidSessionCanResume: true,
+          })
+        } else {
+          log('debug', `${this.opts.appId}: invalid session, will retry with fresh identify, canResume=${canResume}`)
           this.sessionId = ''
           this.seq = 0
-          this.close('session_lost')
-        } else {
-          log('error', `${this.opts.appId}: auth_fail (op:9 with no prior session)`)
-          this.close('auth_fail')
+          this.close('session_lost', {
+            durationMs: this.durationMs(),
+            invalidSessionCanResume: canResume,
+          })
         }
         break
       }
