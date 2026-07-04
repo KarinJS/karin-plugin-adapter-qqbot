@@ -2,6 +2,7 @@ import { URL } from 'url'
 import { logger, registerBot, unregisterBot } from 'node-karin'
 import { QQBotApi } from '@/core/api'
 import { config, pkg, bindHandlers } from '@/utils/config'
+import { normalizeProxyConfig } from '@/utils/proxy-url'
 import { createAxiosInstance, getAccessToken, stopTokenRefresh } from '@/core/internal/axios'
 import { AdapterQQBot } from '@/core/adapter/base'
 import { dispatch as dispatchEvent } from '@/core/event/dispatcher'
@@ -33,19 +34,19 @@ const initState = new Map<string, { hash: string; promise: Promise<void> }>()
 const hashConfig = (bot: QQBotConfig): string => JSON.stringify({
   appId: bot.appId,
   secret: bot.secret,
-  tokenApi: bot.tokenApi,
-  prodApi: bot.prodApi,
-  sandboxApi: bot.sandboxApi,
+  proxy: bot.proxy,
   sandbox: bot.sandbox,
   event: bot.event,
   keyboard: bot.keyboard,
+  markdown: bot.markdown,
   messageCache: bot.messageCache,
 })
 
 /**
  * 创建单个 Bot 实例
  */
-export const createBot = async (bot: QQBotConfig): Promise<void> => {
+export const createBot = async (input: QQBotConfig): Promise<void> => {
+  const bot: QQBotConfig = { ...input, proxy: normalizeProxyConfig(input.proxy) }
   const appId = String(bot.appId)
   if (!appId) {
     logger.warn('[QQ Official Bot] 配置缺少 appId，跳过')
@@ -71,9 +72,9 @@ export const createBot = async (bot: QQBotConfig): Promise<void> => {
     stopTokenRefresh(appId)
 
     logger.info(`[QQ Official Bot][${appId}] 获取 access_token...`)
-    await getAccessToken(bot.tokenApi, appId, bot.secret)
+    await getAccessToken(bot.proxy.tokenApi, appId, bot.secret)
 
-    const baseUrl = bot.sandbox ? bot.sandboxApi : bot.prodApi
+    const baseUrl = bot.sandbox ? bot.proxy.sandboxApi : bot.proxy.prodApi
     const axios = createAxiosInstance(baseUrl, appId)
     const api = new QQBotApi(axios)
 

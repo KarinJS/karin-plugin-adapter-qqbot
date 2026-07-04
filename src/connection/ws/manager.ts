@@ -2,6 +2,7 @@ import axios, { AxiosError } from 'node-karin/axios'
 import { log } from '@/utils/logger'
 import { random } from '@/utils/common'
 import { getUserAgent } from '@/utils/user-agent'
+import { normalizeHttpUrl, normalizeWsGatewayUrl } from '@/utils/proxy-url'
 import { getAccessToken, getBotAccessToken } from '@/core/internal/axios'
 import { formatOpenAPIError } from '@/core/api/error'
 import { dispatch } from '@/connection/transport'
@@ -36,24 +37,36 @@ const QUICK_DISCONNECT_LIMIT = 3
 const QUICK_DISCONNECT_DELAY_MS = 60_000
 
 /**
- * 从 prodApi / sandboxApi 推导兜底的 WSS 地址
+ * 从 proxy.prodApi / proxy.sandboxApi 推导兜底的 WS 地址
  * 官方实际长期返回的也是 wss://{host}/websocket/，不依赖 /gateway 也能直连
  */
-const buildFallbackWssUrl = (cfg: QQBotConfig): string => {
-  const apiUrl = cfg.sandbox ? cfg.sandboxApi : cfg.prodApi
-  const wss = apiUrl.replace(/^https?:\/\//i, 'wss://').replace(/\/+$/, '')
-  return `${wss}/websocket/`
+export const buildFallbackWsUrl = (cfg: QQBotConfig): string => {
+  const apiUrl = cfg.sandbox ? cfg.proxy.sandboxApi : cfg.proxy.prodApi
+  const ws = normalizeWsGatewayUrl(apiUrl).replace(/\/+$/, '')
+  return `${ws}/websocket/`
 }
 
 /**
  * 获取网关地址：优先调 /gateway；失败 / 超时 / 限频 → 直接 fallback 到硬编码
  */
 const fetchGateway = async (cfg: QQBotConfig): Promise<string> => {
-  const apiUrl = cfg.sandbox ? cfg.sandboxApi : cfg.prodApi
-  const fallback = buildFallbackWssUrl(cfg)
+  const apiUrl = normalizeHttpUrl(cfg.sandbox ? cfg.proxy.sandboxApi : cfg.proxy.prodApi)
+  const fallback = buildFallbackWsUrl(cfg)
+  const proxyWsValue = cfg.sandbox ? cfg.proxy.sandboxWs : cfg.proxy.prodWs
+  if (proxyWsValue.trim()) {
+    try {
+      const proxyWsUrl = normalizeWsGatewayUrl(proxyWsValue)
+      log('debug', `${cfg.appId}: 使用自定义 WS ${proxyWsUrl}`)
+      return proxyWsUrl
+    } catch (err: any) {
+      const reason = err?.message || 'unknown'
+      log('warn', `${cfg.appId}: 自定义 WS 地址无效 (${reason})，尝试获取 /gateway`)
+    }
+  }
+
   const accessToken = getBotAccessToken(cfg.appId)
   if (!accessToken) {
-    log('warn', `${cfg.appId}: 无 access_token，使用硬编码 WSS ${fallback}`)
+    log('warn', `${cfg.appId}: 无 access_token，使用硬编码 WS ${fallback}`)
     return fallback
   }
   try {
@@ -65,7 +78,7 @@ const fetchGateway = async (cfg: QQBotConfig): Promise<string> => {
       timeout: GATEWAY_FETCH_TIMEOUT_MS,
     })
     if (data?.url) return data.url
-    log('warn', `${cfg.appId}: /gateway 返回为空，使用硬编码 WSS ${fallback}`)
+    log('warn', `${cfg.appId}: /gateway 返回为空，使用硬编码 WS ${fallback}`)
     return fallback
   } catch (err: any) {
     if (axios.isAxiosError(err)) {
@@ -75,10 +88,10 @@ const fetchGateway = async (cfg: QQBotConfig): Promise<string> => {
       const code = typeof data?.code === 'number' ? data.code : undefined
       const msg = typeof data?.message === 'string' ? data.message : undefined
       const detail = formatOpenAPIError(status, code, msg)
-      log('warn', `${cfg.appId}: /gateway 调用失败 | ${detail}，使用硬编码 WSS ${fallback}`)
+      log('warn', `${cfg.appId}: /gateway 调用失败 | ${detail}，使用硬编码 WS ${fallback}`)
     } else {
       const reason = err?.message || 'unknown'
-      log('warn', `${cfg.appId}: /gateway 调用失败 (${reason})，使用硬编码 WSS ${fallback}`)
+      log('warn', `${cfg.appId}: /gateway 调用失败 (${reason})，使用硬编码 WS ${fallback}`)
     }
     return fallback
   }
@@ -257,7 +270,7 @@ const onClose = (
   if (code === 4004) {
     log('warn', `${cfg.appId}: access_token 已失效，刷新 token 后重连...`)
     schedule(cfg.appId, 1000, () => {
-      getAccessToken(cfg.tokenApi, cfg.appId, cfg.secret)
+      getAccessToken(cfg.proxy.tokenApi, cfg.appId, cfg.secret)
         .then(() => connect(cfg, intents, 0))
         .catch(() => {
           log('error', `${cfg.appId}: access_token 刷新失败，${RATE_LIMIT_DELAY_MS}ms 后重试连接...`)

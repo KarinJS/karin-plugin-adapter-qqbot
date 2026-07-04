@@ -1,5 +1,6 @@
 import FormData from 'form-data'
-import { karinToQQBot, fileToUrl } from 'node-karin'
+import path from 'node:path'
+import { karinToQQBot, fileToUrl, common } from 'node-karin'
 import {
   collectCommandEnterButtons,
   formatCommandEnterButtonNames,
@@ -7,7 +8,7 @@ import {
   normalizeQQBotButton,
 } from './button-enter'
 import { groupElements } from './grouping'
-import { extractUrlButtons, imagesToMarkdown } from './text-to-md'
+import { extractUrlButtons, imagesToMarkdown, splitMarkdownImages } from './text-to-md'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
 import type { Grouping } from './grouping'
@@ -32,14 +33,15 @@ export const sendGuild = async (
 ): Promise<SendMsgResults> => {
   const grouping = groupElements<'guild'>(contact.scene, elements)
 
-  if (ctx.cfg.keyboard.enable && grouping.text.length) {
+  if (ctx.cfg.markdown.enable && ctx.cfg.keyboard.enable && grouping.text.length) {
     const joined = grouping.text.join('')
     const { text, buttons } = extractUrlButtons(joined, false)
     grouping.text = [text]
     grouping.buttons.push(...buttons)
   }
 
-  return sendGuildMarkdown(ctx, contact, grouping)
+  if (ctx.cfg.markdown.enable) return sendGuildMarkdown(ctx, contact, grouping)
+  return sendGuildClassic(ctx, contact, grouping)
 }
 
 /**
@@ -65,7 +67,17 @@ const sendGuildMarkdown = async (
     const mdImages = await imagesToMarkdown(allImages)
     lines.push(...mdImages)
   }
-  grouping.markdowns.forEach(m => lines.push(m.markdown))
+  for (const markdown of grouping.markdowns) {
+    for (const part of splitMarkdownImages(markdown.markdown)) {
+      if (part.type === 'text') {
+        const text = part.value.trim()
+        if (text) lines.push(text)
+      } else {
+        const [mdImage] = await imagesToMarkdown([part.source])
+        lines.push(mdImage)
+      }
+    }
+  }
 
   warnUnsupportedCommandEnterButtons(ctx, contact.scene, collectCommandEnterButtons(grouping.buttons, grouping.keyboards))
   warnUnsupportedCommandEnterMarkdowns(ctx, contact.scene, grouping.markdowns.map(m => m.markdown))
@@ -81,6 +93,64 @@ const sendGuildMarkdown = async (
   }
 
   return flushGuild(ctx, contact, grouping, items)
+}
+
+/**
+ * 经典通道：文本走 content，图片按文档走 image / file_image 单独发送。
+ */
+const sendGuildClassic = async (
+  ctx: AdapterQQBot,
+  contact: Contact<'guild' | 'direct'>,
+  grouping: Grouping<'guild'>
+): Promise<SendMsgResults> => {
+  const items: Array<SendGuildMsg | FormData> = []
+  const lines: string[] = []
+  const images = [...grouping.guildImageUrls, ...grouping.guildImageFiles]
+
+  if (grouping.text.length) lines.push(grouping.text.join(''))
+  grouping.markdowns.forEach(markdown => {
+    splitMarkdownImages(markdown.markdown).forEach(part => {
+      if (part.type === 'text') {
+        const text = part.value.trim()
+        if (text) lines.push(text)
+      } else {
+        images.push(part.source)
+      }
+    })
+  })
+
+  if (grouping.buttons.length || grouping.keyboards.length) {
+    ctx.logger('warn', 'Markdown 通道已关闭，button / keyboard 无法随普通文本发送，已跳过')
+  }
+
+  const content = lines.join('\n').trim()
+  if (content) items.push(ctx.super.guild.text(content))
+
+  for (const image of images) {
+    items.push(await buildGuildImageItem(image))
+  }
+
+  if (!items.length) {
+    items.push(ctx.super.guild.text('不支持发送的消息类型'))
+  }
+
+  return flushGuild(ctx, contact, grouping, items)
+}
+
+const buildGuildImageItem = async (source: string): Promise<SendGuildMsg | FormData> => {
+  if (/^https?:\/\//i.test(source)) return { type: 'image', image: source }
+
+  const form = new FormData()
+  form.append('file_image', await common.buffer(source, { http: false }), {
+    filename: resolveImageFilename(source),
+  })
+  return form
+}
+
+const resolveImageFilename = (source: string): string => {
+  const file = source.split(/[?#]/)[0] || ''
+  const name = path.basename(file)
+  return name.includes('.') ? name : 'image.jpg'
 }
 
 const buildKeyboard = (grouping: Grouping<'guild'>) => {

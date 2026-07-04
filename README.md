@@ -26,7 +26,15 @@ pnpm add @karinjs/adapter-qqbot
     "qqEnable": true,
     "guildEnable": true,
     "guildMode": 0,
+    "proxy": {
+      "prodApi": "https://api.sgroup.qq.com",
+      "sandboxApi": "https://sandbox.api.sgroup.qq.com",
+      "tokenApi": "https://bots.qq.com/app/getAppAccessToken",
+      "prodWs": "wss://api.sgroup.qq.com/websocket/",
+      "sandboxWs": "wss://sandbox.api.sgroup.qq.com/websocket/"
+    },
     "keyboard": { "enable": true },
+    "markdown": { "enable": true },
     "event": { "type": 2 }
   }
 ]
@@ -34,6 +42,8 @@ pnpm add @karinjs/adapter-qqbot
 
 - `event.type`: `0` 关闭、`1` Webhook、`2` WebSocket（默认）。
 - `guildMode`: `0` 公域，只收 @ 消息；`1` 私域，接收全部频道消息。
+- `proxy`: 自定义连接代理地址。HTTP、token、WS 地址末尾有无 `/` 都可以，后端会自动规范化；`prodWs` / `sandboxWs` 支持 `ws://` 和 `wss://`。
+- `markdown.enable`: 是否启用 Markdown 通道，默认开启。关闭后图片会改为单独上传发送。
 
 ## 按钮
 
