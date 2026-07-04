@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'node-karin/axios'
 import { log } from '@/utils/logger'
 import { random } from '@/utils/common'
 import { getUserAgent } from '@/utils/user-agent'
-import { normalizeHttpUrl, normalizeWsGatewayUrl } from '@/utils/proxy-url'
+import { buildFallbackWsUrlFromApi, joinHttpPath, normalizeHttpUrl, normalizeWsGatewayUrl } from '@/utils/proxy-url'
 import { getAccessToken, getBotAccessToken } from '@/core/internal/axios'
 import { formatOpenAPIError } from '@/core/api/error'
 import { dispatch } from '@/connection/transport'
@@ -42,8 +42,7 @@ const QUICK_DISCONNECT_DELAY_MS = 60_000
  */
 export const buildFallbackWsUrl = (cfg: QQBotConfig): string => {
   const apiUrl = cfg.sandbox ? cfg.proxy.sandboxApi : cfg.proxy.prodApi
-  const ws = normalizeWsGatewayUrl(apiUrl).replace(/\/+$/, '')
-  return `${ws}/websocket/`
+  return buildFallbackWsUrlFromApi(apiUrl)
 }
 
 /**
@@ -70,7 +69,7 @@ const fetchGateway = async (cfg: QQBotConfig): Promise<string> => {
     return fallback
   }
   try {
-    const { data } = await axios.get(`${apiUrl}/gateway`, {
+    const { data } = await axios.get(joinHttpPath(apiUrl, 'gateway'), {
       headers: {
         Authorization: `QQBot ${accessToken}`,
         'User-Agent': getUserAgent(),
