@@ -71,6 +71,31 @@ const cacheReference = (
 }
 
 /**
+ * 将 Karin 快速回复自动生成的当前消息引用 ID 转成 QQ 客户端可见引用 ID。
+ *
+ * Karin 核心只能根据 `e.message_id` 生成 `segment.reply(e.message_id)`；而 QQ 群/单聊
+ * 的可见引用需要 `message_scene.ext` 里的 `msg_idx=REFIDX_xxx`。这里仅转换
+ * `reply.messageId === ev.d.id` 的那一个自动引用段，保留 `ev.d.id` 作为 Karin 标准
+ * messageId，避免影响 getMsg / recallMsg / 被动回复 msg_id 等主链路。
+ */
+const normalizeQuickReplyReference = (
+  elements: ElementTypes[],
+  sourceMessageId: string,
+  referenceMessageId: string
+): ElementTypes[] => {
+  if (!sourceMessageId || !referenceMessageId) return elements
+
+  let normalized = false
+  return elements.map((element) => {
+    if (!normalized && element.type === 'reply' && element.messageId === sourceMessageId) {
+      normalized = true
+      return segment.reply(referenceMessageId)
+    }
+    return element
+  })
+}
+
+/**
  * 群消息（@机器人 / 普通消息合并入口）
  */
 export const onGroupMsg = (client: AdapterQQBot, ev: GroupMsgEvent, opts: GroupOptions) => {
@@ -123,7 +148,10 @@ export const onGroupMsg = (client: AdapterQQBot, ev: GroupMsgEvent, opts: GroupO
     time,
     contact,
     sender,
-    srcReply: (elements) => client.srcReply(e, [...elements, segment.pasmsg(ev.d.id)]),
+    srcReply: (elements) => client.srcReply(e, [
+      ...normalizeQuickReplyReference(elements, karinMessageId, messageIndex),
+      segment.pasmsg(ev.d.id),
+    ]),
   })
 
   return e
@@ -178,7 +206,10 @@ export const onFriendMsg = (client: AdapterQQBot, ev: C2CMsgEvent) => {
     time,
     contact,
     sender,
-    srcReply: (elements) => client.srcReply(e, [...elements, segment.pasmsg(ev.d.id)]),
+    srcReply: (elements) => client.srcReply(e, [
+      ...normalizeQuickReplyReference(elements, karinMessageId, messageIndex),
+      segment.pasmsg(ev.d.id),
+    ]),
   })
 
   return e
