@@ -51,11 +51,12 @@ export const sendQQ = async (
   }
 
   /**
-   * 默认走 markdown 通道：
+   * 自动 Markdown 通道：
    * text / at / 可转换为公网 URL 的图片通过 markdown content 渲染；无法转换的图片
    * 与视频 / 语音 / 文件由 sendQQMarkdown 内部以 msg_type=7 单独补发。所有富媒体
    * 都会优先通过 fileToUrl 取得公网地址，QQ 上传只做兜底。只有显式引用的
    * 纯文本消息会降级为 msg_type=0，以保证 QQ 客户端能稳定显示引用气泡。
+   * 显式 segment.markdown 不受该自动通道开关影响。
    */
   if (ctx.cfg.markdown.enable) return sendQQMarkdown(ctx, contact, grouping, target)
   return sendQQClassic(ctx, contact, grouping, target)
@@ -132,18 +133,8 @@ const sendQQClassic = async (
   const images: string[] = [...grouping.qqImages]
 
   if (grouping.text.length) lines.push(grouping.text.join(''))
-  grouping.markdowns.forEach(markdown => {
-    splitMarkdownImages(markdown.markdown).forEach(part => {
-      if (part.type === 'text') {
-        const text = part.value.trim()
-        if (text) lines.push(text)
-      } else {
-        images.push(part.source)
-      }
-    })
-  })
 
-  if (grouping.buttons.length || grouping.keyboards.length) {
+  if (!grouping.markdowns.length && (grouping.buttons.length || grouping.keyboards.length)) {
     ctx.logger('warn', 'Markdown 通道已关闭，button / keyboard 无法随普通文本发送，已跳过')
   }
 
@@ -158,11 +149,43 @@ const sendQQClassic = async (
     items.push(await buildQQMediaItem(ctx, target, contact.peer, m.kind, m.source, m.name))
   }
 
+  await appendExplicitMarkdownItems(ctx, contact, grouping, target, items)
+
   if (!items.length) {
     items.push(ctx.super.qq.text('不支持发送的消息类型'))
   }
 
   return flushQQ(ctx, contact, grouping, items)
+}
+
+/**
+ * 显式 `segment.markdown` 是调用方指定的发送类型，不受 Markdown 自动通道开关影响。
+ */
+const appendExplicitMarkdownItems = async (
+  ctx: AdapterQQBot,
+  contact: Contact<'friend' | 'group'>,
+  grouping: Grouping<'qq'>,
+  target: 'user' | 'group',
+  items: SendQQMsg[]
+): Promise<void> => {
+  if (!grouping.markdowns.length) return
+
+  const lines: string[] = []
+  const fallbackImages = await appendExplicitMarkdown(ctx, lines, grouping)
+
+  if (contact.scene === 'group') {
+    warnUnsupportedCommandEnterButtons(ctx, collectCommandEnterButtons(grouping.buttons, grouping.keyboards))
+    warnUnsupportedCommandEnterMarkdowns(ctx, grouping.markdowns.map(m => m.markdown))
+  }
+
+  const keyboard = buildKeyboard(grouping)
+  const content = lines.length ? lines.join('\n') : BUTTON_ONLY_MARKDOWN
+  items.push(ctx.super.qq.markdown({ content }, keyboard))
+
+  for (const file of fallbackImages) {
+    const res = await ctx.super.media.uploadFallback(target, contact.peer, 'image', file, false)
+    items.push(ctx.super.qq.media(res.file_info))
+  }
 }
 
 const buildQQMediaItem = async (

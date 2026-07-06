@@ -23,8 +23,8 @@ const BUTTON_ONLY_MARKDOWN = '\u200b'
 /**
  * 处理频道场景（子频道 + 私信）的发送
  *
- * 永远走 markdown 通道（msg_type=2），文本 / at / 图片均通过 markdown
- * 渲染。Markdown / Keyboard 已全量开放，老的 type=text/image 通道不再使用。
+ * 默认把普通文本 / at / 图片通过 markdown 渲染。关闭自动 Markdown 通道后，
+ * 普通文本和图片改走经典发送；显式 segment.markdown 仍按调用方指定走 Markdown。
  */
 export const sendGuild = async (
   ctx: AdapterQQBot,
@@ -108,18 +108,8 @@ const sendGuildClassic = async (
   const images = [...grouping.guildImageUrls, ...grouping.guildImageFiles]
 
   if (grouping.text.length) lines.push(grouping.text.join(''))
-  grouping.markdowns.forEach(markdown => {
-    splitMarkdownImages(markdown.markdown).forEach(part => {
-      if (part.type === 'text') {
-        const text = part.value.trim()
-        if (text) lines.push(text)
-      } else {
-        images.push(part.source)
-      }
-    })
-  })
 
-  if (grouping.buttons.length || grouping.keyboards.length) {
+  if (!grouping.markdowns.length && (grouping.buttons.length || grouping.keyboards.length)) {
     ctx.logger('warn', 'Markdown 通道已关闭，button / keyboard 无法随普通文本发送，已跳过')
   }
 
@@ -130,11 +120,45 @@ const sendGuildClassic = async (
     items.push(await buildGuildImageItem(image))
   }
 
+  await appendExplicitGuildMarkdownItems(ctx, contact, grouping, items)
+
   if (!items.length) {
     items.push(ctx.super.guild.text('不支持发送的消息类型'))
   }
 
   return flushGuild(ctx, contact, grouping, items)
+}
+
+/**
+ * 显式 `segment.markdown` 是调用方指定的发送类型，不受 Markdown 自动通道开关影响。
+ */
+const appendExplicitGuildMarkdownItems = async (
+  ctx: AdapterQQBot,
+  contact: Contact<'guild' | 'direct'>,
+  grouping: Grouping<'guild'>,
+  items: Array<SendGuildMsg | FormData>
+): Promise<void> => {
+  if (!grouping.markdowns.length) return
+
+  const lines: string[] = []
+  for (const markdown of grouping.markdowns) {
+    for (const part of splitMarkdownImages(markdown.markdown)) {
+      if (part.type === 'text') {
+        const text = part.value.trim()
+        if (text) lines.push(text)
+      } else {
+        const [mdImage] = await imagesToMarkdown([part.source])
+        lines.push(mdImage)
+      }
+    }
+  }
+
+  warnUnsupportedCommandEnterButtons(ctx, contact.scene, collectCommandEnterButtons(grouping.buttons, grouping.keyboards))
+  warnUnsupportedCommandEnterMarkdowns(ctx, contact.scene, grouping.markdowns.map(m => m.markdown))
+
+  const keyboard = buildKeyboard(grouping)
+  const content = lines.length ? lines.join('\n') : BUTTON_ONLY_MARKDOWN
+  items.push(ctx.super.guild.markdown({ content }, keyboard))
 }
 
 const buildGuildImageItem = async (source: string): Promise<SendGuildMsg | FormData> => {

@@ -214,7 +214,7 @@ export default defineConfig({
               }),
               components.switch.create('markdown:enable', {
                 label: '启用 Markdown 发送通道',
-                description: '开启后文本和图片优先合并为 QQ Markdown 消息，Markdown 里的图片会以内嵌图片形式发送；关闭后不走 Markdown 通道，图片会按官方富媒体单独上传发送。',
+                description: '开启后普通文本和图片优先合并为 QQ Markdown 消息，Markdown 里的图片会以内嵌图片形式发送；关闭后普通图片会按官方富媒体单独上传发送。插件显式传入的 segment.markdown 不受此开关影响。',
                 defaultSelected: true,
               }),
               components.divider.horizontal('bot-cache-section', {
