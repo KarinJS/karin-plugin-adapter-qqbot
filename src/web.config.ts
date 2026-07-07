@@ -1,24 +1,68 @@
 import { Config } from './types'
 import { config } from './utils'
 import { defineConfig, components } from 'node-karin'
-import { normalizeProxyConfig } from '@/utils/proxy-url'
+import { buildFallbackWsUrlFromApi, normalizeProxyConfig } from '@/utils/proxy-url'
 
 const defaultProxy = () => config.getDefaultConfig()[0].proxy
 
-const pickProxy = (cfg: Config) => cfg[0]?.proxy || defaultProxy()
+const proxyKeys = (sandbox: boolean) => sandbox
+  ? { api: 'sandboxApi', ws: 'sandboxWs' } as const
+  : { api: 'prodApi', ws: 'prodWs' } as const
 
-const proxyFromInput = (input: WebConfigInput) => normalizeProxyConfig({
-  prodApi: input['proxy:prodApi'] || defaultProxy().prodApi,
-  sandboxApi: input['proxy:sandboxApi'] || defaultProxy().sandboxApi,
-  tokenApi: input['proxy:tokenApi'] || defaultProxy().tokenApi,
-  prodWs: input['proxy:prodWs'] || defaultProxy().prodWs,
-  sandboxWs: input['proxy:sandboxWs'] || defaultProxy().sandboxWs,
-})
+const getBotProxyInput = (item: Config[number]) => {
+  const keys = proxyKeys(!!item.sandbox)
+  const proxy = item.proxy || defaultProxy()
+  return {
+    'proxy:api': proxy[keys.api] || defaultProxy()[keys.api],
+    'proxy:ws': proxy[keys.ws] || defaultProxy()[keys.ws],
+  }
+}
+
+const proxyFromInput = (item: WebQQBotInput, previous?: Config[number]) => {
+  const def = defaultProxy()
+  const sandbox = !!item.sandbox
+  const previousSandbox = previous?.sandbox ?? sandbox
+  const keys = proxyKeys(sandbox)
+  const previousVisibleKeys = proxyKeys(previousSandbox)
+  const previousProxy = previous?.proxy
+  const base = { ...def, ...previousProxy }
+  const envChanged = !!previous && previousSandbox !== sandbox
+
+  const rawApi = (item['proxy:api'] || '').trim()
+  const rawWs = (item['proxy:ws'] || '').trim()
+  const previousVisibleApi = previousProxy?.[previousVisibleKeys.api] || def[previousVisibleKeys.api]
+  const previousVisibleWs = previousProxy?.[previousVisibleKeys.ws] || def[previousVisibleKeys.ws]
+
+  const api = envChanged && rawApi === previousVisibleApi
+    ? base[keys.api] || def[keys.api]
+    : rawApi || base[keys.api] || def[keys.api]
+
+  const previousApi = previousProxy?.[keys.api] || def[keys.api]
+  const previousWs = previousProxy?.[keys.ws] || def[keys.ws]
+  const wsInput = envChanged && rawWs === previousVisibleWs
+    ? base[keys.ws] || def[keys.ws]
+    : rawWs
+
+  let ws = wsInput || previousWs || def[keys.ws]
+  const previousAutoWs = buildFallbackWsUrlFromApi(previousApi)
+  if (!wsInput || (wsInput === previousWs && previousWs === previousAutoWs && api !== previousApi)) {
+    ws = buildFallbackWsUrlFromApi(api)
+  }
+
+  return normalizeProxyConfig({
+    ...base,
+    [keys.api]: api,
+    tokenApi: base.tokenApi || def.tokenApi,
+    [keys.ws]: ws,
+  })
+}
 
 type WebQQBotInput = {
   name: string
   appId: string
   secret: string
+  'proxy:api': string
+  'proxy:ws': string
   sandbox: boolean
   qqEnable: boolean
   guildEnable: boolean
@@ -32,11 +76,6 @@ type WebQQBotInput = {
 }
 
 type WebConfigInput = {
-  'proxy:prodApi': string
-  'proxy:sandboxApi': string
-  'proxy:tokenApi': string
-  'proxy:prodWs': string
-  'proxy:sandboxWs': string
   qqbot: WebQQBotInput[]
 }
 
@@ -56,7 +95,6 @@ export default defineConfig({
   components: () => {
     const data: any[] = []
     const cfg = config.config()
-    const proxy = pickProxy(cfg)
     cfg.forEach(item => {
       data.push({
         title: item.name || item.appId,
@@ -74,49 +112,11 @@ export default defineConfig({
         'markdown:enable': item.markdown?.enable !== false,
         'messageCache:enable': item.messageCache?.enable === true,
         'messageCache:self': item.messageCache?.self === true,
+        ...getBotProxyInput(item),
       })
     })
 
     return [
-      components.divider.horizontal('proxy-section', {
-        description: '连接代理（适配器全局）',
-        descPosition: 5,
-      }),
-      components.input.create('proxy:prodApi', {
-        label: '正式环境 OpenAPI 地址',
-        description: '机器人使用正式环境时调用的 QQ OpenAPI 根地址。默认是官方地址；如果你有反向代理，就填写代理后的 http:// 或 https:// 地址；后端拼接官方路径时会兼容末尾 /。',
-        value: proxy.prodApi,
-        defaultValue: defaultProxy().prodApi,
-        isRequired: true,
-      }),
-      components.input.create('proxy:sandboxApi', {
-        label: '沙盒环境 OpenAPI 地址',
-        description: '开启“沙盒环境”后使用的 QQ OpenAPI 根地址。一般保持默认；只有需要代理沙盒接口时才修改；后端拼接官方路径时会兼容末尾 /。',
-        value: proxy.sandboxApi,
-        defaultValue: defaultProxy().sandboxApi,
-        isRequired: true,
-      }),
-      components.input.create('proxy:tokenApi', {
-        label: 'AccessToken 获取接口',
-        description: '用于把 AppID 和 Secret 换成 app access token。默认是 QQ 官方接口；如果正式环境 API 走代理，这里通常也要填对应的完整接口地址。',
-        value: proxy.tokenApi,
-        defaultValue: defaultProxy().tokenApi,
-        isRequired: true,
-      }),
-      components.input.create('proxy:prodWs', {
-        label: '正式环境 WebSocket 地址',
-        description: '事件接收方式选择 WebSocket，且机器人未开启沙盒时使用。支持 ws:// 和 wss://；这是完整网关地址，路径和查询参数会按你填写的内容连接。',
-        value: proxy.prodWs,
-        defaultValue: defaultProxy().prodWs,
-        isRequired: true,
-      }),
-      components.input.create('proxy:sandboxWs', {
-        label: '沙盒环境 WebSocket 地址',
-        description: '事件接收方式选择 WebSocket，且机器人开启沙盒时使用。支持 ws:// 和 wss://；这是完整网关地址，路径和查询参数会按你填写的内容连接。',
-        value: proxy.sandboxWs,
-        defaultValue: defaultProxy().sandboxWs,
-        isRequired: true,
-      }),
       components.divider.horizontal('bot-section', {
         description: '机器人账号',
         descPosition: 5,
@@ -132,7 +132,7 @@ export default defineConfig({
             children: [
               components.radio.group('event:type', {
                 label: '事件接收方式',
-                description: '决定这个机器人怎么接收 QQ 官方推送的消息和通知。不确定时选择 WebSocket，配置最少，也最适合本地部署。',
+                description: 'QQ 官方机器人只有 Webhook 推送和 WebSocket 主动连接两种接收方式。不确定时选择 WebSocket；如果 QQ 后台已启用 Webhook，可在下方高级设置填写第三方 Webhook 转 WebSocket 服务地址。',
                 defaultValue: '2',
                 radio: [
                   components.radio.create('0', {
@@ -143,12 +143,12 @@ export default defineConfig({
                   components.radio.create('1', {
                     label: 'Webhook 推送',
                     value: '1',
-                    description: '由 QQ 官方把事件推送到你的服务地址，通常需要公网地址、回调路由和平台侧配置。',
+                    description: '由 QQ 官方把事件推送到 Karin 的 /qqbot/webhook 路由。通常需要公网地址，并在 QQ 后台配置回调地址。',
                   }),
                   components.radio.create('2', {
                     label: 'WebSocket 主动连接',
                     value: '2',
-                    description: '适配器主动连接 QQ 官方网关接收事件，默认推荐；会使用上方代理板块中的 WebSocket 地址。',
+                    description: '适配器主动连接 WebSocket 地址接收事件。默认连接 QQ 官方网关；如果 QQ 后台已开 Webhook，可改为第三方 Webhook 转 WebSocket 服务地址。',
                   }),
                 ],
               }),
@@ -176,7 +176,7 @@ export default defineConfig({
               }),
               components.switch.create('sandbox', {
                 label: '使用沙盒环境',
-                description: '开启后这个机器人会调用沙盒 OpenAPI 和沙盒 WebSocket 地址，适合测试；正式上线机器人请关闭。',
+                description: '开启后这个机器人会使用沙盒环境的 OpenAPI 和 WebSocket 地址；关闭时使用正式环境地址。正式上线机器人请关闭。',
                 defaultSelected: false,
               }),
               components.switch.create('qqEnable', {
@@ -231,6 +231,18 @@ export default defineConfig({
                 description: '只有开启“缓存收到的消息到数据库”后才生效。开启后，机器人发送成功的消息也会写入缓存，方便之后通过消息 ID 查询。',
                 defaultSelected: false,
               }),
+              components.divider.horizontal('bot-proxy-section', {
+                description: '连接代理（高级设置：通常只在使用 Webhook 转 WebSocket 服务时填写，除非你知道你在做什么，否则不建议更改）',
+                descPosition: 5,
+              }),
+              components.input.create('proxy:ws', {
+                label: 'WebSocket 接入地址',
+                description: '事件接收方式为 WebSocket 时连接的地址。常见用途是填写第三方 Webhook 转 WebSocket 服务地址，因为 QQ 后台开启 Webhook 后通常无法再直连官方 WebSocket。不填会使用当前环境的官方默认网关。',
+              }),
+              components.input.create('proxy:api', {
+                label: 'OpenAPI 反代地址',
+                description: '用于发送消息、上传媒体、查询网关和获取机器人资料的 QQ OpenAPI 根地址。多数 Webhook 转 WebSocket 场景不用改这里；只有 OpenAPI 请求也需要走反代时才填写。',
+              }),
             ],
           },
         }
@@ -242,44 +254,50 @@ export default defineConfig({
       return { success: false, message: '保存失败：配置格式错误' }
     }
 
-    let proxy: Config[number]['proxy']
+    const prevConfig = config.config()
+    let data: Config
     try {
-      proxy = proxyFromInput(input)
+      data = input.qqbot.map(item => {
+        const guildMode = item.guildMode === true ? 1 : 0
+        const eventType = Number(item['event:type'] ?? 0) as 0 | 1 | 2
+        const regex = (item.regex || []).map(str => {
+          const parts = str.split(' ')
+          const reg = parts[0]?.replace(/^<|>$/g, '') || ''
+          const rep = parts[1]?.replace(/^<|>$/g, '') || ''
+          return { reg, rep }
+        })
+
+        const previous = prevConfig.find(cfg => cfg.appId === item.appId)
+        const proxy = proxyFromInput(item, previous)
+
+        return {
+          name: item.name || '',
+          appId: item.appId || '',
+          secret: item.secret || '',
+          proxy,
+          sandbox: !!item.sandbox,
+          qqEnable: !!item.qqEnable,
+          guildEnable: !!item.guildEnable,
+          guildMode,
+          regex,
+          keyboard: { enable: item['keyboard:enable'] !== false },
+          markdown: { enable: item['markdown:enable'] !== false },
+          messageCache: {
+            enable: !!item['messageCache:enable'],
+            self: !!item['messageCache:self'],
+          },
+          event: { type: eventType },
+        }
+      })
     } catch (err: any) {
       return { success: false, message: `保存失败：代理地址格式错误：${err?.message || 'unknown'}` }
     }
 
-    const data: Config = input.qqbot.map(item => {
-      const guildMode = item.guildMode === true ? 1 : 0
-      const eventType = Number(item['event:type'] ?? 0) as 0 | 1 | 2
-      const regex = (item.regex || []).map(str => {
-        const parts = str.split(' ')
-        const reg = parts[0]?.replace(/^<|>$/g, '') || ''
-        const rep = parts[1]?.replace(/^<|>$/g, '') || ''
-        return { reg, rep }
-      })
-
-      return {
-        name: item.name || '',
-        appId: item.appId || '',
-        secret: item.secret || '',
-        proxy,
-        sandbox: !!item.sandbox,
-        qqEnable: !!item.qqEnable,
-        guildEnable: !!item.guildEnable,
-        guildMode,
-        regex,
-        keyboard: { enable: item['keyboard:enable'] !== false },
-        markdown: { enable: item['markdown:enable'] !== false },
-        messageCache: {
-          enable: !!item['messageCache:enable'],
-          self: !!item['messageCache:self'],
-        },
-        event: { type: eventType },
-      }
-    })
-
-    config.writeConfig(data)
-    return { success: true, message: '保存成功' }
+    try {
+      config.writeConfig(data)
+      return { success: true, message: '保存成功' }
+    } catch (err: any) {
+      return { success: false, message: `保存失败：${err?.message || 'unknown'}` }
+    }
   },
 })
