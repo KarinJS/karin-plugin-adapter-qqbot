@@ -43,8 +43,8 @@ importers:
         specifier: ^0.13.0
         version: 0.13.0(eslint@9.39.4)(typescript@6.0.3)
       node-karin:
-        specifier: ^1.16.2
-        version: 1.16.2
+        specifier: 1.16.3
+        version: 1.16.3
       tsdown:
         specifier: ^0.22.3
         version: 0.22.3(tsx@4.23.0)(typescript@6.0.3)
@@ -1416,8 +1416,8 @@ packages:
     resolution: {integrity: sha512-pyFS63ptit/P5WqUkt+UUfe+4oevH+bFeIiPPdfb0pFeYEu/1ELnJu5l+5EcTKYL5M7zaAa7S8ddywgXypqKCw==}
     engines: {node: '>= 0.4'}
 
-  node-karin@1.16.2:
-    resolution: {integrity: sha512-jLkTow4JSWU679XQcqMLxk9+tO+Uvs+07nFHnwJRDJB/9VVZ/+u18AokQu874HxqKRWvBYZIEPIAko4H1pK6Fg==}
+  node-karin@1.16.3:
+    resolution: {integrity: sha512-hRJChCbHG+d8sjCYdvoNHA7J3eq46GrVT8FPCewwH6gOfqKlPY2jD7VlQE9f9vvn88QWkdbnLhfvi5ZCWrVzeA==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -3334,7 +3334,7 @@ snapshots:
       object.entries: 1.1.9
       semver: 6.3.1
 
-  node-karin@1.16.2:
+  node-karin@1.16.3:
     dependencies:
       art-template: '@karinjs/art-template@1.1.0'
       axios: '@karinjs/axios@1.13.2'

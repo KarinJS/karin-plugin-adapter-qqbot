@@ -5,6 +5,39 @@ import { buildFallbackWsUrlFromApi, normalizeProxyConfig } from '@/utils/proxy-u
 
 const defaultProxy = () => config.getDefaultConfig()[0].proxy
 
+const unwrapValue = (value: unknown): unknown => {
+  if (value && typeof value === 'object' && 'value' in value) {
+    return (value as { value: unknown }).value
+  }
+  return value
+}
+
+const toBool = (value: unknown, fallback: boolean): boolean => {
+  const raw = unwrapValue(value)
+  if (typeof raw === 'boolean') return raw
+  if (typeof raw === 'number') return raw !== 0
+  if (typeof raw === 'string') {
+    const normalized = raw.trim().toLowerCase()
+    if (['false', '0', 'off', 'no', ''].includes(normalized)) return false
+    if (['true', '1', 'on', 'yes'].includes(normalized)) return true
+  }
+  if (raw === null || raw === undefined) return fallback
+  return fallback
+}
+
+const toStringValue = (value: unknown, fallback = ''): string => {
+  const raw = unwrapValue(value)
+  if (typeof raw === 'string') return raw
+  if (raw === null || raw === undefined) return fallback
+  return String(raw)
+}
+
+const toStringList = (value: unknown): string[] => {
+  const raw = unwrapValue(value)
+  if (!Array.isArray(raw)) return []
+  return raw.map(item => toStringValue(item)).filter(Boolean)
+}
+
 const proxyKeys = (sandbox: boolean) => sandbox
   ? { api: 'sandboxApi', ws: 'sandboxWs' } as const
   : { api: 'prodApi', ws: 'prodWs' } as const
@@ -20,7 +53,7 @@ const getBotProxyInput = (item: Config[number]) => {
 
 const proxyFromInput = (item: WebQQBotInput, previous?: Config[number]) => {
   const def = defaultProxy()
-  const sandbox = !!item.sandbox
+  const sandbox = toBool(item.sandbox, previous?.sandbox ?? false)
   const previousSandbox = previous?.sandbox ?? sandbox
   const keys = proxyKeys(sandbox)
   const previousVisibleKeys = proxyKeys(previousSandbox)
@@ -28,8 +61,8 @@ const proxyFromInput = (item: WebQQBotInput, previous?: Config[number]) => {
   const base = { ...def, ...previousProxy }
   const envChanged = !!previous && previousSandbox !== sandbox
 
-  const rawApi = (item['proxy:api'] || '').trim()
-  const rawWs = (item['proxy:ws'] || '').trim()
+  const rawApi = toStringValue(item['proxy:api']).trim()
+  const rawWs = toStringValue(item['proxy:ws']).trim()
   const previousVisibleApi = previousProxy?.[previousVisibleKeys.api] || def[previousVisibleKeys.api]
   const previousVisibleWs = previousProxy?.[previousVisibleKeys.ws] || def[previousVisibleKeys.ws]
 
@@ -58,21 +91,21 @@ const proxyFromInput = (item: WebQQBotInput, previous?: Config[number]) => {
 }
 
 type WebQQBotInput = {
-  name: string
-  appId: string
-  secret: string
-  'proxy:api': string
-  'proxy:ws': string
-  sandbox: boolean
-  qqEnable: boolean
-  guildEnable: boolean
-  guildMode: boolean
-  regex: string[]
-  'keyboard:enable': boolean
-  'markdown:enable': boolean
-  'messageCache:enable': boolean
-  'messageCache:self': boolean
-  'event:type': string
+  name: unknown
+  appId: unknown
+  secret: unknown
+  'proxy:api': unknown
+  'proxy:ws': unknown
+  sandbox: unknown
+  qqEnable: unknown
+  guildEnable: unknown
+  guildMode: unknown
+  regex: unknown
+  'keyboard:enable': unknown
+  'markdown:enable': unknown
+  'messageCache:enable': unknown
+  'messageCache:self': unknown
+  'event:type': unknown
 }
 
 type WebConfigInput = {
@@ -254,37 +287,44 @@ export default defineConfig({
       return { success: false, message: '保存失败：配置格式错误' }
     }
 
-    const prevConfig = config.config()
+    const prevConfig = config.readConfigFile()
     let data: Config
     try {
       data = input.qqbot.map(item => {
-        const guildMode = item.guildMode === true ? 1 : 0
-        const eventType = Number(item['event:type'] ?? 0) as 0 | 1 | 2
-        const regex = (item.regex || []).map(str => {
+        const previous = prevConfig.find(cfg => cfg.appId === toStringValue(item.appId))
+        const sandbox = toBool(item.sandbox, previous?.sandbox ?? false)
+        const qqEnable = toBool(item.qqEnable, previous?.qqEnable ?? true)
+        const guildEnable = toBool(item.guildEnable, previous?.guildEnable ?? true)
+        const guildMode = toBool(item.guildMode, previous?.guildMode === 1) ? 1 : 0
+        const eventType = Number(toStringValue(item['event:type'], String(previous?.event?.type ?? 0))) as 0 | 1 | 2
+        const keyboardEnable = toBool(item['keyboard:enable'], previous?.keyboard?.enable ?? true)
+        const markdownEnable = toBool(item['markdown:enable'], previous?.markdown?.enable ?? true)
+        const messageCacheEnable = toBool(item['messageCache:enable'], previous?.messageCache?.enable ?? false)
+        const messageCacheSelf = toBool(item['messageCache:self'], previous?.messageCache?.self ?? false)
+        const regex = toStringList(item.regex).map(str => {
           const parts = str.split(' ')
           const reg = parts[0]?.replace(/^<|>$/g, '') || ''
           const rep = parts[1]?.replace(/^<|>$/g, '') || ''
           return { reg, rep }
         })
 
-        const previous = prevConfig.find(cfg => cfg.appId === item.appId)
         const proxy = proxyFromInput(item, previous)
 
         return {
-          name: item.name || '',
-          appId: item.appId || '',
-          secret: item.secret || '',
+          name: toStringValue(item.name),
+          appId: toStringValue(item.appId),
+          secret: toStringValue(item.secret),
           proxy,
-          sandbox: !!item.sandbox,
-          qqEnable: !!item.qqEnable,
-          guildEnable: !!item.guildEnable,
+          sandbox,
+          qqEnable,
+          guildEnable,
           guildMode,
           regex,
-          keyboard: { enable: item['keyboard:enable'] !== false },
-          markdown: { enable: item['markdown:enable'] !== false },
+          keyboard: { enable: keyboardEnable },
+          markdown: { enable: markdownEnable },
           messageCache: {
-            enable: !!item['messageCache:enable'],
-            self: !!item['messageCache:self'],
+            enable: messageCacheEnable,
+            self: messageCacheSelf,
           },
           event: { type: eventType },
         }

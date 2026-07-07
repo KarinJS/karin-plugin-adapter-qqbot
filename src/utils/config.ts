@@ -29,23 +29,35 @@ export const bindHandlers = (
 
 /** 配置目录：${karinPathBase}/@karinjs-adapter-qqbot/config */
 const dirConfig = `${karinPathBase}/${pluginDirName}/config`
+const configPath = `${dirConfig}/config.json`
+
+const syncCache = (data: Config): void => {
+  cache = data
+  Object.keys(cacheMap).forEach(key => delete cacheMap[key])
+  data.forEach(v => { cacheMap[v.appId] = v })
+}
 
 /**
  * 读取配置
  */
 export const config = (): Config => {
-  const cfgPath = `${dirConfig}/config.json`
-  if (!fs.existsSync(cfgPath)) {
+  if (!fs.existsSync(configPath)) {
     fs.mkdirSync(dirConfig, { recursive: true })
-    fs.writeFileSync(cfgPath, JSON.stringify([], null, 2))
+    fs.writeFileSync(configPath, JSON.stringify([], null, 2))
   }
   if (cache) return cache
-  const user = requireFileSync<RawConfig>(cfgPath)
+  const user = requireFileSync<RawConfig>(configPath)
   const result = formatConfig(user)
-  cache = result
-  Object.keys(cacheMap).forEach(key => delete cacheMap[key])
-  result.forEach(v => { cacheMap[v.appId] = v })
+  syncCache(result)
   return result
+}
+
+/**
+ * 直接从磁盘读取配置，不使用内存缓存。
+ */
+export const readConfigFile = (): Config => {
+  if (!fs.existsSync(configPath)) return config()
+  return formatConfig(requireFileSync<RawConfig>(configPath))
 }
 
 /**
@@ -58,7 +70,9 @@ export const getConfig = (appid: string) => cacheMap[appid]
  */
 export const writeConfig = (data: Config) => {
   fs.mkdirSync(dirConfig, { recursive: true })
-  fs.writeFileSync(`${dirConfig}/config.json`, JSON.stringify(data, null, 2))
+  const normalized = formatConfig(data)
+  fs.writeFileSync(configPath, JSON.stringify(normalized, null, 2))
+  syncCache(normalized)
 }
 
 /**
@@ -136,9 +150,7 @@ setTimeout(() => {
   watch<RawConfig>(`${dirConfig}/config.json`, (old, now) => {
     const oldConfig = formatConfig(old)
     const nowConfig = formatConfig(now)
-    cache = nowConfig
-    Object.keys(cacheMap).forEach(key => delete cacheMap[key])
-    cache.forEach(v => { cacheMap[v.appId] = v })
+    syncCache(nowConfig)
 
     const diff = common.diffArray(oldConfig, nowConfig)
 
