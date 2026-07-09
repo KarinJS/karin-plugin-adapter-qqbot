@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v2.1.0...adapter-qqbot-v2.2.0) (2026-07-09)
+
+
+### Features
+
+* Refactor QQBot configuration to support proxy settings ([#48](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/48)) ([ddce181](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/ddce18193c7d903be20039c48081cf1de7e6165a))
+
 ## [2.1.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v2.0.0...adapter-qqbot-v2.1.0) (2026-06-30)
 
 
