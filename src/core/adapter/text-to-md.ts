@@ -3,6 +3,12 @@ import { handleUrl, getImageSize } from '@/utils/common'
 import type { ButtonElement, MarkdownElement } from 'node-karin'
 
 const MAX_BUTTONS = 5
+const MARKDOWN_IMAGE_RE = /!\[[^\]]*]\(\s*(<[^>]+>|[^\s)]+)(?:\s+["'][^"']*["'])?\s*\)/g
+
+/** Markdown 图片拆分结果 */
+export type MarkdownImagePart =
+  | { type: 'text'; value: string }
+  | { type: 'image'; source: string }
 
 /**
  * 提取文本中的 URL，将其替换为 `[按钮 N]` 占位文本并返回 button 列表
@@ -45,6 +51,33 @@ export const imagesToMarkdown = async (urls: string[]): Promise<string[]> => {
     const { url, width, height } = await fileToUrl('image', file, 'image.jpg')
     return `![karin #${width}px #${height}px](${url})`
   }))
+}
+
+/**
+ * 将 markdown 文本拆为普通文本片段与图片来源。
+ */
+export const splitMarkdownImages = (markdown: string): MarkdownImagePart[] => {
+  const parts: MarkdownImagePart[] = []
+  let lastIndex = 0
+
+  for (const match of markdown.matchAll(MARKDOWN_IMAGE_RE)) {
+    const index = match.index ?? 0
+    if (index > lastIndex) {
+      const text = markdown.slice(lastIndex, index)
+      if (text) parts.push({ type: 'text', value: text })
+    }
+
+    const source = (match[1] || '').trim().replace(/^<|>$/g, '')
+    if (source) parts.push({ type: 'image', source })
+    lastIndex = index + match[0].length
+  }
+
+  if (lastIndex < markdown.length) {
+    const text = markdown.slice(lastIndex)
+    if (text) parts.push({ type: 'text', value: text })
+  }
+
+  return parts.length ? parts : [{ type: 'text', value: markdown }]
 }
 
 /**

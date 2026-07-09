@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'node-karin/axios'
 import { log } from '@/utils/logger'
+import { normalizeHttpUrl } from '@/utils/proxy-url'
 import { formatOpenAPIError } from '@/core/api/error'
 import { getUserAgent } from '@/utils/user-agent'
 
@@ -30,9 +31,10 @@ export const getAccessToken = async (
   appId: string,
   secret: string
 ): Promise<{ accessToken: string; expiresIn: number }> => {
+  const tokenUrl = normalizeHttpUrl(url)
   let res
   try {
-    res = await axios.post<AccessTokenResponse>(url, {
+    res = await axios.post<AccessTokenResponse>(tokenUrl, {
       appId: String(appId),
       clientSecret: secret,
     }, {
@@ -69,7 +71,7 @@ export const getAccessToken = async (
   // 提前 50s 刷新，避免边界过期
   const delay = Math.max(5_000, expiresIn * 1000 - 50_000)
   state.refreshTimer = setTimeout(() => {
-    getAccessToken(url, appId, secret).catch(() => { /* 错误已记录 */ })
+    getAccessToken(tokenUrl, appId, secret).catch(() => { /* 错误已记录 */ })
   }, delay)
 
   return { accessToken, expiresIn }
@@ -100,7 +102,7 @@ export const createAxiosInstance = (
   appId: string
 ) => {
   const instance = axios.create({
-    baseURL,
+    baseURL: normalizeHttpUrl(baseURL),
     headers: {
       'Content-Type': 'application/json',
       'User-Agent': getUserAgent(),

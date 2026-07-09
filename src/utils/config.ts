@@ -7,7 +7,8 @@ import {
   logger,
 } from 'node-karin'
 import { pluginDirName } from '@/utils/plugin'
-import type { Config, QQBotConfig } from '@/types/config'
+import { normalizeProxyConfig } from '@/utils/proxy-url'
+import type { Config, QQBotConfig, RawConfig } from '@/types/config'
 
 export { pkg, pluginDirName } from '@/utils/plugin'
 
@@ -28,22 +29,35 @@ export const bindHandlers = (
 
 /** 配置目录：${karinPathBase}/@karinjs-adapter-qqbot/config */
 const dirConfig = `${karinPathBase}/${pluginDirName}/config`
+const configPath = `${dirConfig}/config.json`
+
+const syncCache = (data: Config): void => {
+  cache = data
+  Object.keys(cacheMap).forEach(key => delete cacheMap[key])
+  data.forEach(v => { cacheMap[v.appId] = v })
+}
 
 /**
  * 读取配置
  */
 export const config = (): Config => {
-  const cfgPath = `${dirConfig}/config.json`
-  if (!fs.existsSync(cfgPath)) {
+  if (!fs.existsSync(configPath)) {
     fs.mkdirSync(dirConfig, { recursive: true })
-    fs.writeFileSync(cfgPath, JSON.stringify([], null, 2))
+    fs.writeFileSync(configPath, JSON.stringify([], null, 2))
   }
   if (cache) return cache
-  const user = requireFileSync<Config>(cfgPath)
+  const user = requireFileSync<RawConfig>(configPath)
   const result = formatConfig(user)
-  cache = result
-  result.forEach(v => { cacheMap[v.appId] = v })
+  syncCache(result)
   return result
+}
+
+/**
+ * 直接从磁盘读取配置，不使用内存缓存。
+ */
+export const readConfigFile = (): Config => {
+  if (!fs.existsSync(configPath)) return config()
+  return formatConfig(requireFileSync<RawConfig>(configPath))
 }
 
 /**
@@ -56,21 +70,48 @@ export const getConfig = (appid: string) => cacheMap[appid]
  */
 export const writeConfig = (data: Config) => {
   fs.mkdirSync(dirConfig, { recursive: true })
-  fs.writeFileSync(`${dirConfig}/config.json`, JSON.stringify(data, null, 2))
+  const normalized = formatConfig(data)
+  fs.writeFileSync(configPath, JSON.stringify(normalized, null, 2))
+  syncCache(normalized)
 }
 
 /**
  * 用默认值补齐用户配置
  */
-export const formatConfig = (user: Config): Config => {
+export const formatConfig = (user: RawConfig): Config => {
   const def = getDefaultConfig()[0]
-  return user.map(item => ({
-    ...def,
-    ...item,
-    keyboard: { ...def.keyboard, ...item.keyboard },
-    messageCache: { ...def.messageCache, ...item.messageCache },
-    event: { ...def.event, ...item.event },
-  }))
+  return user.map(item => {
+    const {
+      prodApi,
+      sandboxApi,
+      tokenApi,
+      wsUrl,
+      proxy,
+      keyboard,
+      markdown,
+      messageCache,
+      event,
+      ...rest
+    } = item
+
+    return {
+      ...def,
+      ...rest,
+      proxy: normalizeProxyConfig({
+        ...def.proxy,
+        ...proxy,
+        prodApi: proxy?.prodApi || prodApi || def.proxy.prodApi,
+        sandboxApi: proxy?.sandboxApi || sandboxApi || def.proxy.sandboxApi,
+        tokenApi: proxy?.tokenApi || tokenApi || def.proxy.tokenApi,
+        prodWs: proxy?.prodWs || proxy?.wsUrl || wsUrl || def.proxy.prodWs,
+        sandboxWs: proxy?.sandboxWs || proxy?.wsUrl || wsUrl || def.proxy.sandboxWs,
+      }),
+      keyboard: { ...def.keyboard, ...keyboard },
+      markdown: { ...def.markdown, ...markdown },
+      messageCache: { ...def.messageCache, ...messageCache },
+      event: { ...def.event, ...event },
+    }
+  })
 }
 
 /**
@@ -81,9 +122,13 @@ export const getDefaultConfig = (): Config => [
     name: '',
     appId: '',
     secret: '',
-    prodApi: 'https://api.sgroup.qq.com',
-    sandboxApi: 'https://sandbox.api.sgroup.qq.com',
-    tokenApi: 'https://bots.qq.com/app/getAppAccessToken',
+    proxy: {
+      prodApi: 'https://api.sgroup.qq.com',
+      sandboxApi: 'https://sandbox.api.sgroup.qq.com',
+      tokenApi: 'https://bots.qq.com/app/getAppAccessToken',
+      prodWs: 'wss://api.sgroup.qq.com/websocket/',
+      sandboxWs: 'wss://sandbox.api.sgroup.qq.com/websocket/',
+    },
     sandbox: false,
     qqEnable: true,
     guildEnable: true,
@@ -92,6 +137,7 @@ export const getDefaultConfig = (): Config => [
       { reg: '^/', rep: '#' },
     ],
     keyboard: { enable: true },
+    markdown: { enable: true },
     messageCache: { enable: false, self: false },
     event: { type: 2 },
   },
@@ -101,17 +147,18 @@ export const getDefaultConfig = (): Config => [
  * 监听配置文件，比较前后差异决定重建 / 销毁 bot
  */
 setTimeout(() => {
-  watch<Config>(`${dirConfig}/config.json`, (old, now) => {
-    cache = formatConfig(now)
-    cache.forEach(v => { cacheMap[v.appId] = v })
+  watch<RawConfig>(`${dirConfig}/config.json`, (old, now) => {
+    const oldConfig = formatConfig(old)
+    const nowConfig = formatConfig(now)
+    syncCache(nowConfig)
 
-    const diff = common.diffArray(old, now)
+    const diff = common.diffArray(oldConfig, nowConfig)
 
     diff.removed.forEach(v => _destroyBot?.(v.appId))
 
     if (diff.added.length > 0) {
       const ids = new Set(diff.added.map(v => v.appId))
-      cache.forEach(v => {
+      nowConfig.forEach(v => {
         if (!ids.has(v.appId)) return
         if (v.event.type === 0) return
         _createBot?.(v)
@@ -119,7 +166,7 @@ setTimeout(() => {
     }
 
     diff.common.forEach(curr => {
-      const prev = old.find(c => c.appId === curr.appId)
+      const prev = oldConfig.find(c => c.appId === curr.appId)
       if (!prev) return
       if (JSON.stringify(prev) === JSON.stringify(curr)) return
       logger.info(`[QQ Official Bot][配置监听] 配置已变更: ${curr.appId}，重新初始化`)

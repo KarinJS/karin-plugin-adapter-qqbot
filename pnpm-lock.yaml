@@ -43,14 +43,14 @@ importers:
         specifier: ^0.13.0
         version: 0.13.0(eslint@9.39.4)(typescript@6.0.3)
       node-karin:
-        specifier: ^1.15.5
-        version: 1.15.5
+        specifier: 1.16.3
+        version: 1.16.3
       tsdown:
         specifier: ^0.22.3
-        version: 0.22.3(tsx@4.22.4)(typescript@6.0.3)
+        version: 0.22.3(tsx@4.23.0)(typescript@6.0.3)
       tsx:
-        specifier: ^4.22.4
-        version: 4.22.4
+        specifier: ^4.23.0
+        version: 4.23.0
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -323,6 +323,10 @@ packages:
 
   '@karinjs/axios@1.13.2':
     resolution: {integrity: sha512-0nZq8H5cLorUw5X7uob/EOHnVcWot1ay3rZkh6PgvuZG2VccLKGCeCzoLtb1YJmWErh1BYJpnr1BDAoepkCEOA==}
+    engines: {node: '>=18'}
+
+  '@karinjs/dotenv@1.1.2':
+    resolution: {integrity: sha512-F1YCmSWxh3hvunVkxKco+4dsEL/DHqwuWVesB4M0fDh/sa/jhhQ6YrD3V03j0oTH9+jtszehTFEetcvjr8IH1g==}
     engines: {node: '>=18'}
 
   '@karinjs/express@1.0.3':
@@ -1412,8 +1416,8 @@ packages:
     resolution: {integrity: sha512-pyFS63ptit/P5WqUkt+UUfe+4oevH+bFeIiPPdfb0pFeYEu/1ELnJu5l+5EcTKYL5M7zaAa7S8ddywgXypqKCw==}
     engines: {node: '>= 0.4'}
 
-  node-karin@1.15.5:
-    resolution: {integrity: sha512-uTIvtBezdCfVwpt1GRoBNlC+PZi6p8mqMyFR+Ge/Tt4DC+h69toICq0kYbFqoqBoNLOkj1XmNqhUqJaeve2NmA==}
+  node-karin@1.16.3:
+    resolution: {integrity: sha512-hRJChCbHG+d8sjCYdvoNHA7J3eq46GrVT8FPCewwH6gOfqKlPY2jD7VlQE9f9vvn88QWkdbnLhfvi5ZCWrVzeA==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -1795,8 +1799,8 @@ packages:
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
-  tsx@4.22.4:
-    resolution: {integrity: sha512-X8EX+XV4QR5xCsrgxaED954zTDfY8KqlDtskKEL0cHhyS/P8b4IFOvGDQpsC9Q1XnLq915wEfwwY/zzskCtmhg==}
+  tsx@4.23.0:
+    resolution: {integrity: sha512-eUdUIaCr963q2h5u3+QwvYp0+eqPvn+egeqZUm0hwERCqqx1E3kK5ehbGCvqSE5MQAULr67ww0cA3jKc3YkM1w==}
     engines: {node: '>=18.0.0'}
     hasBin: true
 
@@ -2116,6 +2120,8 @@ snapshots:
   '@karinjs/art-template@1.1.0': {}
 
   '@karinjs/axios@1.13.2': {}
+
+  '@karinjs/dotenv@1.1.2': {}
 
   '@karinjs/express@1.0.3': {}
 
@@ -3224,7 +3230,7 @@ snapshots:
       lodash.isstring: 4.0.1
       lodash.once: 4.1.1
       ms: 2.1.3
-      semver: 7.8.0
+      semver: 7.8.5
 
   jsx-ast-utils@3.3.5:
     dependencies:
@@ -3328,12 +3334,13 @@ snapshots:
       object.entries: 1.1.9
       semver: 6.3.1
 
-  node-karin@1.15.5:
+  node-karin@1.16.3:
     dependencies:
       art-template: '@karinjs/art-template@1.1.0'
       axios: '@karinjs/axios@1.13.2'
       chalk: 5.6.2
       chokidar: 4.0.3
+      dotenv: '@karinjs/dotenv@1.1.2'
       express: '@karinjs/express@1.0.3'
       jsonwebtoken: 9.0.3
       lodash: '@karinjs/lodash@1.1.1'
@@ -3733,7 +3740,7 @@ snapshots:
       picomatch: 4.0.4
       typescript: 6.0.3
 
-  tsdown@0.22.3(tsx@4.22.4)(typescript@6.0.3):
+  tsdown@0.22.3(tsx@4.23.0)(typescript@6.0.3):
     dependencies:
       ansis: 4.3.1
       cac: 7.0.0
@@ -3751,7 +3758,7 @@ snapshots:
       tree-kill: 1.2.2
       unconfig-core: 7.5.0
     optionalDependencies:
-      tsx: 4.22.4
+      tsx: 4.23.0
       typescript: 6.0.3
     transitivePeerDependencies:
       - '@ts-macro/tsc'
@@ -3762,7 +3769,7 @@ snapshots:
   tslib@2.8.1:
     optional: true
 
-  tsx@4.22.4:
+  tsx@4.23.0:
     dependencies:
       esbuild: 0.28.0
     optionalDependencies:
