@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v2.2.0...adapter-qqbot-v2.2.1) (2026-07-10)
+
+
+### Bug Fixes
+
+* ci ([ed85a4e](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/ed85a4e85b1157b0bdd5149de119d133c758aa7d))
+
 ## [2.2.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v2.1.0...adapter-qqbot-v2.2.0) (2026-07-09)
 
 
