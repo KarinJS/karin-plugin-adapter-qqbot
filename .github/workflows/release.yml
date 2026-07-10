@@ -53,9 +53,6 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Upgrade npm
-        run: npm install -g npm@latest
-
       # 使用 npm trusted publishing（OIDC）
       # 需要在 npm 包后台启用：Settings → Trusted publishers
       # provider: GitHub Actions / repo: KarinJS/karin-plugin-adapter-qqbot /
