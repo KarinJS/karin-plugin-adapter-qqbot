@@ -40,6 +40,12 @@ assert(decoded[4].file === 'https://example.com/a.jpg' && decoded[4].width === 1
 assert(decoded[7].name === 'doc.pdf', 'file name roundtrip')
 assert(decoded[8].markdown === '# title', 'markdown roundtrip')
 
+// record magic 变声标记往返
+const magicEnc = encodeElements([{ type: 'record', file: 'https://x/r.mp3', magic: true }])
+const magicDec = decodeElements(magicEnc.json)
+assert(magicDec[0].magic === true, 'magic=true roundtrip')
+assert(decoded[6].magic === false, 'magic=false roundtrip')
+
 // 超长截断
 const long = 'x'.repeat(10000)
 const encLong = encodeElements([{ type: 'text', text: long }])

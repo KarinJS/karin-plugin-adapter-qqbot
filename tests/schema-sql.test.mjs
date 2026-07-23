@@ -24,9 +24,9 @@ const file = join(mkdtempSync(join(tmpdir(), 'qqbot-test-')), 'test.db')
 const db = await new Promise((resolve, reject) => {
   const d = new sqlite3.Database(file, err => err ? reject(err) : resolve(d))
 })
-const run = (sql, params = []) => new Promise((res, rej) => db.run(sql, params, e => e ? rej(new Error(`${e.message}\nSQL: ${sql}`)) : res()))
-const get = (sql, params = []) => new Promise((res, rej) => db.get(sql, params, (e, r) => e ? rej(new Error(`${e.message}\nSQL: ${sql}`)) : res(r)))
-const all = (sql, params = []) => new Promise((res, rej) => db.all(sql, params, (e, r) => e ? rej(new Error(`${e.message}\nSQL: ${sql}`)) : res(r)))
+const run = (sql, params = []) => new Promise((resolve, reject) => db.run(sql, params, e => e ? reject(new Error(`${e.message}\nSQL: ${sql}`)) : resolve()))
+const get = (sql, params = []) => new Promise((resolve, reject) => db.get(sql, params, (e, r) => e ? reject(new Error(`${e.message}\nSQL: ${sql}`)) : resolve(r)))
+const all = (sql, params = []) => new Promise((resolve, reject) => db.all(sql, params, (e, r) => e ? reject(new Error(`${e.message}\nSQL: ${sql}`)) : resolve(r)))
 
 const assert = (cond, msg) => { if (!cond) { console.error('ASSERT FAIL: ' + msg); process.exit(1) } }
 

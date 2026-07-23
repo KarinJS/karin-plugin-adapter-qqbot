@@ -342,14 +342,15 @@ export default defineConfig({
           item['messageCache:level'],
           previous?.messageCache?.level ?? 'standard'
         ) as MessageCacheLevel
-        const messageCacheTtlHours = Number(toStringValue(
-          item['messageCache:ttlHours'],
-          String(previous?.messageCache?.ttlHours ?? 24)
-        ))
-        const messageCacheMaxRows = Number(toStringValue(
-          item['messageCache:maxRows'],
-          String(previous?.messageCache?.maxRows ?? 200000)
-        ))
+        /** 输入被清空时回落上次值/默认值，避免 Number('') = 0 被夹到范围下限。 */
+        const ttlHoursRaw = toStringValue(item['messageCache:ttlHours']).trim()
+        const messageCacheTtlHours = ttlHoursRaw
+          ? Number(ttlHoursRaw)
+          : previous?.messageCache?.ttlHours ?? 24
+        const maxRowsRaw = toStringValue(item['messageCache:maxRows']).trim()
+        const messageCacheMaxRows = maxRowsRaw
+          ? Number(maxRowsRaw)
+          : previous?.messageCache?.maxRows ?? 200000
         const regex = toStringList(item.regex).map(str => {
           const parts = str.split(' ')
           const reg = parts[0]?.replace(/^<|>$/g, '') || ''

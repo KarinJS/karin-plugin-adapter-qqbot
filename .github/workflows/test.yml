@@ -5,12 +5,17 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - name: 检出代码
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: 设置 pnpm
         uses: pnpm/action-setup@v6

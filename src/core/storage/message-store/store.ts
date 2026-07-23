@@ -406,7 +406,12 @@ export class MessageStore {
     await this.transaction(async () => {
       for (const item of batch) {
         if (this.isExpired(item.message)) continue
-        await this.writeItem(item)
+        try {
+          await this.writeItem(item)
+        } catch (err) {
+          /** 单条失败只跳过自身，不让一条毒消息丢掉整批 ID 映射。 */
+          log('warn', `[getMsg] 跳过写入失败的缓存消息: ${item.message.messageId}`, err)
+        }
       }
     })
   }

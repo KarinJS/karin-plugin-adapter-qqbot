@@ -25,8 +25,12 @@ export const MEDIA_LOCALIZE_CONCURRENCY = 4
 /** 媒体本地化待处理队列上限；超过后丢弃最旧任务，原消息仍保留短期 URL。 */
 export const MAX_MEDIA_LOCALIZE_QUEUE = 2000
 
-/** 启动时最多补救的远程媒体消息数。 */
-export const MEDIA_RECOVERY_LIMIT = 500
+/**
+ * 启动时最多补救的远程媒体消息数。
+ * 与 MAX_MEDIA_LOCALIZE_QUEUE 对齐：查询走 has_remote_media 部分索引且不阻塞
+ * 初始化，多查无成本；但超出队列上限的任务会被丢弃，取更大值没有意义。
+ */
+export const MEDIA_RECOVERY_LIMIT = MAX_MEDIA_LOCALIZE_QUEUE
 
 /**
  * 消息主表默认硬上限；实际值由 messageCache.maxRows 配置，多 bot 取最大值。

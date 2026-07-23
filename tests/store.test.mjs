@@ -26,8 +26,8 @@ const assert = (cond, msg) => { if (!cond) { console.error('ASSERT FAIL: ' + msg
 const dbFile = join(sandbox, '@karinjs', '@karinjs-adapter-qqbot', 'data', 'message-cache.db')
 mkdirSync(dirname(dbFile), { recursive: true })
 
-const rawDb = await new Promise((res, rej) => { const d = new sqlite3.Database(dbFile, e => e ? rej(e) : res(d)) })
-const rawRun = (sql, p = []) => new Promise((res, rej) => rawDb.run(sql, p, e => e ? rej(new Error(e.message + '\n' + sql)) : res()))
+const rawDb = await new Promise((resolve, reject) => { const d = new sqlite3.Database(dbFile, e => e ? reject(e) : resolve(d)) })
+const rawRun = (sql, p = []) => new Promise((resolve, reject) => rawDb.run(sql, p, e => e ? reject(new Error(e.message + '\n' + sql)) : resolve()))
 
 await rawRun('CREATE TABLE qqbot_bots (id INTEGER PRIMARY KEY, bot_id TEXT NOT NULL UNIQUE)')
 await rawRun(`CREATE TABLE qqbot_contacts (id INTEGER PRIMARY KEY, bot_ref INTEGER NOT NULL,
@@ -50,7 +50,7 @@ await rawRun(`CREATE TABLE qqbot_message_aliases (bot_ref INTEGER NOT NULL, cont
 await rawRun("INSERT INTO qqbot_bots (bot_id) VALUES ('999')")
 await rawRun("INSERT INTO qqbot_messages VALUES (1, 1, 1, 1, 'OLD_MSG', 0, 123)")
 await rawRun('PRAGMA user_version = 1')
-await new Promise(res => rawDb.close(res))
+await new Promise(resolve => rawDb.close(resolve))
 
 // ---------- 2. 实例化真实 MessageStore ----------
 const src = name => pathToFileURL(join(repo, 'src', name)).href
@@ -79,9 +79,9 @@ await store.save(bot, {
 await store.saveReferenceIfAbsent(bot, msg('REFIDX_ctx_1', now - 2000, [text('被引用的旧消息')]))
 
 // ---------- 3. 迁移结果断言 ----------
-const chk = await new Promise((res, rej) => { const d = new sqlite3.Database(dbFile, e => e ? rej(e) : res(d)) })
-const chkGet = (sql, p = []) => new Promise((res, rej) => chk.get(sql, p, (e, r) => e ? rej(e) : res(r)))
-const chkAll = (sql, p = []) => new Promise((res, rej) => chk.all(sql, p, (e, r) => e ? rej(e) : res(r)))
+const chk = await new Promise((resolve, reject) => { const d = new sqlite3.Database(dbFile, e => e ? reject(e) : resolve(d)) })
+const chkGet = (sql, p = []) => new Promise((resolve, reject) => chk.get(sql, p, (e, r) => e ? reject(e) : resolve(r)))
+const chkAll = (sql, p = []) => new Promise((resolve, reject) => chk.all(sql, p, (e, r) => e ? reject(e) : resolve(r)))
 
 // get() 会排空写队列，顺带保证上面的写都已落库
 const got1 = await store.get(bot, 'ROBOT1.0_recv_1')

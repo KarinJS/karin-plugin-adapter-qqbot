@@ -22,6 +22,8 @@ interface StoredElement {
   h?: number
   /** 文件名。 */
   n?: string
+  /** 语音是否变声（magic），1 表示 true；缺省为 false。 */
+  g?: number
 }
 
 /** 编码结果：JSON 串 + 从消息段提取出的可索引字段。 */
@@ -127,7 +129,11 @@ const encodeElement = (element: ElementTypes): StoredElement | null => {
     case 'video':
       return { c: 'v', v: toStoredFilePath(element.file) }
     case 'record':
-      return { c: 's', v: toStoredFilePath(element.file) }
+      return {
+        c: 's',
+        v: toStoredFilePath(element.file),
+        ...(element.magic ? { g: 1 } : {}),
+      }
     case 'file':
       return {
         c: 'd',
@@ -164,7 +170,7 @@ const decodeElement = (item: StoredElement): ElementTypes[] => {
     case 's': return [{
       type: 'record',
       file: fromStoredFilePath(stringValue(item.v)),
-      magic: false,
+      magic: item.g === 1,
     }]
     case 'd': return [{
       type: 'file',
