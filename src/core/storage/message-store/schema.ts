@@ -1,121 +1,108 @@
 import type { RunSql } from './types'
 
-const LEGACY_DETAIL_TABLES = [
+/** 开发阶段和 v1 版本遗留的全部缓存表；v2 迁移时统一删除重建。 */
+const LEGACY_TABLES = [
+  'qqbot_message_aliases',
   'qqbot_element_text',
   'qqbot_element_at',
   'qqbot_element_reply',
   'qqbot_element_face',
   'qqbot_element_media',
   'qqbot_element_markdown',
+  'qqbot_message_elements',
+  'qqbot_messages',
+  'qqbot_senders',
+  'qqbot_contacts',
+  'qqbot_bots',
+  'qqbot_message_alias',
+  'qqbot_message_cache',
 ] as const
 
 /**
- * 判断当前数据库是否已经是 v1 首发基线结构。
+ * 删除所有旧版缓存表。
  *
- * @param tableColumns 读取指定表字段名的函数。
- * @param tableExists 判断指定表是否存在的函数。
- * @returns true 表示当前表结构可直接使用；false 表示需要重建缓存表。
- */
-export const isCurrentSchema = async (
-  tableColumns: (name: string) => Promise<string[]>,
-  tableExists: (name: string) => Promise<boolean>
-): Promise<boolean> => {
-  const columns = await tableColumns('qqbot_messages')
-  if (!columns.includes('contact_ref')) return false
-  if (columns.includes('expires_at')) return false
-  const elementColumns = await tableColumns('qqbot_message_elements')
-  if (!elementColumns.includes('value')) return false
-  if (!(await tableExists('qqbot_bots'))) return false
-  if (!(await tableExists('qqbot_contacts'))) return false
-  if (!(await tableExists('qqbot_senders'))) return false
-  if (!(await tableExists('qqbot_message_elements'))) return false
-  if (!(await tableExists('qqbot_message_aliases'))) return false
-  return true
-}
-
-/**
- * 删除所有开发阶段旧缓存表。
+ * 消息缓存只有一天 TTL，跨大版本不迁移数据，直接重建。
  *
  * @param run SQL 执行函数。
  */
-export const dropSchema = async (run: RunSql): Promise<void> => {
-  await run('DROP TABLE IF EXISTS qqbot_message_aliases')
-  for (const table of LEGACY_DETAIL_TABLES) {
+export const dropLegacySchema = async (run: RunSql): Promise<void> => {
+  for (const table of LEGACY_TABLES) {
     await run(`DROP TABLE IF EXISTS ${table}`)
   }
-  await run('DROP TABLE IF EXISTS qqbot_message_elements')
-  await run('DROP TABLE IF EXISTS qqbot_messages')
-  await run('DROP TABLE IF EXISTS qqbot_senders')
-  await run('DROP TABLE IF EXISTS qqbot_contacts')
-  await run('DROP TABLE IF EXISTS qqbot_bots')
-  await run('DROP TABLE IF EXISTS qqbot_message_alias')
-  await run('DROP TABLE IF EXISTS qqbot_message_cache')
 }
 
 /**
- * 创建 v1 首发基线表结构。
+ * 创建 v2 表结构。
+ *
+ * 设计要点（相对 v1 的 6 表规范化）：
+ * - 一条消息一行：消息段收进单个 JSON 列，消灭消息段表的行开销、
+ *   delete+reinsert 双写和读取时的 N+1 查询；
+ * - alias 表取消：实践中一条消息最多只有一个 `msg_idx` 引用索引，
+ *   直接作为 `ref_idx` 列存储；
+ * - 长 ID 不建 TEXT 索引：`msg_id`/`ref_idx` 原文只存一份，索引建在
+ *   53 位整数 hash 列上，命中后比对原文防碰撞；
+ * - 不声明外键：无级联删除扫描；senders 由清理任务定期 GC；
+ * - 不为 `time` 单独建索引：清理是每 10 分钟一次的后台全表扫描，
+ *   省下的索引空间比扫描成本更值。
  *
  * @param run SQL 执行函数。
  */
 export const createSchema = async (run: RunSql): Promise<void> => {
-  await run(`CREATE TABLE qqbot_bots (
-    id INTEGER PRIMARY KEY,
-    bot_id TEXT NOT NULL UNIQUE
-  )`)
   await run(`CREATE TABLE qqbot_contacts (
     id INTEGER PRIMARY KEY,
-    bot_ref INTEGER NOT NULL,
+    bot_id TEXT NOT NULL,
     scene TEXT NOT NULL,
     peer TEXT NOT NULL,
     sub_peer TEXT NOT NULL DEFAULT '',
     name TEXT NOT NULL DEFAULT '',
     sub_name TEXT NOT NULL DEFAULT '',
-    UNIQUE(bot_ref, scene, peer, sub_peer),
-    FOREIGN KEY (bot_ref) REFERENCES qqbot_bots(id) ON DELETE CASCADE
+    UNIQUE(bot_id, scene, peer, sub_peer)
   )`)
   await run(`CREATE TABLE qqbot_senders (
     id INTEGER PRIMARY KEY,
-    bot_ref INTEGER NOT NULL,
+    bot_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     nick TEXT NOT NULL DEFAULT '',
     name TEXT NOT NULL DEFAULT '',
     role TEXT NOT NULL DEFAULT 'member',
-    UNIQUE(bot_ref, user_id, nick, name, role),
-    FOREIGN KEY (bot_ref) REFERENCES qqbot_bots(id) ON DELETE CASCADE
+    UNIQUE(bot_id, user_id, nick, name, role)
   )`)
   await run(`CREATE TABLE qqbot_messages (
     id INTEGER PRIMARY KEY,
-    bot_ref INTEGER NOT NULL,
     contact_ref INTEGER NOT NULL,
     sender_ref INTEGER NOT NULL,
-    message_id TEXT NOT NULL,
-    message_seq INTEGER NOT NULL DEFAULT 0,
+    msg_id TEXT NOT NULL,
+    msg_id_hash INTEGER NOT NULL,
+    ref_idx TEXT,
+    ref_idx_hash INTEGER,
+    reply_to TEXT,
     time INTEGER NOT NULL,
-    UNIQUE(bot_ref, contact_ref, message_id),
-    FOREIGN KEY (bot_ref) REFERENCES qqbot_bots(id) ON DELETE CASCADE,
-    FOREIGN KEY (contact_ref) REFERENCES qqbot_contacts(id) ON DELETE CASCADE,
-    FOREIGN KEY (sender_ref) REFERENCES qqbot_senders(id) ON DELETE RESTRICT
+    is_self INTEGER NOT NULL DEFAULT 0,
+    is_ref_context INTEGER NOT NULL DEFAULT 0,
+    has_remote_media INTEGER NOT NULL DEFAULT 0,
+    elements TEXT NOT NULL
   )`)
-  await run(`CREATE TABLE qqbot_message_elements (
-    message_ref INTEGER NOT NULL,
-    element_index INTEGER NOT NULL,
-    element_type TEXT NOT NULL,
-    value TEXT NOT NULL,
-    PRIMARY KEY (message_ref, element_index),
-    FOREIGN KEY (message_ref) REFERENCES qqbot_messages(id) ON DELETE CASCADE
-  ) WITHOUT ROWID`)
-  await run(`CREATE TABLE qqbot_message_aliases (
-    bot_ref INTEGER NOT NULL,
-    contact_ref INTEGER NOT NULL,
-    alias_message_id TEXT NOT NULL,
-    message_ref INTEGER NOT NULL,
-    PRIMARY KEY (bot_ref, contact_ref, alias_message_id),
-    FOREIGN KEY (bot_ref) REFERENCES qqbot_bots(id) ON DELETE CASCADE,
-    FOREIGN KEY (contact_ref) REFERENCES qqbot_contacts(id) ON DELETE CASCADE,
-    FOREIGN KEY (message_ref) REFERENCES qqbot_messages(id) ON DELETE CASCADE
-  ) WITHOUT ROWID`)
-  await run('CREATE INDEX idx_qqbot_contacts_lookup ON qqbot_contacts(bot_ref, scene, peer, sub_peer)')
-  await run('CREATE INDEX idx_qqbot_messages_lookup ON qqbot_messages(bot_ref, message_id)')
-  await run('CREATE INDEX idx_qqbot_messages_time ON qqbot_messages(time)')
-  await run('CREATE INDEX idx_qqbot_message_aliases_id ON qqbot_message_aliases(bot_ref, alias_message_id)')
+  await run('CREATE INDEX idx_qqbot_messages_msg_hash ON qqbot_messages(msg_id_hash)')
+  await run(`CREATE INDEX idx_qqbot_messages_ref_hash ON qqbot_messages(ref_idx_hash)
+    WHERE ref_idx_hash IS NOT NULL`)
+  await run('CREATE INDEX idx_qqbot_messages_history ON qqbot_messages(contact_ref, time)')
+  await run(`CREATE INDEX idx_qqbot_messages_remote ON qqbot_messages(has_remote_media)
+    WHERE has_remote_media = 1`)
+}
+
+/**
+ * 创建 v3 file_info 上传缓存表。
+ *
+ * QQ 上传接口返回的 file_info 有明确 ttl（可达数天）；持久化后进程重启
+ * 不再需要把同一份媒体重新上传。行数少（上限 2000），TEXT 主键即可。
+ *
+ * @param run SQL 执行函数。
+ */
+export const createUploadCacheSchema = async (run: RunSql): Promise<void> => {
+  await run(`CREATE TABLE IF NOT EXISTS qqbot_upload_cache (
+    cache_key TEXT PRIMARY KEY,
+    response TEXT NOT NULL,
+    expires_at INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  )`)
 }

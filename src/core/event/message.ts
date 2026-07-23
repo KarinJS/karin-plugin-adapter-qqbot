@@ -4,7 +4,6 @@ import {
   createGroupMessage, createFriendMessage,
   createGuildMessage, createDirectMessage,
 } from 'node-karin'
-import { rememberApiMessageId } from '@/core/adapter/message-id-map'
 import { log } from '@/utils/logger'
 import type { AdapterQQBot } from '@/core/adapter/base'
 import type {
@@ -33,22 +32,28 @@ interface CacheMessagePayload {
 }
 
 /**
- * 写入 getMsg 热缓存并投递 SQLite 后台队列。
+ * 把消息投递 SQLite 后台写入队列。
  *
  * 不等待数据库落库，避免缓存特性拖慢 Karin 消息事件下发。
  *
+ * 关闭消息缓存时仍按 minimal 级落库最小 ID 映射行（msg_id/ref_idx）——
+ * 撤回和引用解析没有任何内存映射，完全依赖数据库。
+ *
  * @param client 当前 QQBot 适配器实例。
  * @param message 需要缓存的消息快照。
- * @param aliases 可用于查询同一消息的 QQ 侧索引，例如 msg_idx。
+ * @param refIdx QQ `msg_idx` 引用索引，作为该消息的第二查询索引。
  */
 const cacheMessage = (
   client: AdapterQQBot,
   message: CacheMessagePayload,
-  aliases: string[] = []
+  refIdx?: string
 ) => {
-  if (!client.cfg.messageCache.enable) return
+  const { enable, level } = client.cfg.messageCache
   client.messageStore
-    .save(String(client.cfg.appId), { ...message, messageSeq: 0 }, aliases)
+    .save(String(client.cfg.appId), { ...message, messageSeq: 0 }, {
+      refIdx,
+      level: enable ? level : 'minimal',
+    })
     .catch(err => log('warn', `[getMsg] 写入消息缓存失败: ${message.messageId}`, err))
 }
 
@@ -66,7 +71,11 @@ const cacheReference = (
 ) => {
   if (!client.cfg.messageCache.enable) return
   client.messageStore
-    .saveReferenceIfAbsent(String(client.cfg.appId), { ...message, messageSeq: 0 })
+    .saveReferenceIfAbsent(
+      String(client.cfg.appId),
+      { ...message, messageSeq: 0 },
+      client.cfg.messageCache.level
+    )
     .catch(err => log('warn', `[getMsg] 写入引用上下文失败: ${message.messageId}`, err))
 }
 
@@ -114,7 +123,6 @@ export const onGroupMsg = (client: AdapterQQBot, ev: GroupMsgEvent, opts: GroupO
   const referenceIndex = getMessageSceneIndex(ev.d.message_scene, 'ref_msg_idx')
   // Karin 侧 messageId 保持 QQ 官方唯一 ID；msg_idx/REFIDX 只作为引用索引和查询 alias。
   const karinMessageId = ev.d.id
-  if (messageIndex) rememberApiMessageId(client, contact, messageIndex, ev.d.id)
 
   if (referenceIndex) elements.unshift(segment.reply(referenceIndex))
 
@@ -125,7 +133,7 @@ export const onGroupMsg = (client: AdapterQQBot, ev: GroupMsgEvent, opts: GroupO
     contact,
     sender,
     elements,
-  }, [ev.d.id, messageIndex].filter((id): id is string => !!id && id !== karinMessageId && id !== referenceIndex))
+  }, messageIndex && messageIndex !== referenceIndex ? messageIndex : undefined)
 
   const reference = ev.d.msg_elements?.find(item => item.msg_idx === referenceIndex)
   if (reference && referenceIndex) {
@@ -172,7 +180,6 @@ export const onFriendMsg = (client: AdapterQQBot, ev: C2CMsgEvent) => {
   const referenceIndex = getMessageSceneIndex(ev.d.message_scene, 'ref_msg_idx')
   // Karin 侧 messageId 保持 QQ 官方唯一 ID；msg_idx/REFIDX 只作为引用索引和查询 alias。
   const karinMessageId = ev.d.id
-  if (messageIndex) rememberApiMessageId(client, contact, messageIndex, ev.d.id)
 
   if (referenceIndex) elements.unshift(segment.reply(referenceIndex))
 
@@ -183,7 +190,7 @@ export const onFriendMsg = (client: AdapterQQBot, ev: C2CMsgEvent) => {
     contact,
     sender,
     elements,
-  }, [ev.d.id, messageIndex].filter((id): id is string => !!id && id !== karinMessageId && id !== referenceIndex))
+  }, messageIndex && messageIndex !== referenceIndex ? messageIndex : undefined)
 
   const reference = ev.d.msg_elements?.find(item => item.msg_idx === referenceIndex)
   if (reference && referenceIndex) {

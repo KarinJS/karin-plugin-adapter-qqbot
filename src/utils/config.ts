@@ -8,7 +8,7 @@ import {
 } from 'node-karin'
 import { pluginDirName } from '@/utils/plugin'
 import { normalizeProxyConfig } from '@/utils/proxy-url'
-import type { Config, QQBotConfig, RawConfig } from '@/types/config'
+import type { Config, MessageCacheLevel, QQBotConfig, RawConfig } from '@/types/config'
 
 export { pkg, pluginDirName } from '@/utils/plugin'
 
@@ -108,10 +108,48 @@ export const formatConfig = (user: RawConfig): Config => {
       }),
       keyboard: { ...def.keyboard, ...keyboard },
       markdown: { ...def.markdown, ...markdown },
-      messageCache: { ...def.messageCache, ...messageCache },
+      messageCache: normalizeMessageCache(def.messageCache, messageCache),
       event: { ...def.event, ...event },
     }
   })
+}
+
+const MESSAGE_CACHE_LEVELS: MessageCacheLevel[] = ['minimal', 'standard', 'full']
+
+/**
+ * 规范化消息缓存配置，非法枚举与越界数值回落默认值。
+ *
+ * @param def 默认消息缓存配置。
+ * @param user 用户消息缓存配置。
+ * @returns 补齐并夹取后的消息缓存配置。
+ */
+const normalizeMessageCache = (
+  def: QQBotConfig['messageCache'],
+  user?: Partial<QQBotConfig['messageCache']>
+): QQBotConfig['messageCache'] => {
+  const merged = { ...def, ...user }
+  return {
+    enable: !!merged.enable,
+    self: !!merged.self,
+    level: MESSAGE_CACHE_LEVELS.includes(merged.level) ? merged.level : def.level,
+    ttlHours: clampNumber(merged.ttlHours, 1, 720, def.ttlHours),
+    maxRows: clampNumber(merged.maxRows, 1000, 5_000_000, def.maxRows),
+  }
+}
+
+/**
+ * 将数值夹取到闭区间；非法值返回 fallback。
+ *
+ * @param value 用户输入值。
+ * @param min 最小值。
+ * @param max 最大值。
+ * @param fallback 非法时使用的默认值。
+ * @returns 合法数值。
+ */
+const clampNumber = (value: unknown, min: number, max: number, fallback: number): number => {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return fallback
+  return Math.min(Math.max(Math.trunc(num), min), max)
 }
 
 /**
@@ -138,7 +176,7 @@ export const getDefaultConfig = (): Config => [
     ],
     keyboard: { enable: true },
     markdown: { enable: true },
-    messageCache: { enable: false, self: false },
+    messageCache: { enable: false, self: false, level: 'standard', ttlHours: 24, maxRows: 200_000 },
     event: { type: 2 },
   },
 ]

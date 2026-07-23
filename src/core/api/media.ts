@@ -571,13 +571,13 @@ export class MediaApi extends Http {
     const hashes = !srvSendMsg ? await computeUploadHashes(fallbackSource) : undefined
 
     if (hashes) {
-      const cached = getCachedUpload(scene, peer, type, hashes.md5)
+      const cached = await getCachedUpload(scene, peer, type, hashes.md5)
       if (cached) return cached
     }
 
     if (!srvSendMsg && fallbackSource.size >= LARGE_UPLOAD_THRESHOLD) {
       const response = await this.uploadChunked(scene, peer, type, fallbackSource, hashes)
-      if (hashes) setCachedUpload(scene, peer, type, hashes.md5, response)
+      if (hashes) await setCachedUpload(scene, peer, type, hashes.md5, response)
       return response
     }
 
@@ -589,7 +589,7 @@ export class MediaApi extends Http {
     if (type === 'file') body.file_name = fallbackSource.fileName
 
     const response = await this.post<UploadMediaResponse>(`/v2/${scene}s/${peer}/files`, body, undefined, MEDIA_UPLOAD_TIMEOUT)
-    if (hashes) setCachedUpload(scene, peer, type, hashes.md5, response)
+    if (hashes) await setCachedUpload(scene, peer, type, hashes.md5, response)
     return response
   }
 

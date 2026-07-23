@@ -1,35 +1,40 @@
 import { mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import sqlite3, { type Database } from 'node-karin/sqlite3'
+import sqlite3, { type Database, type Statement } from 'node-karin/sqlite3'
 import { karinPathBase } from 'node-karin'
+import { config as readConfig } from '@/utils/config'
 import { log } from '@/utils/logger'
+import { decodeElements, encodeElements, filterElementsByLevel } from './codec'
 import {
-  CLEANUP_INTERVAL, DATABASE_VERSION, FLUSH_BATCH_SIZE, FLUSH_INTERVAL,
-  MAX_MEDIA_LOCALIZE_QUEUE, MAX_WRITE_QUEUE, MEDIA_LOCALIZE_CONCURRENCY,
-  MEDIA_LOCALIZE_INTERVAL, MEDIA_RECOVERY_LIMIT, MESSAGE_TTL,
+  DATABASE_VERSION, FLUSH_BATCH_SIZE, FLUSH_INTERVAL, MAX_MEDIA_LOCALIZE_QUEUE,
+  MAX_MESSAGE_ROWS, MAX_WRITE_QUEUE, MEDIA_LOCALIZE_CONCURRENCY,
+  MEDIA_LOCALIZE_INTERVAL, MEDIA_RECOVERY_LIMIT, MESSAGE_TTL, UPLOAD_CACHE_MAX_ROWS,
 } from './constants'
-import { loadElements, replyElementValue, saveElement } from './elements'
+import { hashId } from './hash'
 import { cleanupMessageMediaCache, hasRemoteFileElement, localizeFileElements } from './media'
 import { migrations } from './migrations'
 import { SQL } from './sql'
 import type { Contact, GroupSender, MessageResponse, Sender } from 'node-karin'
-import type { CachedMessage, IdRow, MessageAliasRow, MessageRow } from './types'
+import type { CachedMessage, CountRow, IdRow, MessageRow, SaveOptions, UploadCacheRow } from './types'
 
 interface PendingWrite {
   botId: string
   message: CachedMessage
-  aliases: string[]
+  /** QQ `msg_idx` 引用索引；无或与 messageId 相同则为 undefined。 */
+  refIdx?: string
+  /** 是否是机器人自己发送的消息。 */
+  isSelf: boolean
+  /** 引用上下文写入：数据库已有该 ID（原文或引用索引）时跳过。 */
   referenceOnly: boolean
 }
 
 /** 待本地化的媒体缓存任务。 */
 interface PendingMediaLocalize {
-  /** 当前 QQBot appId。 */
   botId: string
   /** 包含远程媒体 URL 的消息快照。 */
   message: CachedMessage
-  /** 这条消息的额外查询 alias，成功本地化后需要一并回写。 */
-  aliases: string[]
+  refIdx?: string
+  isSelf: boolean
   /** 会话级去重 key，避免同一消息重复排队下载。 */
   key: string
 }
@@ -37,40 +42,44 @@ interface PendingMediaLocalize {
 /**
  * QQBot 收到的消息缓存。
  *
- * 热路径只写内存并入队，不等待 SQLite：
- * - `getMsg` 优先查内存，插件在同一事件回调内可立即命中；
- * - SQLite 在后台按批次事务落库，避免一条消息一个事务拖慢事件分发；
- * - 元素表只保存 `type + value`，避免宽表 NULL 和多详情表多次 INSERT。
+ * SQLite 是唯一数据层，没有内存镜像：
+ * - 写入热路径只入队，后台按批次事务落库，每条消息稳定 2~3 次语句
+ *   往返（prepared statement 复用）；
+ * - 所有读取直接查 SQLite（WAL + 整数 hash 索引，点查亚毫秒级）；
+ *   读取前先排空待写队列，保证"读到自己刚写的数据"。
  */
 export class MessageStore {
   private db?: Database
   private readonly ready: Promise<void>
-  private lastCleanup = 0
   private shouldVacuum = false
   private flushTimer?: NodeJS.Timeout
-  private flushing = false
+  private flushActive?: Promise<void>
   private mediaTimer?: NodeJS.Timeout
   private mediaActive = 0
 
-  private readonly pending: PendingWrite[] = []
-  private readonly pendingMedia: PendingMediaLocalize[] = []
+  private pending: PendingWrite[] = []
+  private pendingMedia: PendingMediaLocalize[] = []
   private readonly pendingMediaKeys = new Set<string>()
-  private readonly memory = new Map<string, CachedMessage>()
-  private readonly directIndex = new Map<string, string>()
-  private readonly aliasIndex = new Map<string, string>()
-  private readonly scopedAliasIndex = new Map<string, string>()
-  private readonly botRefCache = new Map<string, number>()
+  private readonly statements = new Map<string, Statement>()
   private readonly contactRefCache = new Map<string, number>()
   private readonly senderRefCache = new Map<string, number>()
 
+  /** 当前生效的缓存保留时长；由配置解析，多 bot 取最大值。 */
+  private ttlMs = MESSAGE_TTL
+  /** 当前生效的消息行数硬上限；由配置解析，多 bot 取最大值。 */
+  private maxRows = MAX_MESSAGE_ROWS
+
   constructor () {
     this.ready = this.initialize()
+    this.ready
+      .then(() => this.recoverRemoteMedia())
+      .catch(err => log('error', '[getMsg] 消息缓存数据库初始化失败', err))
   }
 
   /**
    * 立即执行一次过期消息和本地媒体缓存清理。
    *
-   * 该方法交给 Karin `task` 调度调用；类内部只保留清理能力，不自行维护常驻定时器。
+   * 该方法交给 Karin `task` 调度调用；读写路径不再内嵌清理，避免尾延迟。
    *
    * @returns 清理完成 Promise。
    */
@@ -80,41 +89,53 @@ export class MessageStore {
   }
 
   /**
-   * 保存实际消息，并为 QQ 的 `msg_idx` 等引用索引建立轻量映射。
+   * 保存实际消息。
    *
-   * 该方法只同步写入内存并投递后台队列，不等待 SQLite。这样消息事件创建不会被
+   * 只克隆快照并投递后台队列，不等待 SQLite，消息事件创建不会被
    * 数据库写锁或小事务阻塞。
    *
    * @param botId 当前 QQBot appId。
    * @param message 已转换为 Karin elements 的消息缓存。
-   * @param aliases 可查询到该消息的额外消息索引，例如 QQ `msg_idx`。
+   * @param options 引用索引与自己消息标记。
    */
-  async save (botId: string, message: CachedMessage, aliases: string[] = []): Promise<void> {
+  async save (botId: string, message: CachedMessage, options: SaveOptions = {}): Promise<void> {
     if (!message.messageId) return
-    this.cleanupMemoryIfDue()
+    if (this.isExpired(message)) return
 
-    const cached = this.cloneMessage(message)
-    this.putMemory(botId, cached, aliases)
-    this.enqueue({ botId, message: cached, aliases, referenceOnly: false })
-    this.enqueueMediaLocalize(botId, cached, aliases)
+    const cached = this.cloneMessage({
+      ...message,
+      elements: filterElementsByLevel(message.elements, options.level),
+    })
+    const refIdx = options.refIdx && options.refIdx !== message.messageId ? options.refIdx : undefined
+    const isSelf = !!options.isSelf
+    this.enqueue({ botId, message: cached, refIdx, isSelf, referenceOnly: false })
+    this.enqueueMediaLocalize(botId, cached, refIdx, isSelf)
   }
 
   /**
-   * 仅当内存中没有该引用索引时保存 QQ 下发的引用上下文。
-   * 数据库是否已存在由后台 flush 再判断，避免阻塞事件热路径。
+   * 保存 QQ 下发的引用上下文。
+   *
+   * 是否已有同 ID 缓存（原消息或引用索引）由后台 flush 在事务内判断并去重，
+   * 避免阻塞事件热路径。
    *
    * @param botId 当前 QQBot appId。
    * @param message 以 `ref_msg_idx` 作为 messageId 的引用上下文。
+   * @param level 存储分级；缺省按 standard 处理。
    */
-  async saveReferenceIfAbsent (botId: string, message: CachedMessage): Promise<void> {
+  async saveReferenceIfAbsent (
+    botId: string,
+    message: CachedMessage,
+    level?: SaveOptions['level']
+  ): Promise<void> {
     if (!message.messageId) return
-    this.cleanupMemoryIfDue()
-    if (this.getFromMemory(botId, message.messageId, message.contact)) return
+    if (this.isExpired(message)) return
 
-    const cached = this.cloneMessage(message)
-    this.putMemory(botId, cached)
-    this.enqueue({ botId, message: cached, aliases: [], referenceOnly: true })
-    this.enqueueMediaLocalize(botId, cached, [])
+    const cached = this.cloneMessage({
+      ...message,
+      elements: filterElementsByLevel(message.elements, level),
+    })
+    this.enqueue({ botId, message: cached, isSelf: false, referenceOnly: true })
+    this.enqueueMediaLocalize(botId, cached, undefined, false)
   }
 
   /**
@@ -130,32 +151,10 @@ export class MessageStore {
   async get (botId: string, messageId: string, contact?: Contact): Promise<MessageResponse | null> {
     if (!messageId) return null
 
-    const memory = this.getFromMemory(botId, messageId, contact)
-    if (memory) return this.toResponse(memory)
-
     await this.ready
-    await this.cleanupIfDue()
-
-    const key = contact ? this.contactKey(botId, contact, messageId) : [botId, messageId]
-    const direct = await this.getRow<MessageRow>(contact ? SQL.selectMessage : SQL.selectMessageById, key)
-    const alias = direct
-      ? undefined
-      : await this.getRow<MessageAliasRow>(contact ? SQL.selectAlias : SQL.selectAliasById, key)
-    if (!direct && !alias) return null
-
-    const row = direct || await this.getRow<MessageRow>(SQL.selectMessageByRef, [alias!.message_ref])
-    if (!row) return null
-
-    if (!direct && await this.hasReplyTo(row.message_ref, messageId)) {
-      /** 拒绝旧缓存中错误指向当前引用消息的别名。 */
-      await this.deleteAlias(botId, this.contactFromRow(row), messageId)
-      return null
-    }
-    if (this.isExpired(row)) {
-      await this.cleanup()
-      return null
-    }
-
+    await this.flushAll()
+    const row = await this.queryMessageRow(botId, messageId, contact)
+    if (!row || this.isExpired(row)) return null
     return this.rowToResponse(row)
   }
 
@@ -181,32 +180,116 @@ export class MessageStore {
     if (!startMsgId || limit <= 0) return []
 
     await this.ready
-    await this.cleanupIfDue()
-    await this.flushQueue()
+    await this.flushAll()
 
-    const anchor = await this.resolveMessageRow(botId, contact, startMsgId)
-    if (!anchor) return []
-    if (this.isExpired(anchor)) {
-      await this.cleanup()
-      return []
-    }
+    const anchor = await this.queryMessageRow(botId, startMsgId, contact)
+    if (!anchor || this.isExpired(anchor)) return []
 
-    const rows = await this.getRows<MessageRow>(SQL.selectHistory, [
-      botId,
-      contact.scene,
-      contact.peer,
-      contact.subPeer || '',
+    const rows = await this.allS<MessageRow>(SQL.selectHistory, [
+      anchor.contact_ref,
       anchor.time,
       anchor.time,
       anchor.message_ref,
       limit,
     ])
-
-    return Promise.all(rows.map(row => this.rowToResponse(row)))
+    return rows.map(row => this.rowToResponse(row))
   }
 
   /**
-   * 初始化 SQLite 连接、表结构，并执行启动清理和媒体本地化补救。
+   * 将 QQ `REFIDX` 引用索引解析为 API 消息 ID。
+   *
+   * 撤回等平台接口的唯一映射来源；ID 映射行不受缓存开关影响，始终落库。
+   *
+   * @param botId 当前 QQBot appId。
+   * @param contact 消息所在会话。
+   * @param refIdx QQ 引用索引，通常为 REFIDX_...。
+   * @returns 对应的 API 消息 ID；未命中时返回 null。
+   */
+  async resolveApiMessageId (botId: string, contact: Contact, refIdx: string): Promise<string | null> {
+    if (!refIdx) return null
+
+    await this.ready
+    await this.flushAll()
+    const row = await this.getS<MessageRow>(SQL.selectByRefIdxScoped, [
+      hashId(refIdx), botId, contact.scene, contact.peer, contact.subPeer || '', refIdx,
+    ])
+    if (!row || this.isExpired(row)) return null
+    return row.msg_id
+  }
+
+  /**
+   * 将 API 消息 ID 反向解析为 QQ `REFIDX` 引用索引。
+   *
+   * 发送侧显式引用回复的唯一映射来源。
+   *
+   * @param botId 当前 QQBot appId。
+   * @param contact 消息所在会话。
+   * @param messageId QQ API 消息 ID，通常为 ROBOT1.0_...。
+   * @returns 对应的引用索引；未命中时返回 null。
+   */
+  async resolveRefIdx (botId: string, contact: Contact, messageId: string): Promise<string | null> {
+    if (!messageId) return null
+
+    await this.ready
+    await this.flushAll()
+    const row = await this.getS<MessageRow>(SQL.selectByMsgIdScoped, [
+      hashId(messageId), botId, contact.scene, contact.peer, contact.subPeer || '', messageId,
+    ])
+    if (!row || this.isExpired(row)) return null
+    return row.ref_idx
+  }
+
+  /**
+   * 读取持久化的 file_info 上传缓存。
+   *
+   * @param key 由 api 层构造的缓存键。
+   * @returns 序列化的上传响应 JSON；未命中或已过期时返回 null。
+   */
+  async getUploadCache (key: string): Promise<string | null> {
+    if (!key) return null
+    await this.ready
+    const row = await this.getS<UploadCacheRow>(SQL.selectUpload, [key])
+    if (!row) return null
+    if (row.expires_at !== 0 && row.expires_at <= Date.now()) return null
+    return row.response
+  }
+
+  /**
+   * 写入持久化的 file_info 上传缓存。
+   *
+   * @param key 由 api 层构造的缓存键。
+   * @param response 序列化的上传响应 JSON。
+   * @param expiresAt 失效时间戳；0 表示长期有效。
+   */
+  async setUploadCache (key: string, response: string, expiresAt: number): Promise<void> {
+    if (!key) return
+    await this.ready
+    await this.runS(SQL.upsertUpload, [key, response, expiresAt, Date.now()])
+  }
+
+  /**
+   * 判断消息是否由机器人自己发送。
+   *
+   * 单聊撤回判定的唯一来源，读取消息行的 `is_self` 标记。
+   *
+   * @param botId 当前 QQBot appId。
+   * @param contact 消息所在会话。
+   * @param messageId QQ API 消息 ID。
+   * @returns true 表示是机器人自己发送的消息。
+   */
+  async isSelfMessage (botId: string, contact: Contact, messageId: string): Promise<boolean> {
+    if (!messageId) return false
+
+    await this.ready
+    await this.flushAll()
+    const row = await this.queryMessageRow(botId, messageId, contact)
+    return !!row && !this.isExpired(row) && row.is_self === 1
+  }
+
+  /**
+   * 初始化 SQLite 连接、表结构，并执行一次启动清理。
+   *
+   * 远程媒体补救不在这里执行，避免阻塞 `ready` 拖慢首批消息落库。
    *
    * @returns 初始化完成 Promise。
    */
@@ -217,14 +300,35 @@ export class MessageStore {
       const db = new sqlite3.Database(file, (err) => err ? reject(err) : resolve(db))
     })
 
-    await this.run('PRAGMA foreign_keys = ON')
-    await this.run('PRAGMA journal_mode = WAL')
-    await this.run('PRAGMA synchronous = NORMAL')
-    await this.run('PRAGMA temp_store = MEMORY')
-    await this.run('PRAGMA busy_timeout = 5000')
+    await this.exec('PRAGMA journal_mode = WAL')
+    await this.exec('PRAGMA synchronous = NORMAL')
+    await this.exec('PRAGMA temp_store = MEMORY')
+    await this.exec('PRAGMA busy_timeout = 5000')
+    /** 在迁移 VACUUM 前设置才会生效；生效后清理任务通过增量 vacuum 归还空间。 */
+    await this.exec('PRAGMA auto_vacuum = INCREMENTAL')
     await this.migrate()
     await this.cleanup()
-    await this.recoverRemoteMedia()
+  }
+
+  /**
+   * 从配置解析当前生效的 TTL 与行数上限。
+   *
+   * 数据库为全 bot 共享，多个 bot 同时开启缓存时取最大值；配置读取失败时
+   * 保持当前值。每次清理前刷新，配置修改最迟 10 分钟内生效。
+   */
+  private refreshSettings (): void {
+    try {
+      const enabled = readConfig().filter(item => item.messageCache.enable)
+      if (!enabled.length) {
+        this.ttlMs = MESSAGE_TTL
+        this.maxRows = MAX_MESSAGE_ROWS
+        return
+      }
+      this.ttlMs = Math.max(...enabled.map(item => item.messageCache.ttlHours)) * 60 * 60 * 1000
+      this.maxRows = Math.max(...enabled.map(item => item.messageCache.maxRows))
+    } catch (err) {
+      log('debug', '[getMsg] 读取消息缓存配置失败，沿用当前 TTL/上限', err)
+    }
   }
 
   /**
@@ -237,8 +341,9 @@ export class MessageStore {
     if (this.pending.length > MAX_WRITE_QUEUE) {
       this.prunePending()
       if (this.pending.length > MAX_WRITE_QUEUE) {
-        const dropped = this.pending.splice(0, this.pending.length - MAX_WRITE_QUEUE)
-        log('warn', `[getMsg] SQLite 写入队列过长，已丢弃 ${dropped.length} 条最旧待写缓存`)
+        const dropCount = this.pending.length - MAX_WRITE_QUEUE
+        this.pending.splice(0, dropCount)
+        log('warn', `[getMsg] SQLite 写入队列过长，已丢弃 ${dropCount} 条最旧待写缓存`)
       }
     }
     this.scheduleFlush()
@@ -250,12 +355,40 @@ export class MessageStore {
    * 已有 timer 或正在 flush 时不会重复安排。
    */
   private scheduleFlush (): void {
-    if (this.flushTimer || this.flushing) return
+    if (this.flushTimer || this.flushActive) return
     this.flushTimer = setTimeout(() => {
       this.flushTimer = undefined
-      this.flushQueue().catch(err => log('warn', '[getMsg] 批量写入消息缓存失败', err))
+      this.flushQueue().catch(() => undefined)
     }, FLUSH_INTERVAL)
     this.flushTimer.unref()
+  }
+
+  /**
+   * 触发一次批量落库；已有进行中的 flush 时复用其 Promise。
+   *
+   * @returns 当前批次落库完成的 Promise。
+   */
+  private flushQueue (): Promise<void> {
+    if (!this.flushActive) {
+      this.flushActive = this.doFlushBatch()
+        .catch(err => log('warn', '[getMsg] 批量写入消息缓存失败', err))
+        .finally(() => {
+          this.flushActive = undefined
+          if (this.pending.length) this.scheduleFlush()
+        })
+    }
+    return this.flushActive
+  }
+
+  /**
+   * 等待写入队列完全清空。
+   *
+   * 所有读取入口先经过它，保证"读到自己刚写的数据"；队列为空时零开销。
+   */
+  private async flushAll (): Promise<void> {
+    while (this.pending.length || this.flushActive) {
+      await this.flushQueue()
+    }
   }
 
   /**
@@ -265,70 +398,75 @@ export class MessageStore {
    *
    * @returns flush 完成 Promise。
    */
-  private async flushQueue (): Promise<void> {
-    if (this.flushing) return
-    this.flushing = true
-    try {
-      await this.ready
-      const batch = this.pending.splice(0, FLUSH_BATCH_SIZE)
-      if (!batch.length) return
+  private async doFlushBatch (): Promise<void> {
+    await this.ready
+    const batch = this.pending.splice(0, FLUSH_BATCH_SIZE)
+    if (!batch.length) return
 
-      await this.transaction(async () => {
-        for (const item of batch) {
-          if (this.isExpired(item.message)) continue
+    await this.transaction(async () => {
+      for (const item of batch) {
+        if (this.isExpired(item.message)) continue
+        try {
           await this.writeItem(item)
+        } catch (err) {
+          /** 单条失败只跳过自身，不让一条毒消息丢掉整批 ID 映射。 */
+          log('warn', `[getMsg] 跳过写入失败的缓存消息: ${item.message.messageId}`, err)
         }
-      })
-
-      if (this.pending.length) this.scheduleFlush()
-    } finally {
-      this.flushing = false
-      if (this.pending.length) this.scheduleFlush()
-    }
+      }
+    })
   }
 
   /**
    * 写入一条待落库消息。
    *
-   * @param item 待写入的消息、alias 和引用上下文标记。
+   * 稳定状态下（contact/sender 已缓存）每条消息 2 次语句往返：
+   * 定位既有行 + INSERT 或 UPDATE。
+   *
+   * @param item 待写入的消息任务。
    */
   private async writeItem (item: PendingWrite): Promise<void> {
-    const botRef = await this.ensureBot(item.botId)
-    const contactRef = await this.ensureContact(botRef, item.message.contact)
+    const contactRef = await this.ensureContact(item.botId, item.message.contact)
+    const msgHash = hashId(item.message.messageId)
 
+    const existing = await this.getS<IdRow>(SQL.selectMessageIdByMsgId, [
+      msgHash, contactRef, item.message.messageId,
+    ])
     if (item.referenceOnly) {
-      const exists = await this.getRow<IdRow>(SQL.selectMessageRef, [botRef, contactRef, item.message.messageId])
-      if (exists) return
-
-      const alias = await this.getRow<MessageAliasRow>(
-        SQL.selectAlias,
-        this.contactKey(item.botId, item.message.contact, item.message.messageId)
-      )
-      /** 原消息已通过 msg_idx alias 缓存时，不再把引用上下文另存为一条消息。 */
-      if (alias) return
+      if (existing) return
+      /** 原消息已把该 REFIDX 作为自己的引用索引缓存时，不再另存引用上下文。 */
+      const asRefIdx = await this.getS<IdRow>(SQL.selectMessageIdByRefIdx, [
+        msgHash, contactRef, item.message.messageId,
+      ])
+      if (asRefIdx) return
     }
 
-    const senderRef = await this.ensureSender(botRef, item.message.sender)
-    const messageRef = await this.ensureMessage(botRef, contactRef, senderRef, item.message)
+    const senderRef = await this.ensureSender(item.botId, item.message.sender)
+    const encoded = encodeElements(item.message.elements)
+    const hasRemote = hasRemoteFileElement(item.message.elements) ? 1 : 0
+    const refIdx = item.refIdx || null
+    const refHash = refIdx ? hashId(refIdx) : null
 
-    await this.run(SQL.deleteElements, [messageRef])
-    for (const [index, element] of item.message.elements.entries()) {
-      await saveElement((sql, params) => this.run(sql, params), messageRef, index, element)
+    if (existing) {
+      await this.runS(SQL.updateMessage, [
+        senderRef, refIdx, refHash, encoded.replyTo, item.message.time,
+        item.isSelf ? 1 : 0, hasRemote, encoded.json, existing.id,
+      ])
+      return
     }
-
-    for (const alias of new Set(item.aliases.filter(id => id && id !== item.message.messageId))) {
-      await this.run(SQL.insertAlias, [botRef, contactRef, alias, messageRef])
-    }
+    await this.runS(SQL.insertMessage, [
+      contactRef, senderRef, item.message.messageId, msgHash, refIdx, refHash,
+      encoded.replyTo, item.message.time, item.isSelf ? 1 : 0,
+      item.referenceOnly ? 1 : 0, hasRemote, encoded.json,
+    ])
   }
 
   /**
    * 清理待写队列中已经过期的消息。
    */
   private prunePending (): void {
-    const deadline = Date.now() - MESSAGE_TTL
-    for (let index = this.pending.length - 1; index >= 0; index--) {
-      if (this.pending[index].message.time <= deadline) this.pending.splice(index, 1)
-    }
+    const deadline = Date.now() - this.ttlMs
+    const kept = this.pending.filter(item => item.message.time > deadline)
+    if (kept.length !== this.pending.length) this.pending = kept
   }
 
   /**
@@ -339,22 +477,29 @@ export class MessageStore {
    *
    * @param botId 当前 QQBot appId。
    * @param message 可能包含远程媒体 URL 的消息快照。
-   * @param aliases 该消息可被查询到的额外 alias。
+   * @param refIdx 该消息的引用索引，成功本地化后随消息一并回写。
+   * @param isSelf 是否机器人自己发送。
    */
-  private enqueueMediaLocalize (botId: string, message: CachedMessage, aliases: string[]): void {
+  private enqueueMediaLocalize (
+    botId: string,
+    message: CachedMessage,
+    refIdx: string | undefined,
+    isSelf: boolean
+  ): void {
     if (!hasRemoteFileElement(message.elements)) return
     if (this.isExpired(message)) return
 
-    const key = this.scopedKey(botId, message.contact, message.messageId)
+    const key = [botId, message.contact.scene, message.contact.peer,
+      message.contact.subPeer || '', message.messageId].join('\x1f')
     if (this.pendingMediaKeys.has(key)) return
 
-    const item = {
+    this.pendingMedia.push({
       botId,
       message: this.cloneMessage(message),
-      aliases,
+      refIdx,
+      isSelf,
       key,
-    }
-    this.pendingMedia.push(item)
+    })
     this.pendingMediaKeys.add(key)
 
     if (this.pendingMedia.length > MAX_MEDIA_LOCALIZE_QUEUE) {
@@ -425,44 +570,47 @@ export class MessageStore {
       ...item.message,
       elements: result.elements,
     })
-    this.putMemory(item.botId, localized, item.aliases)
     this.enqueue({
       botId: item.botId,
       message: localized,
-      aliases: item.aliases,
+      refIdx: item.refIdx,
+      isSelf: item.isSelf,
       referenceOnly: false,
     })
   }
 
   /**
    * 清理已经过期的媒体本地化待处理任务。
-   *
-   * @returns 无返回值；会同步维护 pendingMediaKeys。
    */
   private prunePendingMedia (): void {
-    const deadline = Date.now() - MESSAGE_TTL
-    for (let index = this.pendingMedia.length - 1; index >= 0; index--) {
-      const item = this.pendingMedia[index]
-      if (item.message.time > deadline) continue
-      this.pendingMedia.splice(index, 1)
-      this.pendingMediaKeys.delete(item.key)
+    const deadline = Date.now() - this.ttlMs
+    const kept: PendingMediaLocalize[] = []
+    for (const item of this.pendingMedia) {
+      if (item.message.time > deadline) {
+        kept.push(item)
+      } else {
+        this.pendingMediaKeys.delete(item.key)
+      }
     }
+    if (kept.length !== this.pendingMedia.length) this.pendingMedia = kept
   }
 
   /**
-   * 启动时扫描 SQLite 中尚未本地化的远程媒体 URL，并重新投递队列补救。
+   * 启动时扫描 SQLite 中尚未本地化的远程媒体消息，并重新投递队列补救。
+   *
+   * `has_remote_media` 是部分索引列，扫描不再需要 LIKE 全表匹配。
    *
    * @returns 扫描和投递完成 Promise。
    */
   private async recoverRemoteMedia (): Promise<void> {
-    const rows = await this.getRows<MessageRow>(SQL.selectMessagesWithRemoteMedia, [
-      Date.now() - MESSAGE_TTL,
+    const rows = await this.allS<MessageRow>(SQL.selectRemoteMedia, [
+      Date.now() - this.ttlMs,
       MEDIA_RECOVERY_LIMIT,
     ])
     if (!rows.length) return
 
     for (const row of rows) {
-      const response = await this.rowToResponse(row)
+      const response = this.rowToResponse(row)
       this.enqueueMediaLocalize(row.bot_id, {
         messageId: response.messageId,
         messageSeq: response.messageSeq,
@@ -470,85 +618,45 @@ export class MessageStore {
         contact: response.contact,
         sender: response.sender,
         elements: response.elements,
-      }, [])
+      }, row.ref_idx || undefined, row.is_self === 1)
     }
     log('debug', `[getMsg] 已投递 ${rows.length} 条远程媒体缓存补救任务`)
   }
 
   /**
-   * 写入内存热缓存。
+   * 按消息 ID 或引用索引查询消息行。
    *
    * @param botId 当前 QQBot appId。
-   * @param message 消息缓存。
-   * @param aliases 可查询到该消息的额外消息索引。
-   */
-  private putMemory (botId: string, message: CachedMessage, aliases: string[] = []): void {
-    const scoped = this.scopedKey(botId, message.contact, message.messageId)
-    this.memory.set(scoped, message)
-    this.directIndex.set(this.globalKey(botId, message.messageId), scoped)
-
-    for (const alias of new Set(aliases.filter(id => id && id !== message.messageId))) {
-      this.scopedAliasIndex.set(this.scopedKey(botId, message.contact, alias), scoped)
-      this.aliasIndex.set(this.globalKey(botId, alias), scoped)
-    }
-  }
-
-  /**
-   * 从内存热缓存读取消息。
-   *
-   * @param botId 当前 QQBot appId。
-   * @param messageId 真实消息 ID 或 alias。
+   * @param messageId 真实消息 ID 或 `REFIDX` 引用索引。
    * @param contact 可选会话范围。
-   * @returns 命中的缓存消息；未命中或过期时返回 null。
+   * @returns 命中的消息行；未命中时返回 null。
    */
-  private getFromMemory (botId: string, messageId: string, contact?: Contact): CachedMessage | null {
-    const scoped = contact
-      ? this.scopedKey(botId, contact, messageId)
-      : this.directIndex.get(this.globalKey(botId, messageId))
-    const alias = contact
-      ? this.scopedAliasIndex.get(this.scopedKey(botId, contact, messageId))
-      : this.aliasIndex.get(this.globalKey(botId, messageId))
-    const key = scoped && this.memory.has(scoped) ? scoped : alias
-    if (!key) return null
+  private async queryMessageRow (
+    botId: string,
+    messageId: string,
+    contact?: Contact
+  ): Promise<MessageRow | null> {
+    const hash = hashId(messageId)
+    const direct = contact
+      ? await this.getS<MessageRow>(SQL.selectByMsgIdScoped, [
+        hash, botId, contact.scene, contact.peer, contact.subPeer || '', messageId,
+      ])
+      : await this.getS<MessageRow>(SQL.selectByMsgId, [hash, botId, messageId])
+    if (direct) return direct
 
-    const message = this.memory.get(key)
-    if (!message) return null
-    if (!this.isExpired(message)) return message
+    const byRef = contact
+      ? await this.getS<MessageRow>(SQL.selectByRefIdxScoped, [
+        hash, botId, contact.scene, contact.peer, contact.subPeer || '', messageId,
+      ])
+      : await this.getS<MessageRow>(SQL.selectByRefIdx, [hash, botId, messageId])
+    if (!byRef) return null
 
-    this.cleanupMemory()
-    return null
-  }
-
-  /**
-   * 到达清理间隔时清理内存缓存。
-   */
-  private cleanupMemoryIfDue (): void {
-    if (Date.now() - this.lastCleanup < CLEANUP_INTERVAL) return
-    this.cleanupMemory()
-  }
-
-  /**
-   * 清理一天前的内存消息，并同步清理失效索引。
-   */
-  private cleanupMemory (): void {
-    const deadline = Date.now() - MESSAGE_TTL
-    for (const [key, message] of this.memory) {
-      if (message.time <= deadline) this.memory.delete(key)
+    if (byRef.reply_to === messageId) {
+      /** 该行的引用索引错误指向它引用的消息，属于旧缓存污染，清除后按未命中处理。 */
+      await this.runS(SQL.clearRefIdx, [byRef.message_ref])
+      return null
     }
-    this.cleanIndex(this.directIndex)
-    this.cleanIndex(this.aliasIndex)
-    this.cleanIndex(this.scopedAliasIndex)
-  }
-
-  /**
-   * 清理指向已删除内存消息的索引。
-   *
-   * @param index 需要清理的索引 Map。
-   */
-  private cleanIndex (index: Map<string, string>): void {
-    for (const [key, scoped] of index) {
-      if (!this.memory.has(scoped)) index.delete(key)
-    }
+    return byRef
   }
 
   /**
@@ -567,149 +675,25 @@ export class MessageStore {
   }
 
   /**
-   * 将内存缓存转换为 Karin `MessageResponse`。
+   * 将数据库行还原为 Karin `MessageResponse`。
    *
-   * @param message 内存缓存消息。
+   * @param row 消息主查询结果。
    * @returns Karin 标准消息查询结果。
    */
-  private toResponse (message: CachedMessage): MessageResponse {
+  private rowToResponse (row: MessageRow): MessageResponse {
     return {
-      messageId: message.messageId,
-      messageSeq: message.messageSeq,
-      time: message.time,
-      contact: { ...message.contact } as Contact,
-      sender: { ...message.sender } as GroupSender,
-      elements: message.elements.map(element => ({ ...element })),
+      messageId: row.msg_id,
+      messageSeq: 0,
+      time: row.time,
+      contact: this.contactFromRow(row),
+      sender: {
+        userId: row.sender_user_id,
+        nick: row.sender_nick,
+        name: row.sender_name,
+        role: row.sender_role,
+      },
+      elements: decodeElements(row.elements),
     }
-  }
-
-  /**
-   * 执行数据库版本迁移。
-   *
-   * 使用 SQLite `PRAGMA user_version` 记录已应用的 schema 版本。
-   * 版本 0 只表示“未初始化或开发期旧库”，首个 alpha 发布基线为 v1。
-   *
-   * @returns 迁移完成 Promise。
-   */
-  private async migrate (): Promise<void> {
-    const latest = migrations.at(-1)?.version || 0
-    if (latest !== DATABASE_VERSION) {
-      throw new Error(`消息缓存数据库迁移版本不一致: 常量 v${DATABASE_VERSION}，迁移入口 v${latest}`)
-    }
-
-    const current = await this.getUserVersion()
-    if (current > DATABASE_VERSION) {
-      throw new Error(`消息缓存数据库版本过高: 当前 v${current}，适配器支持 v${DATABASE_VERSION}`)
-    }
-
-    for (let version = current + 1; version <= DATABASE_VERSION; version++) {
-      const migration = migrations.find(item => item.version === version)
-      if (!migration) throw new Error(`缺少消息缓存数据库迁移: v${version}`)
-      await this.transaction(() => migration.up({
-        run: (sql, params) => this.run(sql, params),
-        tableColumns: name => this.tableColumns(name),
-        tableExists: name => this.tableExists(name),
-        markVacuum: () => {
-          this.shouldVacuum = true
-        },
-      }))
-      await this.setUserVersion(version)
-    }
-
-    if (this.shouldVacuum) {
-      await this.run('VACUUM')
-      this.shouldVacuum = false
-    }
-  }
-
-  /**
-   * 获取或创建 bot 映射 ID。
-   *
-   * @param botId 当前 QQBot appId。
-   * @returns `qqbot_bots.id`。
-   */
-  private async ensureBot (botId: string): Promise<number> {
-    const cached = this.botRefCache.get(botId)
-    if (cached) return cached
-
-    await this.run(SQL.insertBot, [botId])
-    const row = await this.getRow<IdRow>(SQL.selectBotId, [botId])
-    if (!row) throw new Error(`消息缓存 bot 映射写入失败: ${botId}`)
-    this.botRefCache.set(botId, row.id)
-    return row.id
-  }
-
-  /**
-   * 获取或创建会话映射 ID。
-   *
-   * @param botRef `qqbot_bots.id`。
-   * @param contact Karin 会话对象。
-   * @returns `qqbot_contacts.id`。
-   */
-  private async ensureContact (botRef: number, contact: Contact): Promise<number> {
-    const key = [botRef, contact.scene, contact.peer, contact.subPeer || ''].join('\x1f')
-    const cached = this.contactRefCache.get(key)
-    if (cached) return cached
-
-    const values = [
-      botRef, contact.scene, contact.peer, contact.subPeer || '',
-      contact.name || '', contact.subName || '',
-    ]
-    await this.run(SQL.upsertContact, values)
-    const row = await this.getRow<IdRow>(SQL.selectContactId, values.slice(0, 4))
-    if (!row) throw new Error(`消息缓存会话映射写入失败: ${contact.scene}:${contact.peer}`)
-    this.contactRefCache.set(key, row.id)
-    return row.id
-  }
-
-  /**
-   * 获取或创建发送者映射 ID。
-   *
-   * @param botRef `qqbot_bots.id`。
-   * @param sender Karin sender 对象。
-   * @returns `qqbot_senders.id`。
-   */
-  private async ensureSender (botRef: number, sender: Sender): Promise<number> {
-    const role = (sender as GroupSender).role || 'member'
-    const values = [
-      botRef,
-      sender.userId || '',
-      sender.nick || '',
-      sender.name || '',
-      role,
-    ]
-    const key = values.join('\x1f')
-    const cached = this.senderRefCache.get(key)
-    if (cached) return cached
-
-    await this.run(SQL.upsertSender, values)
-    const row = await this.getRow<IdRow>(SQL.selectSenderId, values)
-    if (!row) throw new Error(`消息缓存发送者映射写入失败: ${sender.userId || ''}`)
-    this.senderRefCache.set(key, row.id)
-    return row.id
-  }
-
-  /**
-   * 获取或创建消息主记录。
-   *
-   * @param botRef `qqbot_bots.id`。
-   * @param contactRef `qqbot_contacts.id`。
-   * @param senderRef `qqbot_senders.id`。
-   * @param message 消息缓存。
-   * @returns `qqbot_messages.id`。
-   */
-  private async ensureMessage (
-    botRef: number,
-    contactRef: number,
-    senderRef: number,
-    message: CachedMessage
-  ): Promise<number> {
-    await this.run(SQL.upsertMessage, [
-      botRef, contactRef, senderRef, message.messageId, message.messageSeq, message.time,
-    ])
-    const row = await this.getRow<IdRow>(SQL.selectMessageRef, [botRef, contactRef, message.messageId])
-    if (!row) throw new Error(`消息缓存主记录写入失败: ${message.messageId}`)
-    return row.id
   }
 
   /**
@@ -730,114 +714,56 @@ export class MessageStore {
   }
 
   /**
-   * 将数据库行还原为 Karin `MessageResponse`。
-   *
-   * @param row 消息主查询结果。
-   * @returns Karin 标准消息查询结果。
-   */
-  private async rowToResponse (row: MessageRow): Promise<MessageResponse> {
-    return {
-      messageId: row.message_id,
-      messageSeq: row.message_seq,
-      time: row.time,
-      contact: this.contactFromRow(row),
-      sender: {
-        userId: row.sender_user_id,
-        nick: row.sender_nick,
-        name: row.sender_name,
-        role: row.sender_role,
-      },
-      elements: await loadElements((sql, params) => this.getRows(sql, params), row.message_ref),
-    }
-  }
-
-  /**
-   * 在指定会话中解析消息 ID 或 alias 到消息主表行。
+   * 获取或创建会话映射 ID。
    *
    * @param botId 当前 QQBot appId。
    * @param contact Karin 会话对象。
-   * @param messageId 真实消息 ID 或 alias。
-   * @returns 命中的消息行；未命中时返回 null。
+   * @returns `qqbot_contacts.id`。
    */
-  private async resolveMessageRow (
-    botId: string,
-    contact: Contact,
-    messageId: string
-  ): Promise<MessageRow | null> {
-    const key = this.contactKey(botId, contact, messageId)
-    const direct = await this.getRow<MessageRow>(SQL.selectMessage, key)
-    const alias = direct
-      ? undefined
-      : await this.getRow<MessageAliasRow>(SQL.selectAlias, key)
-    if (!direct && !alias) return null
+  private async ensureContact (botId: string, contact: Contact): Promise<number> {
+    const key = [botId, contact.scene, contact.peer, contact.subPeer || ''].join('\x1f')
+    const cached = this.contactRefCache.get(key)
+    if (cached) return cached
 
-    const row = direct || await this.getRow<MessageRow>(SQL.selectMessageByRef, [alias!.message_ref])
-    if (!row) return null
-
-    if (!direct && await this.hasReplyTo(row.message_ref, messageId)) {
-      await this.deleteAlias(botId, this.contactFromRow(row), messageId)
-      return null
-    }
-    return row
+    const values = [
+      botId, contact.scene, contact.peer, contact.subPeer || '',
+      contact.name || '', contact.subName || '',
+    ]
+    await this.runS(SQL.upsertContact, values)
+    const row = await this.getS<IdRow>(SQL.selectContactId, values.slice(0, 4))
+    if (!row) throw new Error(`消息缓存会话映射写入失败: ${contact.scene}:${contact.peer}`)
+    this.contactRefCache.set(key, row.id)
+    return row.id
   }
 
   /**
-   * 构造会话级查询键。
+   * 获取或创建发送者映射 ID。
+   *
+   * sender 按 (userId, nick, name, role) 去重；不再被引用的行由清理任务 GC，
+   * 不会随昵称变化永久膨胀。
    *
    * @param botId 当前 QQBot appId。
-   * @param contact Karin 会话对象。
-   * @param messageId 消息 ID 或 alias。
-   * @returns 用于 SQL 参数或内存 key 的字段数组。
+   * @param sender Karin sender 对象。
+   * @returns `qqbot_senders.id`。
    */
-  private contactKey (botId: string, contact: Contact, messageId: string): string[] {
-    return [botId, contact.scene, contact.peer, contact.subPeer || '', messageId]
-  }
+  private async ensureSender (botId: string, sender: Sender): Promise<number> {
+    const role = (sender as GroupSender).role || 'member'
+    const values = [
+      botId,
+      sender.userId || '',
+      sender.nick || '',
+      sender.name || '',
+      role,
+    ]
+    const key = values.join('\x1f')
+    const cached = this.senderRefCache.get(key)
+    if (cached) return cached
 
-  /**
-   * 构造内存会话级 key。
-   *
-   * @param botId 当前 QQBot appId。
-   * @param contact Karin 会话对象。
-   * @param messageId 消息 ID 或 alias。
-   * @returns 内存 Map 使用的稳定 key。
-   */
-  private scopedKey (botId: string, contact: Contact, messageId: string): string {
-    return this.contactKey(botId, contact, messageId).join('\x1f')
-  }
-
-  /**
-   * 构造内存全局 key。
-   *
-   * @param botId 当前 QQBot appId。
-   * @param messageId 消息 ID 或 alias。
-   * @returns 不限定会话时使用的内存 key。
-   */
-  private globalKey (botId: string, messageId: string): string {
-    return `${botId}\x1f${messageId}`
-  }
-
-  /**
-   * 删除指定会话下的 alias。
-   *
-   * @param botId 当前 QQBot appId。
-   * @param contact Karin 会话对象。
-   * @param messageId 需要删除的 alias ID。
-   */
-  private async deleteAlias (botId: string, contact: Contact, messageId: string): Promise<void> {
-    await this.run(SQL.deleteAlias, [
-      botId, botId, contact.scene, contact.peer, contact.subPeer || '', messageId,
-    ])
-  }
-
-  /**
-   * 判断某条消息是否包含指向指定 ID 的 reply 段。
-   *
-   * @param messageRef `qqbot_messages.id`。
-   * @param replyId 被引用的消息 ID。
-   * @returns true 表示该消息包含对应 reply 段。
-   */
-  private async hasReplyTo (messageRef: number, replyId: string): Promise<boolean> {
-    return !!await this.getRow<{ found: number }>(SQL.hasReply, [messageRef, replyElementValue(replyId)])
+    await this.runS(SQL.upsertSender, values)
+    const row = await this.getS<IdRow>(SQL.selectSenderId, values)
+    if (!row) throw new Error(`消息缓存发送者映射写入失败: ${sender.userId || ''}`)
+    this.senderRefCache.set(key, row.id)
+    return row.id
   }
 
   /**
@@ -847,27 +773,80 @@ export class MessageStore {
    * @returns true 表示已经超过一天缓存窗口。
    */
   private isExpired (row: Pick<CachedMessage | MessageRow, 'time'>): boolean {
-    return row.time <= Date.now() - MESSAGE_TTL
+    return row.time <= Date.now() - this.ttlMs
   }
 
   /**
-   * 到达清理间隔时清理内存和 SQLite 过期消息。
-   */
-  private async cleanupIfDue (): Promise<void> {
-    if (Date.now() - this.lastCleanup < CLEANUP_INTERVAL) return
-    await this.cleanup()
-  }
-
-  /**
-   * 清理一天前的缓存消息。
+   * 清理过期缓存消息，并执行体积治理。
    *
-   * SQLite 只删除主消息表，消息段和 alias 通过外键级联删除。
+   * 依次执行：配置刷新、TTL 删除、硬上限删除、上传缓存清理、
+   * sender GC（写空闲时）、增量 vacuum 归还空间、WAL checkpoint 截断、
+   * 媒体文件清理。
    */
   private async cleanup (): Promise<void> {
-    this.cleanupMemory()
-    await this.run(SQL.cleanup, [Date.now() - MESSAGE_TTL])
-    await cleanupMessageMediaCache()
-    this.lastCleanup = Date.now()
+    this.refreshSettings()
+    await this.runS(SQL.cleanup, [Date.now() - this.ttlMs])
+
+    const count = await this.getS<CountRow>(SQL.countMessages)
+    if (count && count.total > this.maxRows) {
+      const excess = count.total - this.maxRows
+      await this.runS(SQL.deleteOverCap, [excess])
+      log('warn', `[getMsg] 消息缓存超过 ${this.maxRows} 条硬上限，已删除最旧 ${excess} 条`)
+    }
+
+    await this.runS(SQL.cleanupUploads, [Date.now()])
+    const uploads = await this.getS<CountRow>(SQL.countUploads)
+    if (uploads && uploads.total > UPLOAD_CACHE_MAX_ROWS) {
+      await this.runS(SQL.deleteUploadsOverCap, [uploads.total - UPLOAD_CACHE_MAX_ROWS])
+    }
+
+    /** sender GC 与批量写并发会产生悬空 sender_ref，只在写队列空闲时执行。 */
+    if (!this.pending.length && !this.flushActive) {
+      await this.runS(SQL.gcSenders)
+      this.senderRefCache.clear()
+    }
+
+    await this.exec('PRAGMA incremental_vacuum')
+    await this.rawGet('PRAGMA wal_checkpoint(TRUNCATE)').catch(() => undefined)
+    await cleanupMessageMediaCache(this.ttlMs)
+  }
+
+  /**
+   * 执行数据库版本迁移。
+   *
+   * 使用 SQLite `PRAGMA user_version` 记录已应用的 schema 版本。
+   *
+   * @returns 迁移完成 Promise。
+   */
+  private async migrate (): Promise<void> {
+    const latest = migrations.at(-1)?.version || 0
+    if (latest !== DATABASE_VERSION) {
+      throw new Error(`消息缓存数据库迁移版本不一致: 常量 v${DATABASE_VERSION}，迁移入口 v${latest}`)
+    }
+
+    const current = await this.getUserVersion()
+    if (current > DATABASE_VERSION) {
+      throw new Error(`消息缓存数据库版本过高: 当前 v${current}，适配器支持 v${DATABASE_VERSION}`)
+    }
+
+    for (let version = current + 1; version <= DATABASE_VERSION; version++) {
+      const migration = migrations.find(item => item.version === version)
+      if (!migration) throw new Error(`缺少消息缓存数据库迁移: v${version}`)
+      await this.transaction(() => migration.up({
+        run: (sql, params) => this.exec(sql, params),
+        tableColumns: name => this.tableColumns(name),
+        tableExists: name => this.tableExists(name),
+        markVacuum: () => {
+          this.shouldVacuum = true
+        },
+      }))
+      await this.exec(`PRAGMA user_version = ${version}`)
+    }
+
+    if (this.shouldVacuum) {
+      await this.exec('VACUUM')
+      this.shouldVacuum = false
+    }
   }
 
   /**
@@ -877,7 +856,10 @@ export class MessageStore {
    * @returns true 表示表存在。
    */
   private async tableExists (name: string): Promise<boolean> {
-    return !!await this.getRow('SELECT 1 AS found FROM sqlite_master WHERE type = ? AND name = ?', ['table', name])
+    return !!await this.rawGet(
+      'SELECT 1 AS found FROM sqlite_master WHERE type = ? AND name = ?',
+      ['table', name]
+    )
   }
 
   /**
@@ -888,7 +870,7 @@ export class MessageStore {
    */
   private async tableColumns (name: string): Promise<string[]> {
     if (!(await this.tableExists(name))) return []
-    const rows = await this.getRows<{ name: string }>(`PRAGMA table_info(${name})`)
+    const rows = await this.rawAll<{ name: string }>(`PRAGMA table_info(${name})`)
     return rows.map(row => row.name)
   }
 
@@ -898,17 +880,8 @@ export class MessageStore {
    * @returns 当前 `PRAGMA user_version`；新库默认为 0。
    */
   private async getUserVersion (): Promise<number> {
-    const row = await this.getRow<{ user_version: number }>('PRAGMA user_version')
+    const row = await this.rawGet<{ user_version: number }>('PRAGMA user_version')
     return row?.user_version || 0
-  }
-
-  /**
-   * 写入 SQLite schema 版本。
-   *
-   * @param version 已成功应用的数据库版本号。
-   */
-  private async setUserVersion (version: number): Promise<void> {
-    await this.run(`PRAGMA user_version = ${version}`)
   }
 
   /**
@@ -917,57 +890,116 @@ export class MessageStore {
    * @param fn 事务内执行的异步函数。
    */
   private async transaction (fn: () => Promise<void>): Promise<void> {
-    await this.run('BEGIN IMMEDIATE')
+    await this.exec('BEGIN IMMEDIATE')
     try {
       await fn()
-      await this.run('COMMIT')
+      await this.exec('COMMIT')
     } catch (err) {
-      await this.run('ROLLBACK').catch(() => undefined)
+      await this.exec('ROLLBACK').catch(() => undefined)
       throw err
     }
   }
 
   /**
-   * 执行不返回行的 SQL。
+   * 获取当前数据库连接。
+   *
+   * @returns 已初始化的 sqlite3 Database。
+   */
+  private database (): Database {
+    if (!this.db) throw new Error('消息缓存数据库尚未初始化')
+    return this.db
+  }
+
+  /**
+   * 获取（并缓存）prepared statement。
+   *
+   * 热路径 SQL 只 parse 一次，重复执行只做参数绑定。
+   *
+   * @param sql SQL 字符串。
+   * @returns 复用的 Statement。
+   */
+  private prepared (sql: string): Statement {
+    let stmt = this.statements.get(sql)
+    if (!stmt) {
+      stmt = this.database().prepare(sql)
+      this.statements.set(sql, stmt)
+    }
+    return stmt
+  }
+
+  /**
+   * 以 prepared statement 执行不返回行的 SQL。
    *
    * @param sql SQL 字符串。
    * @param params SQL 参数。
    */
-  private async run (sql: string, params: unknown[] = []): Promise<void> {
-    const db = this.db
-    if (!db) throw new Error('消息缓存数据库尚未初始化')
-    await new Promise<void>((resolve, reject) => {
-      db.run(sql, params, (err) => err ? reject(err) : resolve())
+  private runS (sql: string, params: unknown[] = []): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      this.prepared(sql).run(params, (err) => err ? reject(err) : resolve())
     })
   }
 
   /**
-   * 查询单行数据。
+   * 以 prepared statement 查询单行数据。
    *
    * @param sql SQL 字符串。
    * @param params SQL 参数。
    * @returns 查询结果；未命中时返回 undefined。
    */
-  private async getRow<T> (sql: string, params: unknown[] = []): Promise<T | undefined> {
-    const db = this.db
-    if (!db) throw new Error('消息缓存数据库尚未初始化')
+  private getS<T> (sql: string, params: unknown[] = []): Promise<T | undefined> {
     return new Promise<T | undefined>((resolve, reject) => {
-      db.get(sql, params, (err, row: T | undefined) => err ? reject(err) : resolve(row))
+      this.prepared(sql).get(params, (err, row: T | undefined) => err ? reject(err) : resolve(row))
     })
   }
 
   /**
-   * 查询多行数据。
+   * 以 prepared statement 查询多行数据。
    *
    * @param sql SQL 字符串。
    * @param params SQL 参数。
    * @returns 查询结果数组。
    */
-  private async getRows<T> (sql: string, params: unknown[] = []): Promise<T[]> {
-    const db = this.db
-    if (!db) throw new Error('消息缓存数据库尚未初始化')
+  private allS<T> (sql: string, params: unknown[] = []): Promise<T[]> {
     return new Promise<T[]>((resolve, reject) => {
-      db.all(sql, params, (err, rows: T[]) => err ? reject(err) : resolve(rows))
+      this.prepared(sql).all(params, (err, rows: T[]) => err ? reject(err) : resolve(rows))
+    })
+  }
+
+  /**
+   * 执行一次性 SQL（DDL、PRAGMA、事务控制），不走 prepared statement 缓存。
+   *
+   * @param sql SQL 字符串。
+   * @param params SQL 参数。
+   */
+  private exec (sql: string, params: unknown[] = []): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      this.database().run(sql, params, (err) => err ? reject(err) : resolve())
+    })
+  }
+
+  /**
+   * 一次性查询单行（PRAGMA / 系统表）。
+   *
+   * @param sql SQL 字符串。
+   * @param params SQL 参数。
+   * @returns 查询结果；未命中时返回 undefined。
+   */
+  private rawGet<T> (sql: string, params: unknown[] = []): Promise<T | undefined> {
+    return new Promise<T | undefined>((resolve, reject) => {
+      this.database().get(sql, params, (err, row: T | undefined) => err ? reject(err) : resolve(row))
+    })
+  }
+
+  /**
+   * 一次性查询多行（PRAGMA / 系统表）。
+   *
+   * @param sql SQL 字符串。
+   * @param params SQL 参数。
+   * @returns 查询结果数组。
+   */
+  private rawAll<T> (sql: string, params: unknown[] = []): Promise<T[]> {
+    return new Promise<T[]>((resolve, reject) => {
+      this.database().all(sql, params, (err, rows: T[]) => err ? reject(err) : resolve(rows))
     })
   }
 }

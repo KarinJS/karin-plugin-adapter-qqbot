@@ -1,5 +1,4 @@
 import { fileToUrl, karin } from 'node-karin'
-import { rememberApiMessageId } from './message-id-map'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
 
@@ -46,7 +45,11 @@ export const prepareSelfMessageCache = async (
 }
 
 /**
- * 发送成功后缓存机器人自己的消息，供 bot.getMsg(messageId) 查询。
+ * 发送成功后记录机器人自己的消息。
+ *
+ * 无论缓存开关如何，都会落库最小 ID 映射行（msg_id/ref_idx/is_self）——
+ * 单聊撤回判定和引用解析没有任何内存映射，完全依赖数据库。
+ * 只有 self 缓存开启时才附带消息正文，供 bot.getMsg(messageId) 查询。
  */
 export const cacheSelfMessage = (
   ctx: AdapterQQBot,
@@ -54,13 +57,13 @@ export const cacheSelfMessage = (
   cacheElements: ElementTypes[],
   result: SendMsgResults
 ): void => {
-  if (!shouldCacheSelfMessage(ctx)) return
-  if (!cacheElements.length) return
-
   const rawData = Array.isArray(result.rawData) ? result.rawData : [result.rawData]
   const responses = rawData.filter(item => item?.id)
   if (!responses.length) return
 
+  const withContent = shouldCacheSelfMessage(ctx) && cacheElements.length > 0
+  const elements = withContent ? cacheElements : []
+  const level = withContent ? ctx.cfg.messageCache.level : 'minimal'
   const sender = selfSender(ctx, contact)
   const seen = new Set<string>()
   for (const response of responses) {
@@ -69,10 +72,8 @@ export const cacheSelfMessage = (
       ? response.ext_info.ref_idx
       : ''
     const messageId = apiMessageId
-    const aliases = [referenceMessageId].filter(id => id && id !== messageId)
     if (!messageId || seen.has(messageId)) continue
     seen.add(messageId)
-    if (referenceMessageId) rememberApiMessageId(ctx, contact, referenceMessageId, apiMessageId)
 
     ctx.messageStore
       .save(String(ctx.cfg.appId), {
@@ -81,8 +82,12 @@ export const cacheSelfMessage = (
         time: responseTime(response.timestamp),
         contact,
         sender,
-        elements: cacheElements,
-      }, aliases)
+        elements,
+      }, {
+        refIdx: referenceMessageId && referenceMessageId !== messageId ? referenceMessageId : undefined,
+        isSelf: true,
+        level,
+      })
       .catch(err => ctx.logger('warn', `[getMsg] 写入自己消息缓存失败: ${messageId}`, err))
   }
 }

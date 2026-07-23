@@ -21,6 +21,10 @@ lerna-debug.log*
 /temp/
 wiki/
 
+# 本地开发实例（勿提交：曾以无 .gitmodules 的坏 gitlink 形式入库，导致 submodule 操作 fatal）
+/Karin/
+/openclaw-qqbot/
+
 # 配置
 /lib
 
