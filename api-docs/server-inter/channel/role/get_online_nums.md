@@ -60,7 +60,7 @@ GET /channels/123456/online_nums
 2  
 3
 
-← [子频道事件](/wiki/develop/api-v2/server-inter/channel/manage/event/channel.html) [获取频道成员列表](/wiki/develop/api-v2/server-inter/channel/role/member/get_members.html) →
+← [删除子频道](/wiki/develop/api-v2/autogen/api/channels_channel_id.delete.html) [获取频道成员列表](/wiki/develop/api-v2/server-inter/channel/role/member/get_members.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)

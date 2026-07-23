@@ -9,8 +9,8 @@ export type MediaType = 'image' | 'video' | 'record' | 'file'
 
 /** 发送QQ消息请求参数基类 */
 export interface SendQQMessageRequest {
-  /** 消息类型：0 是文本，2 是 markdown， 3 ark，4 embed，7 media 富媒体 */
-  msg_type: 0 | 2 | 3 | 4 | 7
+  /** 消息类型：0 是文本，2 是 markdown， 3 ark，4 embed，6 输入中状态（仅单聊），7 media 富媒体 */
+  msg_type: 0 | 2 | 3 | 4 | 6 | 7
 }
 
 /** 消息引用对象 */
@@ -99,6 +99,61 @@ export interface SendQQMediaMessageRequest extends SendQQMessageRequest, QQMessa
   media: {
     /** 文件信息，用于发消息接口的 media 字段使用 */
     file_info: string
+  }
+}
+
+/** 发送QQ输入中状态请求参数（仅单聊，客户端展示"正在输入"，窗口约 60 秒） */
+export interface SendQQInputNotifyRequest extends SendQQMessageRequest, QQMessageID {
+  msg_type: 6
+  /** 输入状态 */
+  input_notify: {
+    /** 输入类型，目前固定为 1（正在输入） */
+    input_type: 1
+    /** 输入状态展示时长（秒） */
+    input_second: number
+  }
+}
+
+/** 发送QQ流式消息请求参数（POST /v2/users/{openid}/stream_messages，仅单聊） */
+export interface SendQQStreamMessageRequest {
+  /**
+   * 输入模式：
+   * - append 增量追加（默认），content_raw 为本次新增内容
+   * - replace 全量替换，content_raw 为全量内容，且必须保持已下发内容前缀不变
+   */
+  input_mode?: 'append' | 'replace'
+  /** 输入状态：1 生成中 / 10 正文结束 */
+  input_state: 1 | 10
+  /** 流式序号，从 0 开始逐帧递增，同一次流的 msg_seq 保持一致 */
+  index: number
+  /** 内容类型，默认 text */
+  content_type?: 'text' | 'markdown'
+  /** 内容原文 */
+  content_raw: string
+  /** 首帧由服务端生成并返回，后续帧需携带 */
+  stream_msg_id?: string
+  /** 前置事件 ID（被动消息，与 msg_id 二选一） */
+  event_id?: string
+  /** 前置消息 ID（被动消息，与 event_id 二选一） */
+  msg_id?: string
+  /** 回复序号，与 msg_id 联合使用 */
+  msg_seq?: number
+  /** 互动召回消息，与 msg_id、event_id 互斥 */
+  is_wakeup?: boolean
+}
+
+/** 发送QQ流式消息响应 */
+export interface SendQQStreamMessageResponse {
+  /** 流式消息 ID，后续帧作为 stream_msg_id 携带 */
+  id: string
+  /** 发送时间 */
+  timestamp: number | string
+  /** 剩余可发送字数 */
+  remain_msg_len?: number
+  /** 扩展信息 */
+  ext_info?: {
+    /** 当前发送消息可被引用时使用的索引 */
+    ref_idx?: string
   }
 }
 
@@ -260,6 +315,56 @@ export interface SendQQMsgResponse {
     /** 当前发送消息可被引用时使用的索引。 */
     ref_idx?: string
   }
+}
+
+/** 获取群基础信息接口响应（GET /v2/groups/{group_openid}/info，白名单接口） */
+export interface QQGroupInfoResponse {
+  /** 群 openid */
+  group_openid: string
+  /** 群名称 */
+  group_name: string
+  /** 群简介 */
+  group_finger_memo?: string
+  /** 群分类文本 */
+  group_class_text?: string
+  /** 群标签 */
+  group_tags?: string[]
+  /** 群成员人数 */
+  group_member_num?: number
+}
+
+/** 获取机器人群内状态接口响应（GET /v2/groups/{group_openid}/bot_state，白名单接口） */
+export interface GroupBotStateResponse {
+  /** 机器人在群内的 member_openid */
+  member_openid: string
+  /** 入群时间，RFC3339 格式 */
+  joined_at?: string
+  /** 是否允许主动发消息 */
+  allow_proactive_msg?: boolean
+  /** 接收消息设置：all / only_mention / mention_and_context */
+  recv_msg_setting?: string
+  /** 机器人在群内的角色：owner / admin / member */
+  member_role?: 'owner' | 'admin' | 'member'
+}
+
+/**
+ * 获取群成员详情接口响应（GET /v2/groups/{group_openid}/members/{member_openid}）
+ *
+ * 该接口未出现在公开文档中，仅在腾讯官方 openclaw 插件
+ * （@tencent-connect/openclaw-qqbot v2.0.0）中被作为一等接口使用，返回结构未公开，
+ * 字段全部按可选处理，实际以平台返回为准。
+ */
+export interface QQGroupMemberResponse {
+  /** 群成员 openid */
+  member_openid?: string
+  /** 群成员昵称 */
+  nick?: string
+  /** 入群时间，RFC3339 格式 */
+  joined_at?: string
+  /** 群内角色：owner / admin / member */
+  member_role?: 'owner' | 'admin' | 'member'
+  /** 其余未公开字段原样保留 */
+  [key: string]: unknown
 }
 
 /** 发送频道消息后响应 */
