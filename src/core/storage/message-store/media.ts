@@ -122,10 +122,11 @@ export const localizeFileElements = async (
 /**
  * 清理超过消息缓存 TTL 的本地媒体文件。
  *
+ * @param ttlMs 保留时长；缺省使用默认 TTL。
  * @returns 清理完成 Promise。
  */
-export const cleanupMessageMediaCache = async (): Promise<void> => {
-  const deadline = Date.now() - MESSAGE_TTL
+export const cleanupMessageMediaCache = async (ttlMs: number = MESSAGE_TTL): Promise<void> => {
+  const deadline = Date.now() - ttlMs
   await cleanupDir(MEDIA_CACHE_DIR, deadline)
 }
 

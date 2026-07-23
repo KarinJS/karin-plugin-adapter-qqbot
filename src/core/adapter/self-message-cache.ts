@@ -84,6 +84,7 @@ export const cacheSelfMessage = (
       }, {
         refIdx: referenceMessageId && referenceMessageId !== messageId ? referenceMessageId : undefined,
         isSelf: true,
+        level: ctx.cfg.messageCache.level,
       })
       .catch(err => ctx.logger('warn', `[getMsg] 写入自己消息缓存失败: ${messageId}`, err))
   }

@@ -1,4 +1,4 @@
-/** QQ 官方不提供按消息 ID 查询历史消息；本地缓存保留一天。 */
+/** 默认缓存保留时长；实际值由 messageCache.ttlHours 配置，多 bot 取最大值。 */
 export const MESSAGE_TTL = 1 * 24 * 60 * 60 * 1000
 
 /** 空闲时也定期清理，避免长期运行的机器人积累过期记录。 */
@@ -29,7 +29,7 @@ export const MAX_MEDIA_LOCALIZE_QUEUE = 2000
 export const MEDIA_RECOVERY_LIMIT = 500
 
 /**
- * 消息主表硬上限；超出后从最旧的行开始删除。
+ * 消息主表默认硬上限；实际值由 messageCache.maxRows 配置，多 bot 取最大值。
  * TTL 只能约束时间维度，硬上限保证刷屏场景下磁盘占用可预期。
  */
 export const MAX_MESSAGE_ROWS = 200_000
@@ -37,5 +37,8 @@ export const MAX_MESSAGE_ROWS = 200_000
 /** 单个 text/markdown 消息段最大缓存字符数，超出部分截断。 */
 export const ELEMENT_TEXT_LIMIT = 4096
 
-/** v2：单表消息 + 整数 hash 索引 + JSON 消息段。 */
-export const DATABASE_VERSION = 2
+/** file_info 上传缓存最大行数，超出后删除最旧。 */
+export const UPLOAD_CACHE_MAX_ROWS = 2000
+
+/** v2：单表消息 + 整数 hash 索引 + JSON 消息段；v3：file_info 上传缓存表。 */
+export const DATABASE_VERSION = 3

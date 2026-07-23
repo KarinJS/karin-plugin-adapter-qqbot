@@ -1,4 +1,5 @@
 import type { Contact, ElementTypes, GroupSender, Sender } from 'node-karin'
+import type { MessageCacheLevel } from '@/types/config'
 
 export interface CachedMessage {
   messageId: string
@@ -15,6 +16,16 @@ export interface SaveOptions {
   refIdx?: string
   /** 是否是机器人自己发送的消息，用于单聊撤回判定。 */
   isSelf?: boolean
+  /** 存储分级；缺省按 standard 处理。 */
+  level?: MessageCacheLevel
+}
+
+/** file_info 上传缓存查询行。 */
+export interface UploadCacheRow {
+  /** 序列化后的上传响应 JSON。 */
+  response: string
+  /** 失效时间戳；0 表示长期有效。 */
+  expires_at: number
 }
 
 export interface IdRow {

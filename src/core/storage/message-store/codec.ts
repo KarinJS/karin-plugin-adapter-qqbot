@@ -1,6 +1,7 @@
 import { ELEMENT_TEXT_LIMIT } from './constants'
 import { fromStoredFilePath, toStoredFilePath } from './media'
 import type { ElementTypes } from 'node-karin'
+import type { MessageCacheLevel } from '@/types/config'
 
 /**
  * 消息段的紧凑存储形态。
@@ -29,6 +30,33 @@ export interface EncodedElements {
   json: string
   /** 第一个 reply 段引用的消息 ID；没有 reply 段时为 null。 */
   replyTo: string | null
+}
+
+/** 各存储分级允许落库的消息段类型；full 不过滤（encode 自身会跳过不支持的类型）。 */
+const LEVEL_ALLOWED: Record<Exclude<MessageCacheLevel, 'full'>, Set<ElementTypes['type']>> = {
+  minimal: new Set<ElementTypes['type']>(['reply']),
+  standard: new Set<ElementTypes['type']>([
+    'text', 'at', 'reply', 'face', 'image', 'video', 'record', 'file',
+  ]),
+}
+
+/**
+ * 按存储分级过滤消息段。
+ *
+ * minimal 只保留 reply 段（引用链解析所需）；standard 丢弃 markdown 原文；
+ * full 原样返回。消息主记录（ID 映射、is_self）不受分级影响，始终落库。
+ *
+ * @param elements Karin 消息段数组。
+ * @param level 存储分级；缺省按 standard 处理。
+ * @returns 过滤后的消息段数组。
+ */
+export const filterElementsByLevel = (
+  elements: ElementTypes[],
+  level: MessageCacheLevel = 'standard'
+): ElementTypes[] => {
+  if (level === 'full') return elements
+  const allowed = LEVEL_ALLOWED[level] || LEVEL_ALLOWED.standard
+  return elements.filter(element => allowed.has(element.type))
 }
 
 /**
