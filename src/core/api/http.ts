@@ -7,7 +7,7 @@ export type AxiosInstance = ReturnType<typeof createAxiosInstance>
 
 /**
  * 包装 axios 错误为可读多行 message
- * 如果响应中包含 QQ 官方错误码(code)，会自动映射为中文描述
+ * 如果响应中包含 QQ 官方错误码(err_code)，会自动映射为中文描述
  */
 const formatError = (path: string, options: unknown, err: unknown): Error => {
   if (axios.isAxiosError(err)) {
@@ -15,9 +15,12 @@ const formatError = (path: string, options: unknown, err: unknown): Error => {
     const status = response?.status ?? 0
     const data = response?.data as Record<string, unknown> | undefined
 
-    // 尝试提取 QQ 官方错误码
-    const code = typeof data?.code === 'number' ? data.code : undefined
+    // 尝试提取 QQ 官方错误码（新版文档字段为 err_code，兼容旧版 code）
+    const code = typeof data?.err_code === 'number'
+      ? data.err_code
+      : typeof data?.code === 'number' ? data.code : undefined
     const msg = typeof data?.message === 'string' ? data.message : undefined
+    const traceId = typeof data?.trace_id === 'string' ? data.trace_id : undefined
 
     const lines: string[] = []
     lines.push('[axios] 请求失败')
@@ -31,6 +34,9 @@ const formatError = (path: string, options: unknown, err: unknown): Error => {
     // 使用映射表格式化错误
     if (code !== undefined || status > 0) {
       lines.push(`错误详情: ${formatOpenAPIError(status, code, msg)}`)
+    }
+    if (traceId) {
+      lines.push(`TraceID: ${traceId}`)
     }
 
     // 原始响应数据兜底

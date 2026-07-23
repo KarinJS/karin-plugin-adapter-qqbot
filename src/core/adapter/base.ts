@@ -1,4 +1,4 @@
-import { AdapterBase, logger, buttonHandle, segment, fileToUrl } from 'node-karin'
+import { AdapterBase, logger, buttonHandle, segment, fileToUrl, senderGroup } from 'node-karin'
 import { QQBotApi } from '@/core/api'
 import { sendQQ } from './pipeline-qq'
 import { sendGuild } from './pipeline-guild'
@@ -18,6 +18,9 @@ import type {
 import type { QQBotConfig } from '@/types/config'
 
 const adapterConfigStore = new WeakMap<object, QQBotConfig>()
+
+/** HTTP(S) URL 可直接交给 QQ 平台拉取上传 */
+const HTTP_URL_RE = /^https?:\/\//i
 
 /**
  * QQ Official Bot 适配器
@@ -464,11 +467,12 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
 
   /**
    * 获取群信息
+   *
+   * 走官方 `GET /v2/groups/{group_openid}/info`（白名单接口）。
+   * 未开通权限（11253）或查询失败时降级为空结构并告警。
    */
   async getGroupInfo (_groupId: string, _noCache?: boolean): Promise<GroupInfo> {
-    // TODO: QQ 官方 Bot API 暂不支持获取群信息
-    this.logger('warn', '[getGroupInfo] QQ Official Bot API 暂不支持获取群信息')
-    return {
+    const empty: GroupInfo = {
       groupId: _groupId,
       groupName: '',
       owner: '',
@@ -478,6 +482,20 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
       memberCount: 0,
       groupDesc: '',
       avatar: '',
+    }
+
+    try {
+      const info = await this.super.groups.getGroupInfo(_groupId)
+      return {
+        ...empty,
+        groupName: info.group_name || '',
+        memberCount: info.group_member_num ?? 0,
+        groupDesc: info.group_finger_memo || '',
+        avatar: await this.getGroupAvatarUrl(_groupId),
+      }
+    } catch (err) {
+      this.logger('warn', `[getGroupInfo] 获取群信息失败（该接口为白名单接口，未开通权限会返回 11253）: ${err instanceof Error ? err.message : err}`)
+      return empty
     }
   }
 
@@ -492,14 +510,52 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
 
   /**
    * 获取群成员信息
+   *
+   * - 查询机器人自身（targetId 为 selfId）走官方 `GET /v2/groups/{group_openid}/bot_state`（白名单）。
+   * - 查询其他成员走 `GET /v2/groups/{group_openid}/members/{member_openid}`，
+   *   该接口未公开文档，来自腾讯官方 openclaw 插件 v2.0.0，返回结构以平台实际为准。
+   * 接口不可用（如白名单未开通返回 11253）时降级为占位结构并告警。
    */
   async getGroupMemberInfo (_groupId: string, _targetId: string, _refresh?: boolean): Promise<GroupMemberInfo> {
-    // TODO: QQ 官方 Bot API 暂不支持获取群成员信息
-    this.logger('warn', '[getGroupMemberInfo] QQ Official Bot API 暂不支持获取群成员信息')
-    return {
-      userId: _targetId,
-      role: 'member',
-    } as GroupMemberInfo
+    /** 按 karin 接口约定构造返回值，sender 由 getter 即时构建 */
+    const build = (userId: string, role: GroupMemberInfo['role'], nick?: string, joinTime?: number): GroupMemberInfo => ({
+      userId,
+      role,
+      nick,
+      joinTime,
+      get sender () {
+        return senderGroup({ userId, nick: nick || '', name: nick || '', role })
+      },
+    })
+
+    if (_targetId === this.selfId) {
+      try {
+        const state = await this.super.groups.getBotState(_groupId)
+        return build(
+          state.member_openid || _targetId,
+          state.member_role || 'member',
+          undefined,
+          state.joined_at ? new Date(state.joined_at).getTime() : undefined
+        )
+      } catch (err) {
+        this.logger('warn', `[getGroupMemberInfo] 获取机器人群内状态失败（该接口为白名单接口，未开通权限会返回 11253）: ${err instanceof Error ? err.message : err}`)
+        return build(_targetId, 'member')
+      }
+    }
+
+    try {
+      const member = await this.super.groups.getGroupMember(_groupId, _targetId)
+      if (member.nick) this.nicknameCache.set(_targetId, member.nick)
+      return build(
+        member.member_openid || _targetId,
+        member.member_role || 'member',
+        member.nick,
+        member.joined_at ? new Date(member.joined_at).getTime() : undefined
+      )
+    } catch (err) {
+      this.logger('warn', `[getGroupMemberInfo] 获取群成员详情失败（该接口未公开文档，可能不可用）: ${err instanceof Error ? err.message : err}`)
+      return build(_targetId, 'member')
+    }
   }
 
   /**
@@ -554,10 +610,22 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
 
   /**
    * 上传群文件、私聊文件
+   *
+   * QQ 官方 Bot API 没有群文件系统，上传走 `POST /v2/{users|groups}/{openid}/files`
+   * （file_type=4 + srv_send_msg=true），由服务端直接发送文件消息。
+   * 频道 / 频道私信场景官方无文件接口，暂不支持。
    */
   async uploadFile (_contact: Contact, _file: string, _name: string, _folder?: string): Promise<void> {
-    // TODO: QQ 官方 Bot API 暂不支持上传文件
-    this.logger('warn', '[uploadFile] QQ Official Bot API 暂不支持上传文件')
+    if (_contact.scene !== 'friend' && _contact.scene !== 'group') {
+      this.logger('warn', '[uploadFile] 频道场景 QQ Official Bot API 暂不支持上传文件')
+      return
+    }
+    const scene = _contact.scene === 'friend' ? 'user' : 'group'
+    if (HTTP_URL_RE.test(_file)) {
+      await this.super.media.upload(scene, _contact.peer, 'file', _file, true, _name)
+    } else {
+      await this.super.media.uploadFallback(scene, _contact.peer, 'file', _file, true, _name)
+    }
   }
 
   /**
@@ -598,11 +666,21 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
 
   /**
    * 上传群文件
+   *
+   * 实现同 {@link uploadFile}：官方无群文件系统，走 files 接口由服务端直发文件消息。
    */
   async uploadGroupFile (_groupId: string, _file: string, _name?: string): Promise<boolean> {
-    // TODO: QQ 官方 Bot API 暂不支持上传群文件
-    this.logger('warn', '[uploadGroupFile] QQ Official Bot API 暂不支持上传群文件')
-    return false
+    try {
+      if (HTTP_URL_RE.test(_file)) {
+        await this.super.media.upload('group', _groupId, 'file', _file, true, _name)
+      } else {
+        await this.super.media.uploadFallback('group', _groupId, 'file', _file, true, _name)
+      }
+      return true
+    } catch (err) {
+      this.logger('warn', `[uploadGroupFile] 上传群文件失败: ${err instanceof Error ? err.message : err}`)
+      return false
+    }
   }
 
   /**

@@ -1,16 +1,29 @@
-# [#](#openapi-错误) openapi 错误
+# [#](#错误与调试) 错误与调试
 
-## [#](#错误码处理) 错误码处理
+## [#](#openapi错误码) OpenAPI错误码
 
 错误码分为两部分：
 
 * http 状态码
-* http body 返回的 json 中的 code
-* 其中有一些错误会在 http body 返回的 json 中的 [data](/wiki/develop/api-v2/openapi/error/data/model.html) 中，返回业务具体信息。例如 [主动消息审核](/wiki/develop/api-v2/server-inter/message/post_messages.html)
+* http body 返回的 json 中的 err\_code
 
-如： ![错误码](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/error.592db73d.png)
+例如：
 
-### [#](#http-状态码) http 状态码
+```json
+{
+  "err_code": 40034005,
+  "message": "回复消息msg_id已过期",
+  "trace_id": "4a8a61565b909f199b1ec169fdd6f49e"
+}
+```
+
+1  
+2  
+3  
+4  
+5
+
+### [#](#http-状态码) HTTP 状态码
 
 |值|含义|
 |:---|:---|
@@ -24,7 +37,9 @@
 |500|处理失败|
 |504|处理失败|
 
-### [#](#code) code
+### [#](#公共错误码) 公共错误码
+
+> 以下为所有接口通用的公共错误码。各接口特有的错误码请查阅具体接口文档中的「错误码」章节。
 
 |值|含义|
 |:---|:---|
@@ -271,11 +286,39 @@
 |3000000~3999999|编辑消息错误|
 |3300006|安全打击|
 
-## [#](#有关-traceid) 有关 traceID
+## [#](#全链路追踪) 全链路追踪
 
-在 openapi 的返回 http 头上，有一个 `X-Tps-trace-ID` 自定义头部，是平台的链路追踪 ID，如果开发者有无法自己定位的问题，需要找平台协助的时候，可以提取这个 ID，提交给平台方。
+平台的链路追踪 `TraceID` 可通过两种方式获取：
 
-方便查询相关日志。
+* **HTTP 响应头**：`X-Tps-trace-ID` 字段
+* **响应 Body**：返回体中的 `trace_id` 字段
+
+如果开发者有无法自行定位的问题，需要找平台协助时，可提取该 ID 提交给平台方，方便查询相关日志。
+
+## [#](#websocket-错误码) WebSocket 错误码
+
+|值|含义|是否可以重试 RESUME|是否可以重试 IDENTIFY|
+|:---|:---|:---|:---|
+|4001|无效的 opcode|否|否|
+|4002|无效的 payload|否|否|
+|4007|seq 错误|否|**是**|
+|4006|无效的 session id，无法继续 resume，请 identify|否|**是**|
+|4008|发送 payload 过快，请重新连接，并遵守连接后返回的频控信息|**是**|**是**|
+|4009|连接过期，请重连并执行 resume 进行重新连接|**是**|**是**|
+|4010|无效的 shard|否|否|
+|4011|连接需要处理的 guild 过多，请进行合理的分片|否|否|
+|4012|无效的 version|否|否|
+|4013|无效的 intent|否|否|
+|4014|intent 无权限|否|否|
+|4900~4913|内部错误，请重连|否|**是**|
+|4914|机器人已下架,只允许连接沙箱环境,请断开连接,检验当前连接环境|否|否|
+|4915|机器人已封禁,不允许连接,请断开连接,申请解封后再连接|否|否|
+
+针对 WebSocket 错误码的简单处理逻辑：
+
+* 4009 可以重新发起 resume
+* 4914，4915 不可以连接，请联系官方解封
+* 其他错误，请重新发起 identify
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)

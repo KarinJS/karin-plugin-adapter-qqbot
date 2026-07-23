@@ -84,7 +84,9 @@ const fetchGateway = async (cfg: QQBotConfig): Promise<string> => {
       const response = (err as AxiosError).response
       const status = response?.status ?? 0
       const data = response?.data as Record<string, unknown> | undefined
-      const code = typeof data?.code === 'number' ? data.code : undefined
+      const code = typeof data?.err_code === 'number'
+        ? data.err_code
+        : typeof data?.code === 'number' ? data.code : undefined
       const msg = typeof data?.message === 'string' ? data.message : undefined
       const detail = formatOpenAPIError(status, code, msg)
       log('warn', `${cfg.appId}: /gateway 调用失败 | ${detail}，使用硬编码 WS ${fallback}`)
