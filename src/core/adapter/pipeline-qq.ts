@@ -7,7 +7,6 @@ import {
 } from './button-enter'
 import { groupElements } from './grouping'
 import { resolvePreferredMediaSource } from './media-source'
-import { rememberApiMessageId, rememberOwnMessageId, resolveReferenceMessageId } from './message-id-map'
 import { extractUrlButtons, imagesToMarkdown, splitMarkdownImages } from './text-to-md'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
@@ -89,7 +88,7 @@ const sendQQMarkdown = async (
 
   // markdown 主消息：有任意可渲染内容才推
   if (lines.length || grouping.buttons.length || grouping.keyboards.length) {
-    if (shouldUseTextForReference(ctx, contact, grouping)) {
+    if (shouldUseTextForReference(grouping)) {
       items.push(ctx.super.qq.text(lines.join('\n')))
     } else {
       const keyboard = buildKeyboard(grouping)
@@ -288,12 +287,8 @@ const appendImageUrlLine = async (lines: string[], url: string): Promise<void> =
  * @param grouping 已归类的消息段。
  * @returns 是否使用普通文本发送主消息。
  */
-const shouldUseTextForReference = (
-  ctx: AdapterQQBot,
-  contact: Contact<'friend' | 'group'>,
-  grouping: Grouping<'qq'>
-): boolean => {
-  return isQQReferenceMessageId(resolveReferenceMessageId(ctx, contact, grouping.reply.messageId)) &&
+const shouldUseTextForReference = (grouping: Grouping<'qq'>): boolean => {
+  return isQQReferenceMessageId(grouping.reply.messageId) &&
     !grouping.qqImages.length &&
     !grouping.buttons.length &&
     !grouping.keyboards.length &&
@@ -314,9 +309,9 @@ const isQQReferenceMessageId = (messageId: string): boolean => messageId.startsW
 /**
  * 发送前把显式引用的 API 消息 ID 解析为 REFIDX。
  *
- * 内存映射（重启后为空）未命中时回退查询 SQLite 消息缓存，保证重启后
- * `segment.reply(e.messageId)` 依然能渲染可见引用。解析结果直接写回
- * grouping，后续同步路径（降级判断、message_reference 附加）无需再查库。
+ * 映射只存在于 SQLite 消息缓存（ID 映射行不受缓存开关影响，始终落库）。
+ * 解析结果直接写回 grouping，后续同步路径（降级判断、message_reference
+ * 附加）无需再查库。
  *
  * @param ctx 适配器实例。
  * @param contact 消息目标会话。
@@ -328,14 +323,7 @@ const resolveOutgoingReferenceQQ = async (
   grouping: Grouping<'qq'>
 ): Promise<void> => {
   const original = grouping.reply.messageId
-  if (!original) return
-
-  const resolved = resolveReferenceMessageId(ctx, contact, original)
-  if (isQQReferenceMessageId(resolved)) {
-    grouping.reply.messageId = resolved
-    return
-  }
-  if (!ctx.cfg.messageCache.enable) return
+  if (!original || isQQReferenceMessageId(original)) return
 
   const fromStore = await ctx.messageStore
     .resolveRefIdx(String(ctx.cfg.appId), contact, original)
@@ -423,10 +411,8 @@ const flushQQ = async (
   let referenceHandled = false
   for (const item of items.slice(0, maxItems)) {
     passive(item)
-    if (!referenceHandled) referenceHandled = attachVisibleReferenceQQ(ctx, contact, item, grouping)
+    if (!referenceHandled) referenceHandled = attachVisibleReferenceQQ(item, grouping)
     const res: SendQQMsgResponse = await sendQQWithEventFallback(ctx, contact, send, item)
-    rememberOwnMessageId(ctx, contact, res.id)
-    if (res.ext_info?.ref_idx) rememberApiMessageId(ctx, contact, res.ext_info.ref_idx, res.id)
     result.rawData.push(res)
   }
   return ctx.handleResponse(result)
@@ -496,19 +482,17 @@ const resolvePassiveQQ = (grouping: Grouping<'qq'>): PassiveInfo | undefined => 
  * 附加 QQ 客户端可见的引用对象。
  *
  * 群聊/单聊里真正发给 QQ 的值必须是 `message_scene.ext` 的 `msg_idx=REFIDX_xxx`。
- * 如果插件传入的是 Karin 暴露的官方 API 消息 ID，这里会先按同会话映射转换。
+ * API 消息 ID 到 REFIDX 的转换已由 `resolveOutgoingReferenceQQ` 在发送前完成。
  *
  * @param item 即将发送的 QQ 消息体。
  * @param grouping 已归类的消息段。
  * @returns 是否已经消费一次显式引用。
  */
 const attachVisibleReferenceQQ = (
-  ctx: AdapterQQBot,
-  contact: Contact<'friend' | 'group'>,
   item: SendQQMsg,
   grouping: Grouping<'qq'>
 ): boolean => {
-  const messageId = resolveReferenceMessageId(ctx, contact, grouping.reply.messageId)
+  const messageId = grouping.reply.messageId
   if (!isQQReferenceMessageId(messageId)) return false
   item.message_reference = { message_id: messageId }
   return true

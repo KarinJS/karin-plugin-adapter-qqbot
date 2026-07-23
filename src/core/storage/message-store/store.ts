@@ -198,7 +198,7 @@ export class MessageStore {
   /**
    * 将 QQ `REFIDX` 引用索引解析为 API 消息 ID。
    *
-   * 供撤回等平台接口在内存映射（重启后为空）未命中时回退查询。
+   * 撤回等平台接口的唯一映射来源；ID 映射行不受缓存开关影响，始终落库。
    *
    * @param botId 当前 QQBot appId。
    * @param contact 消息所在会话。
@@ -220,7 +220,7 @@ export class MessageStore {
   /**
    * 将 API 消息 ID 反向解析为 QQ `REFIDX` 引用索引。
    *
-   * 供发送侧显式引用回复在内存映射（重启后为空）未命中时回退查询。
+   * 发送侧显式引用回复的唯一映射来源。
    *
    * @param botId 当前 QQBot appId。
    * @param contact 消息所在会话。
@@ -270,7 +270,7 @@ export class MessageStore {
   /**
    * 判断消息是否由机器人自己发送。
    *
-   * 供单聊撤回在内存标记（重启后为空）未命中时回退查询。
+   * 单聊撤回判定的唯一来源，读取消息行的 `is_self` 标记。
    *
    * @param botId 当前 QQBot appId。
    * @param contact 消息所在会话。

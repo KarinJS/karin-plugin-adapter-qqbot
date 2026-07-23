@@ -2,7 +2,6 @@ import { AdapterBase, logger, buttonHandle, segment, fileToUrl } from 'node-kari
 import { QQBotApi } from '@/core/api'
 import { sendQQ } from './pipeline-qq'
 import { sendGuild } from './pipeline-guild'
-import { isOwnMessageId, resolveApiMessageId } from './message-id-map'
 import { cacheSelfMessage, prepareSelfMessageCache, shouldCacheSelfMessage } from './self-message-cache'
 import { getMessageStore, type MessageStore } from '@/core/storage/message'
 import { getImageSize } from '@/utils/common'
@@ -73,22 +72,17 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
     elements: Array<ElementTypes>,
     _retryCount?: number
   ): Promise<SendMsgResults> {
+    /** 发送成功后始终记录消息 ID 映射；正文是否入库由 cacheSelfMessage 内部按开关决定。 */
     if (contact.scene === 'direct' || contact.scene === 'guild') {
-      if (!shouldCacheSelfMessage(this)) {
-        return sendGuild(this, contact as Contact<'guild' | 'direct'>, elements)
-      }
-      const prepared = await prepareSelfMessageCache(this, elements)
-      const result = await sendGuild(this, contact as Contact<'guild' | 'direct'>, prepared.sendElements)
-      cacheSelfMessage(this, contact, prepared.cacheElements, result)
+      const prepared = shouldCacheSelfMessage(this) ? await prepareSelfMessageCache(this, elements) : undefined
+      const result = await sendGuild(this, contact as Contact<'guild' | 'direct'>, prepared?.sendElements ?? elements)
+      cacheSelfMessage(this, contact, prepared?.cacheElements ?? [], result)
       return result
     }
     if (contact.scene === 'group' || contact.scene === 'friend') {
-      if (!shouldCacheSelfMessage(this)) {
-        return sendQQ(this, contact as Contact<'friend' | 'group'>, elements)
-      }
-      const prepared = await prepareSelfMessageCache(this, elements)
-      const result = await sendQQ(this, contact as Contact<'friend' | 'group'>, prepared.sendElements)
-      cacheSelfMessage(this, contact, prepared.cacheElements, result)
+      const prepared = shouldCacheSelfMessage(this) ? await prepareSelfMessageCache(this, elements) : undefined
+      const result = await sendQQ(this, contact as Contact<'friend' | 'group'>, prepared?.sendElements ?? elements)
+      cacheSelfMessage(this, contact, prepared?.cacheElements ?? [], result)
       return result
     }
     throw new Error(`不支持的消息场景: ${contact.scene}`)
@@ -98,11 +92,12 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
    * 撤回消息
    *
    * 群聊中机器人被群主设为管理员后，也可撤回成员消息；平台仍限制消息发送后两分钟内。
-   * 内存映射未命中时（例如进程重启后）回退查询 SQLite 消息缓存。
+   * REFIDX 与 API 消息 ID 的映射、单聊"是否自己发送"的判定都直接查询
+   * SQLite 消息缓存（ID 映射行不受缓存开关影响，始终落库）。
    */
   async recallMsg (contact: Contact, messageId: string): Promise<void> {
-    let apiMessageId = resolveApiMessageId(this, contact, messageId)
-    if (apiMessageId.startsWith('REFIDX_') && this.cfg.messageCache.enable) {
+    let apiMessageId = messageId
+    if (apiMessageId.startsWith('REFIDX_')) {
       const resolved = await this.messageStore
         .resolveApiMessageId(String(this.cfg.appId), contact, apiMessageId)
         .catch(() => null)
@@ -110,12 +105,9 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
     }
     try {
       if (contact.scene === 'friend') {
-        let own = isOwnMessageId(this, contact, apiMessageId)
-        if (!own && this.cfg.messageCache.enable) {
-          own = await this.messageStore
-            .isSelfMessage(String(this.cfg.appId), contact, apiMessageId)
-            .catch(() => false)
-        }
+        const own = await this.messageStore
+          .isSelfMessage(String(this.cfg.appId), contact, apiMessageId)
+          .catch(() => false)
         if (!own) {
           this.logger('warn', `[recallMsg] QQ 单聊只能撤回机器人自己发送的消息，已跳过撤回: ${messageId}`)
           return
