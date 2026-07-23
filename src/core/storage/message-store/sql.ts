@@ -1,18 +1,19 @@
 /**
  * 消息主表查询字段。
  *
- * 主表只保存整数外键，读取时再 JOIN 联系人和发送者映射表，避免在每条消息和每个
- * 消息段上重复写入 bot、群号、用户 ID 等长字符串。
+ * 长 ID 只在 `qqbot_messages` 存一份原文；查询统一走整数 hash 索引，
+ * 命中后由调用方比对原文防碰撞。
  */
-export const messageSelectFields = (): string => `
+const messageSelectFields = `
   m.id AS message_ref,
-  m.bot_ref,
   m.contact_ref,
-  m.sender_ref,
-  b.bot_id,
-  m.message_id,
-  m.message_seq,
+  c.bot_id,
+  m.msg_id,
+  m.ref_idx,
+  m.reply_to,
   m.time,
+  m.is_self,
+  m.elements,
   c.scene,
   c.peer,
   c.sub_peer,
@@ -23,107 +24,81 @@ export const messageSelectFields = (): string => `
   s.name AS sender_name,
   s.role AS sender_role`
 
+const messageJoins = `
+  FROM qqbot_messages m
+  JOIN qqbot_contacts c ON c.id = m.contact_ref
+  JOIN qqbot_senders s ON s.id = m.sender_ref`
+
 export const SQL = {
-  insertBot: 'INSERT INTO qqbot_bots (bot_id) VALUES (?) ON CONFLICT(bot_id) DO NOTHING',
-  selectBotId: 'SELECT id FROM qqbot_bots WHERE bot_id = ?',
-  upsertContact: `INSERT INTO qqbot_contacts (bot_ref, scene, peer, sub_peer, name, sub_name)
+  upsertContact: `INSERT INTO qqbot_contacts (bot_id, scene, peer, sub_peer, name, sub_name)
     VALUES (?, ?, ?, ?, ?, ?)
-    ON CONFLICT(bot_ref, scene, peer, sub_peer) DO UPDATE SET
+    ON CONFLICT(bot_id, scene, peer, sub_peer) DO UPDATE SET
       name = excluded.name,
       sub_name = excluded.sub_name`,
   selectContactId: `SELECT id FROM qqbot_contacts
-    WHERE bot_ref = ? AND scene = ? AND peer = ? AND sub_peer = ?`,
-  upsertSender: `INSERT INTO qqbot_senders (bot_ref, user_id, nick, name, role)
+    WHERE bot_id = ? AND scene = ? AND peer = ? AND sub_peer = ?`,
+  upsertSender: `INSERT INTO qqbot_senders (bot_id, user_id, nick, name, role)
     VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(bot_ref, user_id, nick, name, role) DO NOTHING`,
+    ON CONFLICT(bot_id, user_id, nick, name, role) DO NOTHING`,
   selectSenderId: `SELECT id FROM qqbot_senders
-    WHERE bot_ref = ? AND user_id = ? AND nick = ? AND name = ? AND role = ?`,
-  upsertMessage: `INSERT INTO qqbot_messages (
-    bot_ref, contact_ref, sender_ref, message_id, message_seq, time
-  ) VALUES (?, ?, ?, ?, ?, ?)
-  ON CONFLICT(bot_ref, contact_ref, message_id) DO UPDATE SET
-    sender_ref = excluded.sender_ref,
-    message_seq = excluded.message_seq,
-    time = excluded.time`,
-  selectMessageRef: `SELECT id FROM qqbot_messages
-    WHERE bot_ref = ? AND contact_ref = ? AND message_id = ?`,
-  deleteElements: 'DELETE FROM qqbot_message_elements WHERE message_ref = ?',
-  insertElement: `INSERT INTO qqbot_message_elements (
-    message_ref, element_index, element_type, value
-  ) VALUES (?, ?, ?, ?)`,
-  insertAlias: `INSERT INTO qqbot_message_aliases (
-    bot_ref, contact_ref, alias_message_id, message_ref
-  ) VALUES (?, ?, ?, ?)
-  ON CONFLICT(bot_ref, contact_ref, alias_message_id) DO UPDATE SET
-    message_ref = excluded.message_ref`,
-  selectMessage: `SELECT ${messageSelectFields()}
-    FROM qqbot_messages m
-    JOIN qqbot_bots b ON b.id = m.bot_ref
-    JOIN qqbot_contacts c ON c.id = m.contact_ref
-    JOIN qqbot_senders s ON s.id = m.sender_ref
-    WHERE b.bot_id = ? AND c.scene = ? AND c.peer = ? AND c.sub_peer = ? AND m.message_id = ?`,
-  selectMessageById: `SELECT ${messageSelectFields()}
-    FROM qqbot_messages m
-    JOIN qqbot_bots b ON b.id = m.bot_ref
-    JOIN qqbot_contacts c ON c.id = m.contact_ref
-    JOIN qqbot_senders s ON s.id = m.sender_ref
-    WHERE b.bot_id = ? AND m.message_id = ?
+    WHERE bot_id = ? AND user_id = ? AND nick = ? AND name = ? AND role = ?`,
+
+  /** 写入侧按 hash 定位既有行；同一 flush 循环串行执行，无并发写竞争。 */
+  selectMessageIdByMsgId: `SELECT id FROM qqbot_messages
+    WHERE msg_id_hash = ? AND contact_ref = ? AND msg_id = ?`,
+  selectMessageIdByRefIdx: `SELECT id FROM qqbot_messages
+    WHERE ref_idx_hash = ? AND ref_idx_hash IS NOT NULL AND contact_ref = ? AND ref_idx = ?`,
+  insertMessage: `INSERT INTO qqbot_messages (
+    contact_ref, sender_ref, msg_id, msg_id_hash, ref_idx, ref_idx_hash,
+    reply_to, time, is_self, is_ref_context, has_remote_media, elements
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  updateMessage: `UPDATE qqbot_messages SET
+    sender_ref = ?,
+    ref_idx = COALESCE(?, ref_idx),
+    ref_idx_hash = COALESCE(?, ref_idx_hash),
+    reply_to = ?,
+    time = ?,
+    is_self = ?,
+    has_remote_media = ?,
+    elements = ?
+    WHERE id = ?`,
+
+  selectByMsgId: `SELECT ${messageSelectFields} ${messageJoins}
+    WHERE m.msg_id_hash = ? AND c.bot_id = ? AND m.msg_id = ?
     LIMIT 1`,
-  selectMessageByRef: `SELECT ${messageSelectFields()}
-    FROM qqbot_messages m
-    JOIN qqbot_bots b ON b.id = m.bot_ref
-    JOIN qqbot_contacts c ON c.id = m.contact_ref
-    JOIN qqbot_senders s ON s.id = m.sender_ref
-    WHERE m.id = ?`,
-  selectHistory: `SELECT ${messageSelectFields()}
-    FROM qqbot_messages m
-    JOIN qqbot_bots b ON b.id = m.bot_ref
-    JOIN qqbot_contacts c ON c.id = m.contact_ref
-    JOIN qqbot_senders s ON s.id = m.sender_ref
-    WHERE b.bot_id = ? AND c.scene = ? AND c.peer = ? AND c.sub_peer = ?
+  selectByMsgIdScoped: `SELECT ${messageSelectFields} ${messageJoins}
+    WHERE m.msg_id_hash = ? AND c.bot_id = ? AND c.scene = ? AND c.peer = ? AND c.sub_peer = ?
+      AND m.msg_id = ?
+    LIMIT 1`,
+  selectByRefIdx: `SELECT ${messageSelectFields} ${messageJoins}
+    WHERE m.ref_idx_hash = ? AND m.ref_idx_hash IS NOT NULL AND c.bot_id = ? AND m.ref_idx = ?
+    LIMIT 1`,
+  selectByRefIdxScoped: `SELECT ${messageSelectFields} ${messageJoins}
+    WHERE m.ref_idx_hash = ? AND m.ref_idx_hash IS NOT NULL
+      AND c.bot_id = ? AND c.scene = ? AND c.peer = ? AND c.sub_peer = ?
+      AND m.ref_idx = ?
+    LIMIT 1`,
+  /** 清除指向错误消息的引用索引（历史缓存中 alias 污染的兜底）。 */
+  clearRefIdx: 'UPDATE qqbot_messages SET ref_idx = NULL, ref_idx_hash = NULL WHERE id = ?',
+
+  selectHistory: `SELECT ${messageSelectFields} ${messageJoins}
+    WHERE m.contact_ref = ?
       AND (m.time < ? OR (m.time = ? AND m.id <= ?))
     ORDER BY m.time DESC, m.id DESC
     LIMIT ?`,
-  selectElements: `SELECT element_index, element_type, value
-    FROM qqbot_message_elements
-    WHERE message_ref = ?
-    ORDER BY element_index ASC`,
-  /** 查询仍保存远程 URL 的媒体消息，value 只匹配 URLSearchParams 编码后的 file 字段。 */
-  selectMessagesWithRemoteMedia: `SELECT DISTINCT ${messageSelectFields()}
-    FROM qqbot_messages m
-    JOIN qqbot_bots b ON b.id = m.bot_ref
-    JOIN qqbot_contacts c ON c.id = m.contact_ref
-    JOIN qqbot_senders s ON s.id = m.sender_ref
-    JOIN qqbot_message_elements e ON e.message_ref = m.id
-    WHERE m.time > ?
-      AND e.element_type IN ('image', 'video', 'record', 'file')
-      AND (
-        e.value LIKE 'file=http%3A%2F%2F%' OR e.value LIKE 'file=https%3A%2F%2F%'
-        OR e.value LIKE 'file=%2F%2F%'
-      )
-    ORDER BY m.time DESC, m.id DESC
+  selectRemoteMedia: `SELECT ${messageSelectFields} ${messageJoins}
+    WHERE m.has_remote_media = 1 AND m.time > ?
+    ORDER BY m.time DESC
     LIMIT ?`,
-  selectAlias: `SELECT a.message_ref
-    FROM qqbot_message_aliases a
-    JOIN qqbot_bots b ON b.id = a.bot_ref
-    JOIN qqbot_contacts c ON c.id = a.contact_ref
-    WHERE b.bot_id = ? AND c.scene = ? AND c.peer = ? AND c.sub_peer = ? AND a.alias_message_id = ?`,
-  selectAliasById: `SELECT a.message_ref
-    FROM qqbot_message_aliases a
-    JOIN qqbot_bots b ON b.id = a.bot_ref
-    WHERE b.bot_id = ? AND a.alias_message_id = ?
-    LIMIT 1`,
-  deleteAlias: `DELETE FROM qqbot_message_aliases
-    WHERE bot_ref = (SELECT id FROM qqbot_bots WHERE bot_id = ?)
-      AND contact_ref = (
-        SELECT id FROM qqbot_contacts
-        WHERE bot_ref = (SELECT id FROM qqbot_bots WHERE bot_id = ?)
-          AND scene = ? AND peer = ? AND sub_peer = ?
-      )
-      AND alias_message_id = ?`,
-  /** 判断消息是否包含指定 reply 段，value 参数必须使用 elements.replyElementValue 编码。 */
-  hasReply: `SELECT 1 AS found FROM qqbot_message_elements
-    WHERE message_ref = ? AND element_type = 'reply' AND value = ?
-    LIMIT 1`,
+
   cleanup: 'DELETE FROM qqbot_messages WHERE time <= ?',
+  countMessages: 'SELECT COUNT(*) AS total FROM qqbot_messages',
+  /** 超过硬上限时删除最旧的行；id 单调递增，等价于按写入顺序删除。 */
+  deleteOverCap: `DELETE FROM qqbot_messages WHERE id IN (
+    SELECT id FROM qqbot_messages ORDER BY id ASC LIMIT ?
+  )`,
+  /** 清理不再被任何消息引用的 sender 行，避免昵称变化导致的永久膨胀。 */
+  gcSenders: `DELETE FROM qqbot_senders WHERE id NOT IN (
+    SELECT DISTINCT sender_ref FROM qqbot_messages
+  )`,
 } as const

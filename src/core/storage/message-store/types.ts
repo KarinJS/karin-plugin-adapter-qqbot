@@ -9,19 +9,33 @@ export interface CachedMessage {
   elements: ElementTypes[]
 }
 
+/** 保存消息时的附加标记。 */
+export interface SaveOptions {
+  /** QQ 客户端引用使用的 `msg_idx`（REFIDX），作为消息的第二查询索引。 */
+  refIdx?: string
+  /** 是否是机器人自己发送的消息，用于单聊撤回判定。 */
+  isSelf?: boolean
+}
+
 export interface IdRow {
   id: number
 }
 
+export interface CountRow {
+  total: number
+}
+
+/** 消息主表 JOIN contacts/senders 后的查询行。 */
 export interface MessageRow {
   message_ref: number
-  bot_ref: number
   contact_ref: number
-  sender_ref: number
   bot_id: string
-  message_id: string
-  message_seq: number
+  msg_id: string
+  ref_idx: string | null
+  reply_to: string | null
   time: number
+  is_self: number
+  elements: string
   scene: Contact['scene']
   peer: string
   sub_peer: string
@@ -33,18 +47,7 @@ export interface MessageRow {
   sender_role: GroupSender['role']
 }
 
-export interface MessageAliasRow {
-  message_ref: number
-}
-
-export interface StoredElementRow {
-  element_index: number
-  element_type: ElementTypes['type']
-  value: string
-}
-
 export type RunSql = (sql: string, params?: unknown[]) => Promise<void>
-export type GetRows = <T>(sql: string, params?: unknown[]) => Promise<T[]>
 
 export interface MigrationContext {
   run: RunSql

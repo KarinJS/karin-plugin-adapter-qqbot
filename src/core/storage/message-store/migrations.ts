@@ -1,4 +1,4 @@
-import { createSchema, dropSchema, isCurrentSchema } from './schema'
+import { createSchema, dropLegacySchema } from './schema'
 import type { Migration } from './types'
 
 /**
@@ -8,7 +8,7 @@ import type { Migration } from './types'
  *
  * ```ts
  * {
- *   version: 2,
+ *   version: 3,
  *   description: '给 qqbot_messages 增加 xxx 字段',
  *   up: async ({ run }) => {
  *     await run('ALTER TABLE qqbot_messages ADD COLUMN xxx TEXT')
@@ -19,11 +19,14 @@ import type { Migration } from './types'
 export const migrations: Migration[] = [
   {
     version: 1,
-    description: '首个 alpha 发布基线：消息主表、单 value 消息段表和 alias 表',
-    up: async ({ run, tableColumns, tableExists, markVacuum }) => {
-      if (await isCurrentSchema(tableColumns, tableExists)) return
-
-      await dropSchema(run)
+    description: '旧版 6 表基线；已被 v2 整体重建取代，仅保留版本号占位',
+    up: async () => {},
+  },
+  {
+    version: 2,
+    description: 'v2 重建：单表消息 + 整数 hash 索引 + JSON 消息段，取消 alias 表和外键',
+    up: async ({ run, markVacuum }) => {
+      await dropLegacySchema(run)
       markVacuum()
       await createSchema(run)
     },

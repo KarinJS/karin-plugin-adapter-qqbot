@@ -39,16 +39,16 @@ interface CacheMessagePayload {
  *
  * @param client 当前 QQBot 适配器实例。
  * @param message 需要缓存的消息快照。
- * @param aliases 可用于查询同一消息的 QQ 侧索引，例如 msg_idx。
+ * @param refIdx QQ `msg_idx` 引用索引，作为该消息的第二查询索引。
  */
 const cacheMessage = (
   client: AdapterQQBot,
   message: CacheMessagePayload,
-  aliases: string[] = []
+  refIdx?: string
 ) => {
   if (!client.cfg.messageCache.enable) return
   client.messageStore
-    .save(String(client.cfg.appId), { ...message, messageSeq: 0 }, aliases)
+    .save(String(client.cfg.appId), { ...message, messageSeq: 0 }, { refIdx })
     .catch(err => log('warn', `[getMsg] 写入消息缓存失败: ${message.messageId}`, err))
 }
 
@@ -125,7 +125,7 @@ export const onGroupMsg = (client: AdapterQQBot, ev: GroupMsgEvent, opts: GroupO
     contact,
     sender,
     elements,
-  }, [ev.d.id, messageIndex].filter((id): id is string => !!id && id !== karinMessageId && id !== referenceIndex))
+  }, messageIndex && messageIndex !== referenceIndex ? messageIndex : undefined)
 
   const reference = ev.d.msg_elements?.find(item => item.msg_idx === referenceIndex)
   if (reference && referenceIndex) {
@@ -183,7 +183,7 @@ export const onFriendMsg = (client: AdapterQQBot, ev: C2CMsgEvent) => {
     contact,
     sender,
     elements,
-  }, [ev.d.id, messageIndex].filter((id): id is string => !!id && id !== karinMessageId && id !== referenceIndex))
+  }, messageIndex && messageIndex !== referenceIndex ? messageIndex : undefined)
 
   const reference = ev.d.msg_elements?.find(item => item.msg_idx === referenceIndex)
   if (reference && referenceIndex) {

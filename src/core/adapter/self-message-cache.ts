@@ -69,7 +69,6 @@ export const cacheSelfMessage = (
       ? response.ext_info.ref_idx
       : ''
     const messageId = apiMessageId
-    const aliases = [referenceMessageId].filter(id => id && id !== messageId)
     if (!messageId || seen.has(messageId)) continue
     seen.add(messageId)
     if (referenceMessageId) rememberApiMessageId(ctx, contact, referenceMessageId, apiMessageId)
@@ -82,7 +81,10 @@ export const cacheSelfMessage = (
         contact,
         sender,
         elements: cacheElements,
-      }, aliases)
+      }, {
+        refIdx: referenceMessageId && referenceMessageId !== messageId ? referenceMessageId : undefined,
+        isSelf: true,
+      })
       .catch(err => ctx.logger('warn', `[getMsg] 写入自己消息缓存失败: ${messageId}`, err))
   }
 }

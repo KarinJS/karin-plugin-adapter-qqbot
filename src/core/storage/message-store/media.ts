@@ -2,14 +2,14 @@ import crypto from 'node:crypto'
 import { createWriteStream } from 'node:fs'
 import type { Dirent } from 'node:fs'
 import { mkdir, readdir, rename, rm, stat, utimes } from 'node:fs/promises'
-import { extname, join } from 'node:path'
+import { extname, join, sep } from 'node:path'
 import { Transform, type Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { imageSizeFromFile } from 'image-size/fromFile'
 import { karinPathTemp } from 'node-karin'
 import axios from 'node-karin/axios'
 import { pluginDirName } from '@/utils/plugin'
-import { CLEANUP_INTERVAL, MESSAGE_TTL } from './constants'
+import { MESSAGE_TTL } from './constants'
 import type { ElementTypes } from 'node-karin'
 
 /** Karin 中通过 `file` 字段承载远程资源、需要本地缓存的消息段类型。 */
@@ -40,23 +40,10 @@ const EXTENSIONS_BY_TYPE: Record<FileElementType, string> = {
   file: '.bin',
 }
 
-/** 常见 content-type 到本地文件扩展名的映射。 */
-const CONTENT_TYPE_EXTENSIONS: Record<string, string> = {
-  'image/jpeg': '.jpg',
-  'image/jpg': '.jpg',
-  'image/png': '.png',
-  'image/gif': '.gif',
-  'image/webp': '.webp',
-  'image/bmp': '.bmp',
-  'video/mp4': '.mp4',
-  'audio/mpeg': '.mp3',
-  'audio/mp3': '.mp3',
-  'audio/wav': '.wav',
-  'audio/x-wav': '.wav',
-  'audio/amr': '.amr',
-}
+/** 数据库中相对媒体路径的标记前缀。 */
+const STORED_PATH_SCHEME = 'media://'
 
-/** 图片 subType 到扩展名的映射，优先级高于响应头和 URL 后缀。 */
+/** 图片 subType 到扩展名的映射，优先级高于 URL 后缀。 */
 const SUBTYPE_EXTENSIONS: Record<string, string> = {
   jpg: '.jpg',
   jpeg: '.jpg',
@@ -71,9 +58,6 @@ const SUBTYPE_EXTENSIONS: Record<string, string> = {
   mp3: '.mp3',
 }
 
-/** 上次清理本地媒体缓存的时间戳。 */
-let lastCleanup = 0
-
 /** 媒体本地化批处理结果。 */
 export interface LocalizeFileElementsResult {
   /** 本地化后的消息段数组；失败的单个消息段会保留原始 URL。 */
@@ -82,16 +66,6 @@ export interface LocalizeFileElementsResult {
   changed: boolean
   /** 单个媒体下载失败的错误信息列表。 */
   failures: string[]
-}
-
-/** 远程文件下载完成后的本地文件信息。 */
-interface StreamDownloadResult {
-  /** 写入成功后的本地绝对路径。 */
-  file: string
-  /** 响应头中的 content-type，缺失时为空字符串。 */
-  contentType: string
-  /** 从最终扩展名推导出的图片格式。 */
-  subType?: string
 }
 
 /** 下载流进度，用于限制实际读取的字节数。 */
@@ -122,8 +96,6 @@ export const hasRemoteFileElement = (elements: ElementTypes[]): boolean => {
 export const localizeFileElements = async (
   elements: ElementTypes[]
 ): Promise<LocalizeFileElementsResult> => {
-  await cleanupMessageMediaCacheIfDue()
-
   let changed = false
   const failures: string[] = []
   const localized: ElementTypes[] = []
@@ -153,19 +125,35 @@ export const localizeFileElements = async (
  * @returns 清理完成 Promise。
  */
 export const cleanupMessageMediaCache = async (): Promise<void> => {
-  lastCleanup = Date.now()
   const deadline = Date.now() - MESSAGE_TTL
   await cleanupDir(MEDIA_CACHE_DIR, deadline)
 }
 
 /**
- * 到达清理间隔时清理本地媒体文件。
+ * 将本地媒体缓存绝对路径转换为数据库存储形态。
  *
- * @returns 清理完成 Promise；未到间隔时立即返回。
+ * 缓存目录下的文件存为 `media://<相对路径>`：一是省掉每条媒体消息重复的
+ * 目录前缀（几十字节），二是换机器或缓存目录变更后路径仍可解析。
+ *
+ * @param file 消息段 file 字段。
+ * @returns 缓存目录内的文件返回相对形态，其余原样返回。
  */
-export const cleanupMessageMediaCacheIfDue = async (): Promise<void> => {
-  if (Date.now() - lastCleanup < CLEANUP_INTERVAL) return
-  await cleanupMessageMediaCache()
+export const toStoredFilePath = (file: string): string => {
+  const prefix = MEDIA_CACHE_DIR + sep
+  if (!file.startsWith(prefix)) return file
+  return STORED_PATH_SCHEME + file.slice(prefix.length).split(sep).join('/')
+}
+
+/**
+ * 将数据库存储形态还原为本地绝对路径。
+ *
+ * @param value `qqbot_messages.elements` 中的 file 字段值。
+ * @returns `media://` 形态还原为绝对路径，其余原样返回。
+ */
+export const fromStoredFilePath = (value: string): string => {
+  if (!value.startsWith(STORED_PATH_SCHEME)) return value
+  const relative = value.slice(STORED_PATH_SCHEME.length)
+  return join(MEDIA_CACHE_DIR, ...relative.split('/'))
 }
 
 /**
@@ -181,22 +169,36 @@ const cacheFileElement = async (element: FileBackedElement): Promise<FileBackedE
   const dir = join(MEDIA_CACHE_DIR, element.type)
   await mkdir(dir, { recursive: true })
 
-  const downloaded = await downloadRemoteFile({
-    url: source,
-    dir,
-    element,
-    maxBytes: MAX_CACHE_BYTES[element.type],
-  })
+  /**
+   * 文件名由 URL hash 决定：同一 URL 出现在多条消息或重复本地化时，
+   * 只会落盘一份，且已存在时直接跳过下载。
+   */
+  const filename = getLocalFilename(element, source)
+  const finalFile = join(dir, filename)
+  const exists = await stat(finalFile).then(info => info.isFile()).catch(() => false)
+  if (exists) {
+    const now = new Date()
+    await utimes(finalFile, now, now).catch(() => undefined)
+  } else {
+    await downloadRemoteFile({
+      url: source,
+      dir,
+      finalFile,
+      element,
+      maxBytes: MAX_CACHE_BYTES[element.type],
+    })
+  }
+
   const result = {
     ...element,
-    file: downloaded.file,
+    file: finalFile,
   } as FileBackedElement
 
   if (element.type === 'image') {
-    const dimensions = await imageSizeFromFile(downloaded.file).catch(() => undefined)
+    const dimensions = await imageSizeFromFile(finalFile).catch(() => undefined)
     return {
       ...result,
-      subType: downloaded.subType || element.subType,
+      subType: extensionToSubType(extname(filename)) || element.subType,
       width: dimensions?.width || element.width,
       height: dimensions?.height || element.height,
     } as FileBackedElement
@@ -213,17 +215,19 @@ const cacheFileElement = async (element: FileBackedElement): Promise<FileBackedE
  * @param params 下载参数。
  * @param params.url 规范化后的远程 URL。
  * @param params.dir 当前媒体类型的缓存目录。
- * @param params.element 原始媒体消息段，用于命名和扩展名推断。
+ * @param params.finalFile 下载完成后的目标绝对路径。
+ * @param params.element 原始媒体消息段，用于响应类型校验。
  * @param params.maxBytes 当前类型允许的最大下载体积。
- * @returns 下载后的本地文件路径和格式信息。
+ * @returns 下载完成 Promise。
  */
 const downloadRemoteFile = async (params: {
   url: string
   dir: string
+  finalFile: string
   element: FileBackedElement
   maxBytes: number
-}): Promise<StreamDownloadResult> => {
-  const { url, dir, element, maxBytes } = params
+}): Promise<void> => {
+  const { url, dir, finalFile, element, maxBytes } = params
   const response = await axios({
     url,
     method: 'GET',
@@ -260,22 +264,7 @@ const downloadRemoteFile = async (params: {
       createLimitStream(progress, maxBytes),
       createWriteStream(tempFile)
     )
-
-    const filename = getLocalFilename(element, url, contentType)
-    const finalFile = join(dir, filename)
-    const now = new Date()
-    const exists = await stat(finalFile).then(() => true).catch(() => false)
-    if (exists) {
-      await rm(tempFile, { force: true }).catch(() => undefined)
-      await utimes(finalFile, now, now).catch(() => undefined)
-    } else {
-      await rename(tempFile, finalFile)
-    }
-    return {
-      file: finalFile,
-      contentType,
-      subType: element.type === 'image' ? extensionToSubType(extname(filename)) : undefined,
-    }
+    await rename(tempFile, finalFile)
   } catch (err) {
     await rm(tempFile, { force: true }).catch(() => undefined)
     throw err
@@ -341,43 +330,34 @@ const cleanupDir = async (dir: string, deadline: number): Promise<void> => {
 /**
  * 生成本地缓存文件名。
  *
- * 文件名使用原始 name 的主文件名加 UUID，既保留可读性，也避免同名文件冲突。
+ * 文件名由 URL 的 sha1 hash 决定，保证同一 URL 的重复本地化落到同一文件，
+ * 使去重和跳过下载生效。业务文件名保留在消息段 name 字段里，不进文件名。
  *
  * @param element 媒体消息段。
  * @param source 远程 URL。
- * @param contentType 响应 content-type。
  * @returns 不含目录的本地文件名。
  */
-const getLocalFilename = (
-  element: FileBackedElement,
-  source: string,
-  contentType: string
-): string => {
-  const ext = getFileExtension(element, source, contentType)
-  const base = getFileBaseName(element) || element.type
-  return `${base}-${crypto.randomUUID()}${ext}`
+const getLocalFilename = (element: FileBackedElement, source: string): string => {
+  const hash = crypto.createHash('sha1').update(source).digest('hex').slice(0, 20)
+  return `${hash}${getFileExtension(element, source)}`
 }
 
 /**
  * 推断本地缓存文件扩展名。
  *
- * 优先级：
+ * 文件名必须在请求发出前确定（用于命中已有缓存跳过下载），因此不使用
+ * 响应 content-type。优先级：
  * 1. 图片 subType；
  * 2. 文件消息段自带 name 后缀；
  * 3. 语音固定 .mp3；
- * 4. content-type、name、URL 后缀；
+ * 4. name、URL 后缀；
  * 5. 类型默认扩展名。
  *
  * @param element 媒体消息段。
  * @param source 远程 URL。
- * @param contentType 响应 content-type。
  * @returns 带点号的扩展名。
  */
-const getFileExtension = (
-  element: FileBackedElement,
-  source: string,
-  contentType: string
-): string => {
+const getFileExtension = (element: FileBackedElement, source: string): string => {
   if (element.type === 'image') {
     const subtype = element.subType?.toLowerCase()
     if (subtype && SUBTYPE_EXTENSIONS[subtype]) return SUBTYPE_EXTENSIONS[subtype]
@@ -390,14 +370,25 @@ const getFileExtension = (
 
   if (element.type === 'record') return EXTENSIONS_BY_TYPE.record
 
-  const byType = CONTENT_TYPE_EXTENSIONS[contentType]
-  if (byType) return byType
-
   const byName = normalizeExtension(extname(element.name || ''))
   if (byName) return byName
 
-  const byUrl = normalizeExtension(extname(new URL(source).pathname))
+  const byUrl = normalizeExtension(extname(safeUrlPathname(source)))
   return byUrl || EXTENSIONS_BY_TYPE[element.type]
+}
+
+/**
+ * 提取 URL pathname，非法 URL 返回空字符串。
+ *
+ * @param source 远程 URL。
+ * @returns pathname 或空字符串。
+ */
+const safeUrlPathname = (source: string): string => {
+  try {
+    return new URL(source).pathname
+  } catch {
+    return ''
+  }
 }
 
 /**
@@ -413,46 +404,6 @@ const normalizeExtension = (ext: string): string => {
   if (!normalized || normalized.length > 16) return ''
   if (!/^\.[a-z0-9]+$/.test(normalized)) return ''
   return normalized === '.jpeg' ? '.jpg' : normalized
-}
-
-/**
- * 获取用于本地文件名的主文件名。
- *
- * 只有 file 消息段通常会带业务文件名；其他媒体没有 name 时由类型名兜底。
- *
- * @param element 媒体消息段。
- * @returns 已清理的主文件名，不包含扩展名。
- */
-const getFileBaseName = (element: FileBackedElement): string => {
-  const raw = element.name || ''
-  const withoutExt = raw ? raw.slice(0, raw.length - extname(raw).length) : ''
-  return sanitizeFilename(withoutExt)
-}
-
-/**
- * 清理文件名中的危险字符。
- *
- * @param name 原始文件名。
- * @returns 可安全拼接到本地路径中的文件名片段。
- */
-const sanitizeFilename = (name: string): string => {
-  return name
-    .split('')
-    .map(char => isUnsafeFilenameChar(char) ? '_' : char)
-    .join('')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 80)
-}
-
-/**
- * 判断字符是否不适合出现在 Windows/Unix 文件名中。
- *
- * @param char 单个字符。
- * @returns true 表示需要替换。
- */
-const isUnsafeFilenameChar = (char: string): boolean => {
-  return char.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(char)
 }
 
 /**
