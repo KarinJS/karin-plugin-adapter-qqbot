@@ -98,12 +98,25 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
    * 撤回消息
    *
    * 群聊中机器人被群主设为管理员后，也可撤回成员消息；平台仍限制消息发送后两分钟内。
+   * 内存映射未命中时（例如进程重启后）回退查询 SQLite 消息缓存。
    */
   async recallMsg (contact: Contact, messageId: string): Promise<void> {
-    const apiMessageId = resolveApiMessageId(this, contact, messageId)
+    let apiMessageId = resolveApiMessageId(this, contact, messageId)
+    if (apiMessageId.startsWith('REFIDX_') && this.cfg.messageCache.enable) {
+      const resolved = await this.messageStore
+        .resolveApiMessageId(String(this.cfg.appId), contact, apiMessageId)
+        .catch(() => null)
+      if (resolved) apiMessageId = resolved
+    }
     try {
       if (contact.scene === 'friend') {
-        if (!isOwnMessageId(this, contact, apiMessageId)) {
+        let own = isOwnMessageId(this, contact, apiMessageId)
+        if (!own && this.cfg.messageCache.enable) {
+          own = await this.messageStore
+            .isSelfMessage(String(this.cfg.appId), contact, apiMessageId)
+            .catch(() => false)
+        }
+        if (!own) {
           this.logger('warn', `[recallMsg] QQ 单聊只能撤回机器人自己发送的消息，已跳过撤回: ${messageId}`)
           return
         }
