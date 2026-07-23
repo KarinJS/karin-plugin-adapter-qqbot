@@ -6,7 +6,7 @@
 |机器人发送|不支持|不支持|支持|支持|
 
 ## [#](#样式) 样式
-![embed](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/message-embed.18d8bc6d.jpg)
+![embed](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.17.0/assets/img/message-embed.18d8bc6d.jpg)
 ## [#](#数据结构与协议) 数据结构与协议
 
 ### [#](#content-type) Content-Type
@@ -163,8 +163,6 @@ application/json
 36  
 37  
 38
-
-← [ARK 消息](/wiki/develop/api-v2/server-inter/message/type/ark.html) [表情表态](/wiki/develop/api-v2/server-inter/message/trans/emoji.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)

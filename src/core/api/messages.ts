@@ -2,7 +2,11 @@ import FormData from 'form-data'
 import { Http } from './http'
 import type {
   SendQQMsg, SendQQMsgResponse, SendGuildMsg, SendGuildResponse, Scene,
+  SendQQStreamMessageRequest, SendQQStreamMessageResponse, QQMessageID,
 } from './types'
+
+/** 输入中状态默认展示时长（秒），平台 typing 窗口约 60s */
+const INPUT_NOTIFY_DEFAULT_SECOND = 60
 
 /**
  * 消息发送 + 撤回
@@ -16,6 +20,36 @@ export class MessagesApi extends Http {
   /** 群聊消息 */
   sendGroupMsg (groupOpenid: string, body: SendQQMsg): Promise<SendQQMsgResponse> {
     return this.post(`/v2/groups/${groupOpenid}/messages`, body)
+  }
+
+  /**
+   * 单聊输入中状态（msg_type=6，仅单聊）
+   * @param openid 用户 openid
+   * @param inputSecond 展示时长（秒），默认 60
+   * @param passive 被动消息参数（msg_id / event_id / msg_seq），可选
+   */
+  sendFriendInputNotify (
+    openid: string,
+    inputSecond: number = INPUT_NOTIFY_DEFAULT_SECOND,
+    passive?: QQMessageID
+  ): Promise<SendQQMsgResponse> {
+    return this.post(`/v2/users/${openid}/messages`, {
+      msg_type: 6,
+      input_notify: { input_type: 1, input_second: inputSecond },
+      ...passive,
+    })
+  }
+
+  /**
+   * 单聊流式消息（仅单聊）
+   *
+   * 首帧不带 stream_msg_id，响应的 id 作为后续帧的 stream_msg_id 回传；
+   * 同一次流 index 从 0 递增、msg_seq 保持一致；建议帧间隔 300~500ms。
+   * @param openid 用户 openid
+   * @param body 流式消息帧
+   */
+  sendFriendStreamMsg (openid: string, body: SendQQStreamMessageRequest): Promise<SendQQStreamMessageResponse> {
+    return this.post(`/v2/users/${openid}/stream_messages`, body)
   }
 
   /** 文字子频道消息 */

@@ -1,7 +1,7 @@
 # [#](#_37-大图模板) 37 大图模板
 
 ### [#](#样式) 样式
-![37](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/37.2955062b.png)
+![37](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.14.0/assets/img/37.2955062b.png)
 
 模板 id=37。
 

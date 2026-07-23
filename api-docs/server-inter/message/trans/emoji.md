@@ -222,7 +222,7 @@ GET /channels/1013531/messages/08c095b7ba8ed4abd7e00110cbd83f3841489aa2bd9006/re
 12  
 13
 
-← [Embed 消息](/wiki/develop/api-v2/server-inter/message/type/embed.html) [文本交互](/wiki/develop/api-v2/server-inter/message/trans/text-chain.html) →
+← [频道私信](/wiki/develop/api-v2/server-inter/channel/message/dms.html) [频道消息事件](/wiki/develop/api-v2/server-inter/channel/message/event.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)

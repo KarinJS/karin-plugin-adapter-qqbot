@@ -1,6 +1,6 @@
 /**
  * OpenAPI 错误码映射表
- * 来源: api-v2/openapi/error/error.md
+ * 来源: api-docs/openapi/error/error.md
  *
  * 规则:
  * - 区间码 (如 301000~301099) 用范围匹配
@@ -21,7 +21,7 @@ export const httpStatusMap: Record<number, string> = {
   504: '处理失败',
 }
 
-/** 业务错误码(code)映射 */
+/** 业务错误码(err_code)映射 */
 export const errorCodeMap: Record<number, string> = {
   10001: 'UnknownAccount 账号异常',
   10003: 'UnknownChannel 子频道异常',

@@ -3,6 +3,7 @@ import { MessagesApi } from './messages'
 import { MediaApi } from './media'
 import { InteractionApi } from './interaction'
 import { MetaApi } from './meta'
+import { GroupsApi } from './groups'
 import { buildQQMsg, buildGuildMsg } from './builders'
 
 /**
@@ -13,6 +14,7 @@ import { buildQQMsg, buildGuildMsg } from './builders'
  * - media：富媒体上传
  * - interaction：按钮回调 ack
  * - meta：@me / dms / gateway
+ * - groups：群基础信息 / 机器人群内状态（白名单接口）
  *
  * 请求体构造器 {@link buildQQMsg} / {@link buildGuildMsg} 独立导出，避免与 HTTP 调用耦合
  */
@@ -21,6 +23,7 @@ export class QQBotApi {
   public readonly media: MediaApi
   public readonly interaction: InteractionApi
   public readonly meta: MetaApi
+  public readonly groups: GroupsApi
 
   /** 请求体构造器（静态便利） */
   public readonly qq = buildQQMsg
@@ -31,6 +34,7 @@ export class QQBotApi {
     this.media = new MediaApi(axios)
     this.interaction = new InteractionApi(axios)
     this.meta = new MetaApi(axios)
+    this.groups = new GroupsApi(axios)
   }
 }
 

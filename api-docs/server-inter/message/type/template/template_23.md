@@ -1,7 +1,7 @@
 # [#](#_23-链接-文本列表模板) 23 链接+文本列表模板
 
 ### [#](#样式) 样式
-![23](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/23.dcdba41f.png)
+![23](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.14.0/assets/img/23.dcdba41f.png)
 
 模板 id=23。
 

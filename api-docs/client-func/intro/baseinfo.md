@@ -8,7 +8,7 @@
 
 |单聊|群聊|文字子频道|频道私信|
 |---|---|---|---|
-|![单聊](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/chat-single.c4f33531.jpg)|![群聊](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/chat-group.d5318db5.jpg)|![文字子频道](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/chat-text-channel.6dfae006.jpg)|![频道私信](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/chat-c2c.33e2820c.jpg)|
+|![单聊](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.14.0/assets/img/chat-single.c4f33531.jpg)|![群聊](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.14.0/assets/img/chat-group.d5318db5.jpg)|![文字子频道](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.14.0/assets/img/chat-text-channel.6dfae006.jpg)|![频道私信](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.14.0/assets/img/chat-c2c.33e2820c.jpg)|
 
 ## [#](#消息类型) 消息类型
 
@@ -35,7 +35,7 @@
 
 |/|@|
 |---|---|
-|![指令面板/](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/command-banner-1.3e7cda26.jpg)|![指令面板@](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/command-banner-2.fdc45220.jpg)|
+|![指令面板/](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.14.0/assets/img/command-banner-1.3e7cda26.jpg)|![指令面板@](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.14.0/assets/img/command-banner-2.fdc45220.jpg)|
 
 ## [#](#自定义菜单) 自定义菜单
 
@@ -45,7 +45,7 @@
 
 |单聊|
 |---|
-|![自定义菜单](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/custum-menu.3a2f97a3.jpg)|
+|![自定义菜单](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.14.0/assets/img/custum-menu.3a2f97a3.jpg)|
 
 ## [#](#消息交互) 消息交互
 
@@ -55,7 +55,7 @@
 
 |消息按钮|文字链|
 |---|---|
-|![消息按钮](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/message-btn.94002609.jpg)|![文字链](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.11.0/assets/img/text-chain.b2f9b0fb.jpg)|
+|![消息按钮](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.14.0/assets/img/message-btn.94002609.jpg)|![文字链](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.14.0/assets/img/text-chain.b2f9b0fb.jpg)|
 
 ← [启动接入](/wiki/develop/api-v2/) [接口调用与鉴权](/wiki/develop/api-v2/dev-prepare/interface-framework/api-use.html) →
 
