@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v2.2.1...adapter-qqbot-v2.3.0) (2026-07-23)
+
+
+### Features
+
+* 实现了GroupsApi类，用于管理QQ群信息、机器人状态及成员详情（仅白名单）。更新接口文档 ([#53](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/53)) ([b3681bb](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/b3681bbc350cccb4c59be15a1e770dfd93a257b8))
+
 ## [2.2.1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v2.2.0...adapter-qqbot-v2.2.1) (2026-07-10)
 
 
