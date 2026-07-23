@@ -41,6 +41,7 @@ export const sendQQ = async (
 ): Promise<SendMsgResults> => {
   const target = contact.scene === 'friend' ? 'user' : 'group'
   const grouping = groupElements<'qq'>(contact.scene, elements)
+  await resolveOutgoingReferenceQQ(ctx, contact, grouping)
 
   // 文本是否需要做 URL→ 按钮转化
   if (ctx.cfg.markdown.enable && ctx.cfg.keyboard.enable && grouping.text.length) {
@@ -309,6 +310,38 @@ const shouldUseTextForReference = (
  * @returns 是否为 QQ 引用索引。
  */
 const isQQReferenceMessageId = (messageId: string): boolean => messageId.startsWith('REFIDX_')
+
+/**
+ * 发送前把显式引用的 API 消息 ID 解析为 REFIDX。
+ *
+ * 内存映射（重启后为空）未命中时回退查询 SQLite 消息缓存，保证重启后
+ * `segment.reply(e.messageId)` 依然能渲染可见引用。解析结果直接写回
+ * grouping，后续同步路径（降级判断、message_reference 附加）无需再查库。
+ *
+ * @param ctx 适配器实例。
+ * @param contact 消息目标会话。
+ * @param grouping 已归类的消息段。
+ */
+const resolveOutgoingReferenceQQ = async (
+  ctx: AdapterQQBot,
+  contact: Contact<'friend' | 'group'>,
+  grouping: Grouping<'qq'>
+): Promise<void> => {
+  const original = grouping.reply.messageId
+  if (!original) return
+
+  const resolved = resolveReferenceMessageId(ctx, contact, original)
+  if (isQQReferenceMessageId(resolved)) {
+    grouping.reply.messageId = resolved
+    return
+  }
+  if (!ctx.cfg.messageCache.enable) return
+
+  const fromStore = await ctx.messageStore
+    .resolveRefIdx(String(ctx.cfg.appId), contact, original)
+    .catch(() => null)
+  if (fromStore) grouping.reply.messageId = fromStore
+}
 
 /**
  * 构造 keyboard 字段（buttons + keyboards 合并）
