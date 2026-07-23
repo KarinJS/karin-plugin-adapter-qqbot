@@ -2,19 +2,20 @@ import { mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import sqlite3, { type Database, type Statement } from 'node-karin/sqlite3'
 import { karinPathBase } from 'node-karin'
+import { config as readConfig } from '@/utils/config'
 import { log } from '@/utils/logger'
-import { decodeElements, encodeElements } from './codec'
+import { decodeElements, encodeElements, filterElementsByLevel } from './codec'
 import {
   DATABASE_VERSION, FLUSH_BATCH_SIZE, FLUSH_INTERVAL, MAX_MEDIA_LOCALIZE_QUEUE,
   MAX_MESSAGE_ROWS, MAX_WRITE_QUEUE, MEDIA_LOCALIZE_CONCURRENCY,
-  MEDIA_LOCALIZE_INTERVAL, MEDIA_RECOVERY_LIMIT, MESSAGE_TTL,
+  MEDIA_LOCALIZE_INTERVAL, MEDIA_RECOVERY_LIMIT, MESSAGE_TTL, UPLOAD_CACHE_MAX_ROWS,
 } from './constants'
 import { hashId } from './hash'
 import { cleanupMessageMediaCache, hasRemoteFileElement, localizeFileElements } from './media'
 import { migrations } from './migrations'
 import { SQL } from './sql'
 import type { Contact, GroupSender, MessageResponse, Sender } from 'node-karin'
-import type { CachedMessage, CountRow, IdRow, MessageRow, SaveOptions } from './types'
+import type { CachedMessage, CountRow, IdRow, MessageRow, SaveOptions, UploadCacheRow } from './types'
 
 interface PendingWrite {
   botId: string
@@ -63,6 +64,11 @@ export class MessageStore {
   private readonly contactRefCache = new Map<string, number>()
   private readonly senderRefCache = new Map<string, number>()
 
+  /** 当前生效的缓存保留时长；由配置解析，多 bot 取最大值。 */
+  private ttlMs = MESSAGE_TTL
+  /** 当前生效的消息行数硬上限；由配置解析，多 bot 取最大值。 */
+  private maxRows = MAX_MESSAGE_ROWS
+
   constructor () {
     this.ready = this.initialize()
     this.ready
@@ -96,7 +102,10 @@ export class MessageStore {
     if (!message.messageId) return
     if (this.isExpired(message)) return
 
-    const cached = this.cloneMessage(message)
+    const cached = this.cloneMessage({
+      ...message,
+      elements: filterElementsByLevel(message.elements, options.level),
+    })
     const refIdx = options.refIdx && options.refIdx !== message.messageId ? options.refIdx : undefined
     const isSelf = !!options.isSelf
     this.enqueue({ botId, message: cached, refIdx, isSelf, referenceOnly: false })
@@ -111,12 +120,20 @@ export class MessageStore {
    *
    * @param botId 当前 QQBot appId。
    * @param message 以 `ref_msg_idx` 作为 messageId 的引用上下文。
+   * @param level 存储分级；缺省按 standard 处理。
    */
-  async saveReferenceIfAbsent (botId: string, message: CachedMessage): Promise<void> {
+  async saveReferenceIfAbsent (
+    botId: string,
+    message: CachedMessage,
+    level?: SaveOptions['level']
+  ): Promise<void> {
     if (!message.messageId) return
     if (this.isExpired(message)) return
 
-    const cached = this.cloneMessage(message)
+    const cached = this.cloneMessage({
+      ...message,
+      elements: filterElementsByLevel(message.elements, level),
+    })
     this.enqueue({ botId, message: cached, isSelf: false, referenceOnly: true })
     this.enqueueMediaLocalize(botId, cached, undefined, false)
   }
@@ -201,6 +218,56 @@ export class MessageStore {
   }
 
   /**
+   * 将 API 消息 ID 反向解析为 QQ `REFIDX` 引用索引。
+   *
+   * 供发送侧显式引用回复在内存映射（重启后为空）未命中时回退查询。
+   *
+   * @param botId 当前 QQBot appId。
+   * @param contact 消息所在会话。
+   * @param messageId QQ API 消息 ID，通常为 ROBOT1.0_...。
+   * @returns 对应的引用索引；未命中时返回 null。
+   */
+  async resolveRefIdx (botId: string, contact: Contact, messageId: string): Promise<string | null> {
+    if (!messageId) return null
+
+    await this.ready
+    await this.flushAll()
+    const row = await this.getS<MessageRow>(SQL.selectByMsgIdScoped, [
+      hashId(messageId), botId, contact.scene, contact.peer, contact.subPeer || '', messageId,
+    ])
+    if (!row || this.isExpired(row)) return null
+    return row.ref_idx
+  }
+
+  /**
+   * 读取持久化的 file_info 上传缓存。
+   *
+   * @param key 由 api 层构造的缓存键。
+   * @returns 序列化的上传响应 JSON；未命中或已过期时返回 null。
+   */
+  async getUploadCache (key: string): Promise<string | null> {
+    if (!key) return null
+    await this.ready
+    const row = await this.getS<UploadCacheRow>(SQL.selectUpload, [key])
+    if (!row) return null
+    if (row.expires_at !== 0 && row.expires_at <= Date.now()) return null
+    return row.response
+  }
+
+  /**
+   * 写入持久化的 file_info 上传缓存。
+   *
+   * @param key 由 api 层构造的缓存键。
+   * @param response 序列化的上传响应 JSON。
+   * @param expiresAt 失效时间戳；0 表示长期有效。
+   */
+  async setUploadCache (key: string, response: string, expiresAt: number): Promise<void> {
+    if (!key) return
+    await this.ready
+    await this.runS(SQL.upsertUpload, [key, response, expiresAt, Date.now()])
+  }
+
+  /**
    * 判断消息是否由机器人自己发送。
    *
    * 供单聊撤回在内存标记（重启后为空）未命中时回退查询。
@@ -241,6 +308,27 @@ export class MessageStore {
     await this.exec('PRAGMA auto_vacuum = INCREMENTAL')
     await this.migrate()
     await this.cleanup()
+  }
+
+  /**
+   * 从配置解析当前生效的 TTL 与行数上限。
+   *
+   * 数据库为全 bot 共享，多个 bot 同时开启缓存时取最大值；配置读取失败时
+   * 保持当前值。每次清理前刷新，配置修改最迟 10 分钟内生效。
+   */
+  private refreshSettings (): void {
+    try {
+      const enabled = readConfig().filter(item => item.messageCache.enable)
+      if (!enabled.length) {
+        this.ttlMs = MESSAGE_TTL
+        this.maxRows = MAX_MESSAGE_ROWS
+        return
+      }
+      this.ttlMs = Math.max(...enabled.map(item => item.messageCache.ttlHours)) * 60 * 60 * 1000
+      this.maxRows = Math.max(...enabled.map(item => item.messageCache.maxRows))
+    } catch (err) {
+      log('debug', '[getMsg] 读取消息缓存配置失败，沿用当前 TTL/上限', err)
+    }
   }
 
   /**
@@ -371,7 +459,7 @@ export class MessageStore {
    * 清理待写队列中已经过期的消息。
    */
   private prunePending (): void {
-    const deadline = Date.now() - MESSAGE_TTL
+    const deadline = Date.now() - this.ttlMs
     const kept = this.pending.filter(item => item.message.time > deadline)
     if (kept.length !== this.pending.length) this.pending = kept
   }
@@ -490,7 +578,7 @@ export class MessageStore {
    * 清理已经过期的媒体本地化待处理任务。
    */
   private prunePendingMedia (): void {
-    const deadline = Date.now() - MESSAGE_TTL
+    const deadline = Date.now() - this.ttlMs
     const kept: PendingMediaLocalize[] = []
     for (const item of this.pendingMedia) {
       if (item.message.time > deadline) {
@@ -511,7 +599,7 @@ export class MessageStore {
    */
   private async recoverRemoteMedia (): Promise<void> {
     const rows = await this.allS<MessageRow>(SQL.selectRemoteMedia, [
-      Date.now() - MESSAGE_TTL,
+      Date.now() - this.ttlMs,
       MEDIA_RECOVERY_LIMIT,
     ])
     if (!rows.length) return
@@ -680,23 +768,31 @@ export class MessageStore {
    * @returns true 表示已经超过一天缓存窗口。
    */
   private isExpired (row: Pick<CachedMessage | MessageRow, 'time'>): boolean {
-    return row.time <= Date.now() - MESSAGE_TTL
+    return row.time <= Date.now() - this.ttlMs
   }
 
   /**
-   * 清理一天前的缓存消息，并执行体积治理。
+   * 清理过期缓存消息，并执行体积治理。
    *
-   * 依次执行：TTL 删除、硬上限删除、sender GC（写空闲时）、
-   * 增量 vacuum 归还空间、WAL checkpoint 截断、媒体文件清理。
+   * 依次执行：配置刷新、TTL 删除、硬上限删除、上传缓存清理、
+   * sender GC（写空闲时）、增量 vacuum 归还空间、WAL checkpoint 截断、
+   * 媒体文件清理。
    */
   private async cleanup (): Promise<void> {
-    await this.runS(SQL.cleanup, [Date.now() - MESSAGE_TTL])
+    this.refreshSettings()
+    await this.runS(SQL.cleanup, [Date.now() - this.ttlMs])
 
     const count = await this.getS<CountRow>(SQL.countMessages)
-    if (count && count.total > MAX_MESSAGE_ROWS) {
-      const excess = count.total - MAX_MESSAGE_ROWS
+    if (count && count.total > this.maxRows) {
+      const excess = count.total - this.maxRows
       await this.runS(SQL.deleteOverCap, [excess])
-      log('warn', `[getMsg] 消息缓存超过 ${MAX_MESSAGE_ROWS} 条硬上限，已删除最旧 ${excess} 条`)
+      log('warn', `[getMsg] 消息缓存超过 ${this.maxRows} 条硬上限，已删除最旧 ${excess} 条`)
+    }
+
+    await this.runS(SQL.cleanupUploads, [Date.now()])
+    const uploads = await this.getS<CountRow>(SQL.countUploads)
+    if (uploads && uploads.total > UPLOAD_CACHE_MAX_ROWS) {
+      await this.runS(SQL.deleteUploadsOverCap, [uploads.total - UPLOAD_CACHE_MAX_ROWS])
     }
 
     /** sender GC 与批量写并发会产生悬空 sender_ref，只在写队列空闲时执行。 */
@@ -707,7 +803,7 @@ export class MessageStore {
 
     await this.exec('PRAGMA incremental_vacuum')
     await this.rawGet('PRAGMA wal_checkpoint(TRUNCATE)').catch(() => undefined)
-    await cleanupMessageMediaCache()
+    await cleanupMessageMediaCache(this.ttlMs)
   }
 
   /**

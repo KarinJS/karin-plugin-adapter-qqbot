@@ -89,3 +89,20 @@ export const createSchema = async (run: RunSql): Promise<void> => {
   await run(`CREATE INDEX idx_qqbot_messages_remote ON qqbot_messages(has_remote_media)
     WHERE has_remote_media = 1`)
 }
+
+/**
+ * 创建 v3 file_info 上传缓存表。
+ *
+ * QQ 上传接口返回的 file_info 有明确 ttl（可达数天）；持久化后进程重启
+ * 不再需要把同一份媒体重新上传。行数少（上限 2000），TEXT 主键即可。
+ *
+ * @param run SQL 执行函数。
+ */
+export const createUploadCacheSchema = async (run: RunSql): Promise<void> => {
+  await run(`CREATE TABLE IF NOT EXISTS qqbot_upload_cache (
+    cache_key TEXT PRIMARY KEY,
+    response TEXT NOT NULL,
+    expires_at INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  )`)
+}

@@ -101,4 +101,18 @@ export const SQL = {
   gcSenders: `DELETE FROM qqbot_senders WHERE id NOT IN (
     SELECT DISTINCT sender_ref FROM qqbot_messages
   )`,
+
+  selectUpload: 'SELECT response, expires_at FROM qqbot_upload_cache WHERE cache_key = ?',
+  upsertUpload: `INSERT INTO qqbot_upload_cache (cache_key, response, expires_at, created_at)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(cache_key) DO UPDATE SET
+      response = excluded.response,
+      expires_at = excluded.expires_at,
+      created_at = excluded.created_at`,
+  /** expires_at = 0 表示长期有效，只受行数上限淘汰。 */
+  cleanupUploads: 'DELETE FROM qqbot_upload_cache WHERE expires_at != 0 AND expires_at <= ?',
+  countUploads: 'SELECT COUNT(*) AS total FROM qqbot_upload_cache',
+  deleteUploadsOverCap: `DELETE FROM qqbot_upload_cache WHERE cache_key IN (
+    SELECT cache_key FROM qqbot_upload_cache ORDER BY created_at ASC LIMIT ?
+  )`,
 } as const

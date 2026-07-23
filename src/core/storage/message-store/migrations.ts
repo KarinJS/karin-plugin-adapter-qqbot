@@ -1,4 +1,4 @@
-import { createSchema, dropLegacySchema } from './schema'
+import { createSchema, createUploadCacheSchema, dropLegacySchema } from './schema'
 import type { Migration } from './types'
 
 /**
@@ -29,6 +29,13 @@ export const migrations: Migration[] = [
       await dropLegacySchema(run)
       markVacuum()
       await createSchema(run)
+    },
+  },
+  {
+    version: 3,
+    description: '新增 file_info 上传结果持久化缓存表',
+    up: async ({ run }) => {
+      await createUploadCacheSchema(run)
     },
   },
 ]
