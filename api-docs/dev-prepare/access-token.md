@@ -42,7 +42,7 @@ QQ 机器人开放平台提供以下类型的访问凭证：
 ### [#](#调用示例) 调用示例
 
 ```shell
-curl --location 'https://bots.qq.com/app/getAppAccessToken' \
+curl --location 'https://api.bot.qq.com/app/getAppAccessToken' \
 --header 'Content-Type: application/json' \
 --data '{
   "appId": "APPID",

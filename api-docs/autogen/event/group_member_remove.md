@@ -38,7 +38,7 @@
 5  
 6
 
-← [群成员加入](/wiki/develop/api-v2/autogen/event/group_member_add.html) [频道创建](/wiki/develop/api-v2/autogen/event/guild_create.html) →
+← [群成员加入](/wiki/develop/api-v2/autogen/event/group_member_add.html) [用户申请加群事件](/wiki/develop/api-v2/autogen/event/group_join_request.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)

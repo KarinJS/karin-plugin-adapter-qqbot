@@ -67,7 +67,7 @@ res 得到的是加密之后的数据，需要开发者解密，解密方案参�
 |channel\_type|number|子频道类型|
 |is\_accessible|number|是否可以访问该子频道，0不可访问、1可访问|
 
-← [开放数据域加密](/wiki/develop/api-v2/server-inter/channel/miniapp/opendata.html)
+← [开放数据域加密](/wiki/develop/api-v2/server-inter/channel/miniapp/opendata.html) [变更记录](/wiki/develop/api-v2/changelog.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)

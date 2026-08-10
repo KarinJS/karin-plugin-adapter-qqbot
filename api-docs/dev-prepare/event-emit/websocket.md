@@ -193,7 +193,7 @@ wss://api.bot.qq.com/websocket/
 
 ```json
 {
-  "url": "wss://sandbox.api.sgroup.qq.com/websocket",
+  "url": "wss://api.bot.qq.com/websocket",
   "shards": 1,
   "session_start_limit": {
     "total": 1000,

@@ -1,6 +1,6 @@
 # [#](#发送群聊消息) 发送群聊消息
 
-向指定群发送消息。支持文本/Markdown/ARK/富媒体等类型，可附带内嵌键盘。 注意: 群消息不支持流式参数
+向指定群发送消息。支持文本/Markdown/富媒体等类型，可附带内嵌键盘。 注意: 群消息不支持流式参数
 
 * 被动消息有效时间 **5 分钟**，每个消息最多回复 **5 次**
 * 主动消息频控规则
@@ -45,6 +45,7 @@
 |template\_id|integer|否|【已废弃】平台 Markdown 模板 ID。使用模板时填写，非模板不传|
 |content|string|否|Markdown 内容。支持的格式参考文档：[Markdown(opens new window)](https://bot.q.qq.com/wiki/develop/api-v2/server-inter/message/type/markdown.html)|
 |custom\_template\_id|string|否|【已废弃】自定义模板 ID，与 template\_id 二选一|
+|force\_verify\_image\_resource|boolean|否|是否校验图片转存结果，当为true时，如果出现图片转存失败，则会返回错误，消息不会发送。 默认为false|
 
 **Keyboard**
 
@@ -239,56 +240,6 @@ POST /v2/groups/B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5/messages
 10  
 11  
 12
-
-**卡片消息 (msg\_type=8)**
-
-```text
-POST /v2/groups/B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5/messages
-{
-    "msg_type": 8,
-    "card": {
-        "type": "tuwen",
-        "content": {
-            "description": "2分钟完成注册并创建QQBot 无缝对接OpenClaw",
-            "pic_url": "https://qqminiapp.cdn-go.cn/qq-open-platform/9b9327f1/assets/33-2-GiI9drV8.png",
-            "title": "QQ开放平台",
-            "url": "https://q.qq.com/#/"
-        }
-    },
-    "msg_id": "ROBOT1.0_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    "msg_seq": 22
-}
-
-// 当type为tuwen时 会发送一个包括标题,描述,图片,跳转链接的消息.
-// title 表示卡片消息的标题.
-// description 表示卡片消息的描述.
-// pic_url: 表示卡片消息中出现的图片.
-// url: 表示卡片消息中的跳转链接.
-
-```
-
-1  
-2  
-3  
-4  
-5  
-6  
-7  
-8  
-9  
-10  
-11  
-12  
-13  
-14  
-15  
-16  
-17  
-18  
-19  
-20  
-21  
-22
 
 ## [#](#响应) 响应
 

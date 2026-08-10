@@ -34,7 +34,7 @@
 3  
 4
 
-← [单聊消息接收开启](/wiki/develop/api-v2/autogen/event/c2c_msg_receive.html) [获取群基础信息](/wiki/develop/api-v2/autogen/api/v2_groups_group_openid_info.get.html) →
+← [单聊消息接收开启](/wiki/develop/api-v2/autogen/event/c2c_msg_receive.html) [获取群基本信息](/wiki/develop/api-v2/autogen/api/v2_groups_group_openid_info.get.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)

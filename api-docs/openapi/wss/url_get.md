@@ -34,7 +34,7 @@ application/json
 
 ```json
 {
-  "url": "wss://api.sgroup.qq.com/websocket/"
+  "url": "wss://api.bot.qq.com/websocket/"
 }
 ```
 

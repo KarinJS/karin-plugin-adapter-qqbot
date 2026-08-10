@@ -35,7 +35,7 @@
 4  
 5
 
-← [获取机器人群内状态](/wiki/develop/api-v2/autogen/api/v2_groups_group_openid_bot_state.get.html) [机器人退出群聊](/wiki/develop/api-v2/autogen/event/group_del_robot.html) →
+← [修改入群自动审批策略的白名单号码](/wiki/develop/api-v2/autogen/api/v2_groups_join_approval_strategy_strategy_id_whitelist_users.post.html) [机器人退出群聊](/wiki/develop/api-v2/autogen/event/group_del_robot.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)

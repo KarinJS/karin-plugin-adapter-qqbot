@@ -48,7 +48,7 @@ application/json
 
 ```json
 {
-  "wss://api.sgroup.qq.com/websocket/",
+  "wss://api.bot.qq.com/websocket/",
   "shards": 9,
   "session_start_limit": {
     "total": 1000,

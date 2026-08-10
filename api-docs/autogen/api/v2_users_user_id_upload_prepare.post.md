@@ -24,12 +24,12 @@
 
 |名称|类型|必填|描述|
 |---|---|---|---|
-|file\_type|integer|否|业务类型。1=图片, 2=视频, 3=语音, 4=文件|
-|file\_size|string|否|文件大小（字节）|
-|file\_name|string|否|文件名|
-|md5|string|否|整个文件的 MD5|
-|sha1|string|否|整个文件的 SHA1|
-|md5\_10m|string|否|文件前 10002432 字节（约 10MB）的 MD5 校验值|
+|file\_type|integer|是|业务类型。1=图片, 2=视频, 3=语音, 4=文件|
+|file\_size|string|是|文件大小（字节）|
+|file\_name|string|是|文件名|
+|md5|string|是|整个文件的 MD5|
+|sha1|string|是|整个文件的 SHA1|
+|md5\_10m|string|是|文件前 10002432 字节（约 10MB）的 MD5 校验值|
 
 ### [#](#请求示例) 请求示例
 

@@ -16,7 +16,7 @@
 |---|---|
 |HTTP URL|/v2/users/{user\_openid}/messages|
 |HTTP Method|POST|
-|接口频率限制|100 QPS|
+|接口频率限制|100 QPS，包括主动、被动等所有消息类型|
 
 ## [#](#路径参数) 路径参数
 
@@ -47,6 +47,7 @@
 |template\_id|integer|否|【已废弃】平台 Markdown 模板 ID。使用模板时填写，非模板不传|
 |content|string|否|Markdown 内容。支持的格式参考文档：[Markdown(opens new window)](https://bot.q.qq.com/wiki/develop/api-v2/server-inter/message/type/markdown.html)|
 |custom\_template\_id|string|否|【已废弃】自定义模板 ID，与 template\_id 二选一|
+|force\_verify\_image\_resource|boolean|否|是否校验图片转存结果，当为true时，如果出现图片转存失败，则会返回错误，消息不会发送。 默认为false|
 
 **Keyboard**
 

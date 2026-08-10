@@ -31,7 +31,7 @@ payload 指的是在 websocket 连接上传输的数据，网关的上下行消�
 第一步先调用 [/gateway](/wiki/develop/api-v2/openapi/wss/url_get.html) 或 [/gateway/bot](/wiki/develop/api-v2/openapi/wss/shard_url_get.html) 接口获取网关地址。 会得到一个类似下面这样的地址：
 
 ```text
-wss://api.sgroup.qq.com/websocket/
+wss://api.bot.qq.com/websocket/
 ```
 
 1
