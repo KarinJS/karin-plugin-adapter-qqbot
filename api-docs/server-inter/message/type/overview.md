@@ -10,7 +10,6 @@
 |---|---|---|---|
 |0|文本|`content`|纯文本消息|
 |2|Markdown|`markdown`|支持 Markdown 语法，详见 [Markdown 消息](/wiki/develop/api-v2/server-inter/message/type/markdown.html)|
-|3|结构化卡片|`ark`|结构化卡片，详见 [结构化卡片消息](/wiki/develop/api-v2/server-inter/message/type/ark.html)|
 |7|富媒体|`media`|图片/视频/语音/文件，需先上传获取 `file_info`|
 
 ## [#](#接收-message-type) 接收：message\_type
@@ -35,7 +34,7 @@
 |**视频**|收发 ✅|收发 ✅|收发 ✅|
 |**语音**|收发 ✅|收发 ✅|收发 ✅|
 |**文件**|收发 ✅|收发 ✅|❌|
-|**结构化卡片**|收发 ✅|收发 ✅|发 ✅ / 收 ❌|
+|**结构化卡片**|发 ❌ / 收 ✅|发 ❌ / 收 ✅|发 ❌ / 收 ❌|
 |**Embed**|❌|❌|发 ✅ / 收 ❌|
 |**表情表态**|❌|❌|收发 ✅|
 |**引用消息**|收 ✅|收 ✅|收 ✅|

@@ -48,10 +48,10 @@
 |feedback\_opt|string|反馈选项（仅 type=13 消息反馈）。LIKE=点赞, UNLIKE=点踩|
 |checked|integer|反馈选项是否选中（仅 type=13 消息反馈）|
 |action|string|操作类型（type=15 故事集：ENTER\_STORY=进入, QUIT\_STORY=退出；type=16 切换模型：对应操作动作）|
-|message\_scene|[MessageScene](#schema-messagescene)|消息场景信息（仅 type=13 消息反馈）|
+|message\_scene|[InteractionMessageScene](#schema-interactionmessagescene)|消息场景信息（仅 type=13 消息反馈）|
 |authorize\_data|[AuthorizeData](#schema-authorizedata)|授权数据（仅 type=18/19 用户/群授权事件）|
 
-**MessageScene**
+**InteractionMessageScene**
 
 |名称|类型|描述|
 |---|---|---|

@@ -73,7 +73,7 @@ QQ机器人开放平台支持通过使用HTTP接口接收事件。开发者可�
 
 开发者需要提供一个HTTPS回调地址。并选定监听的事件类型。开放平台会将事件通过回调的方式推送给机器人。
 
-![event_subscription](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.17.0/assets/img/event_subscription.fa237046.png)
+![event_subscription](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.20.0/assets/img/event_subscription.fa237046.png)
 
 配置回调地址后，开放平台会对回调地址进行验证：
 

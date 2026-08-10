@@ -42,7 +42,8 @@
 
 |名称|类型|描述|
 |---|---|---|
-|ext|\[\]string|扩展信息键值对列表，如 "disable\_net\_search=1" 表示关闭联网搜索|
+|source|string|场景来源。default=默认聊天窗口|
+|ext|\[\]string|扩展数据列表，key=value 格式: msg\_idx=消息索引, 用于引用场景 ref\_msg\_idx=引用的消息索引 auth\_token=鉴权令牌|
 
 **MessageAttachment**
 
@@ -62,7 +63,7 @@
 |名称|类型|描述|
 |---|---|---|
 |prompt|string|卡片消息中的用户操作提示文本|
-|ark\_type|string|卡片消息类型标识: forward\_msg = 合并转发消息 tuwen = 图文 H5（如快手分享链接） feed = 图文卡片（群相册、频道帖子、分享卡片） miniapp = 小程序（微信小程序、QQ 小程序、哔哩哔哩等） map = 位置卡片 contact\_card = 好友名片 video\_share = 视频分享 music\_together = 一起听歌 unknown = 未知类型（无法识别或已下线的 ARK）|
+|ark\_type|string|卡片消息类型标识: tuwen = 图文 H5（如快手分享链接） feed = 图文卡片（群相册、频道帖子、分享卡片） miniapp = 小程序（微信小程序、QQ 小程序、哔哩哔哩等） map = 位置卡片 contact\_card = 好友名片 video\_share = 视频分享 music\_together = 一起听歌|
 |ark\_name|string|卡片消息类型的中文名称，如"图文 H5"、"小程序"、"图文卡片"|
 |fields|object|卡片消息字段，常见键名: tag/tags=来源标签, title=标题, desc=描述, jump\_url=跳转链接, preview=预览图, source=来源名称, source\_logo=来源图标, tag\_icon=标签图标, nickname=昵称, avatar=头像, address=地址|
 

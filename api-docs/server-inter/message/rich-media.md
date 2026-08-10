@@ -7,7 +7,7 @@
 |||||
 |---|---|---|---|
 |图片|语音|视频|文件|
-|![图片消息](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.17.0/assets/img/image-send.35813305.jpg)|![语音消息](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.17.0/assets/img/voice-send.21dce8bf.jpg)|![视频消息](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.17.0/assets/img/video-send.9416079c.jpg)|![文件消息](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.17.0/assets/img/large-file-transfer.f49ff1e2.jpg)|
+|![图片消息](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.20.0/assets/img/image-send.35813305.jpg)|![语音消息](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.20.0/assets/img/voice-send.21dce8bf.jpg)|![视频消息](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.20.0/assets/img/video-send.9416079c.jpg)|![文件消息](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.20.0/assets/img/large-file-transfer.f49ff1e2.jpg)|
 |支持 jpg/png/gif/webp/bmp 格式，发送后直接展示图片|支持 silk/mp3/wav/ogg 格式，发送后展示语音条|支持 mp4 格式，发送后展示视频封面可播放|支持任意格式，发送后展示文件卡片可下载|
 
 ## [#](#文件类型与限制) 文件类型与限制
@@ -143,7 +143,7 @@ POST /v2/users/{user_openid}/messages
 * 分片大小默认 5MB，并发数、重试策略由服务端在 `upload_config` 中下发。
 * 上传接口超时建议设为 ≥ 5 秒。
 
-← [结构化卡片消息](/wiki/develop/api-v2/server-inter/message/type/ark.html) [单聊富媒体上传](/wiki/develop/api-v2/autogen/api/v2_users_user_openid_files.post.html) →
+← [Markdown 消息](/wiki/develop/api-v2/server-inter/message/type/markdown.html) [单聊富媒体上传](/wiki/develop/api-v2/autogen/api/v2_users_user_openid_files.post.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)

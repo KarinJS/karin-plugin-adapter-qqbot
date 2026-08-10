@@ -294,7 +294,7 @@ markdown 模版消息的使用示例：
 |custom\_template\_id|string|否|markdown 模版id，申请模版后获得|
 |params|Array|否|{key: xxx, values: xxx}，模版内变量与填充值的kv映射|
 
-← [消息类型](/wiki/develop/api-v2/server-inter/message/type/overview.html) [结构化卡片消息](/wiki/develop/api-v2/server-inter/message/type/ark.html) →
+← [消息类型](/wiki/develop/api-v2/server-inter/message/type/overview.html) [富媒体消息概述](/wiki/develop/api-v2/server-inter/message/rich-media.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)
