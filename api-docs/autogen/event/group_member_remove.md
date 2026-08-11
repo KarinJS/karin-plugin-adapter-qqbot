@@ -7,7 +7,7 @@
 |字段|值|
 |---|---|
 |事件名|GROUP\_MEMBER\_REMOVE|
-|Intent|GROUP\_AND\_C2C\_EVENT (1<<25)|
+|Intent|GROUP\_MEMBER\_EVENT (1<<24)|
 
 ### [#](#事件体) 事件体
 

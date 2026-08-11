@@ -27,7 +27,7 @@
 |---|---|---|---|
 |op|string|是|审批动作：approve 通过，decline 拒绝|
 |join\_request\_id|string|否|申请ID|
-|reject\_reason|string|否|拒绝理由，action=decline 时可填|
+|reject\_reason|string|否|拒绝理由，op=decline 时可填|
 |add\_to\_member\_blacklist|boolean|否|是否同时加入群黑名单，默认 false, action=decline 时可填|
 
 ### [#](#请求示例) 请求示例
