@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.0.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v2.2.1...adapter-qqbot-v3.0.0) (2026-08-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* rebuild message cache storage (SQLite v3, single data layer) ([#52](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/52))
+
+### Features
+
+* 实现了GroupsApi类，用于管理QQ群信息、机器人状态及成员详情（仅白名单）。更新接口文档 ([#53](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/53)) ([b3681bb](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/b3681bbc350cccb4c59be15a1e770dfd93a257b8))
+
+
+### Code Refactoring
+
+* rebuild message cache storage (SQLite v3, single data layer) ([#52](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/52)) ([cc1113d](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/cc1113db394a692b7f9fd368625a9c18db0f11fa))
+
 ## [2.2.1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v2.2.0...adapter-qqbot-v2.2.1) (2026-07-10)
 
 
