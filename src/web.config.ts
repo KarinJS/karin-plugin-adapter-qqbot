@@ -1,4 +1,4 @@
-import { Config } from './types'
+import { Config, MessageCacheLevel } from './types'
 import { config } from './utils'
 import { defineConfig, components } from 'node-karin'
 import { buildFallbackWsUrlFromApi, normalizeProxyConfig } from '@/utils/proxy-url'
@@ -105,6 +105,9 @@ type WebQQBotInput = {
   'markdown:enable': unknown
   'messageCache:enable': unknown
   'messageCache:self': unknown
+  'messageCache:level': unknown
+  'messageCache:ttlHours': unknown
+  'messageCache:maxRows': unknown
   'event:type': unknown
 }
 
@@ -145,6 +148,9 @@ export default defineConfig({
         'markdown:enable': item.markdown?.enable !== false,
         'messageCache:enable': item.messageCache?.enable === true,
         'messageCache:self': item.messageCache?.self === true,
+        'messageCache:level': item.messageCache?.level || 'standard',
+        'messageCache:ttlHours': String(item.messageCache?.ttlHours ?? 24),
+        'messageCache:maxRows': String(item.messageCache?.maxRows ?? 200000),
         ...getBotProxyInput(item),
       })
     })
@@ -264,6 +270,36 @@ export default defineConfig({
                 description: '只有开启“缓存收到的消息到数据库”后才生效。开启后，机器人发送成功的消息也会写入缓存，方便之后通过消息 ID 查询。',
                 defaultSelected: false,
               }),
+              components.radio.group('messageCache:level', {
+                label: '缓存存储分级',
+                description: '控制每条消息落库的内容多少，直接影响数据库体积。撤回和引用解析在任何分级下都可用。',
+                defaultValue: 'standard',
+                radio: [
+                  components.radio.create('minimal', {
+                    label: '最小',
+                    value: 'minimal',
+                    description: '只记录消息 ID 映射与引用关系，不保存正文和媒体，体积最小。',
+                  }),
+                  components.radio.create('standard', {
+                    label: '标准（推荐）',
+                    value: 'standard',
+                    description: '保存文本、表情和媒体本地文件，不保存 markdown 原文。',
+                  }),
+                  components.radio.create('full', {
+                    label: '完整',
+                    value: 'full',
+                    description: '所有支持的消息段原样保存，包含 markdown 原文，体积最大。',
+                  }),
+                ],
+              }),
+              components.input.create('messageCache:ttlHours', {
+                label: '缓存保留小时数',
+                description: '超过该时长的消息会被清理任务删除。范围 1~720 小时，默认 24。多个机器人同时开启缓存时按最大值生效。',
+              }),
+              components.input.create('messageCache:maxRows', {
+                label: '缓存最大消息条数',
+                description: '数据库消息行数硬上限，超出后从最旧的消息开始删除，保证磁盘占用可预期。范围 1000~5000000，默认 200000。',
+              }),
               components.divider.horizontal('bot-proxy-section', {
                 description: '连接代理（高级设置：通常只在使用 Webhook 转 WebSocket 服务时填写，除非你知道你在做什么，否则不建议更改）',
                 descPosition: 5,
@@ -301,6 +337,20 @@ export default defineConfig({
         const markdownEnable = toBool(item['markdown:enable'], previous?.markdown?.enable ?? true)
         const messageCacheEnable = toBool(item['messageCache:enable'], previous?.messageCache?.enable ?? false)
         const messageCacheSelf = toBool(item['messageCache:self'], previous?.messageCache?.self ?? false)
+        /** 枚举与数值范围由 writeConfig 内的 formatConfig 统一校验回落。 */
+        const messageCacheLevel = toStringValue(
+          item['messageCache:level'],
+          previous?.messageCache?.level ?? 'standard'
+        ) as MessageCacheLevel
+        /** 输入被清空时回落上次值/默认值，避免 Number('') = 0 被夹到范围下限。 */
+        const ttlHoursRaw = toStringValue(item['messageCache:ttlHours']).trim()
+        const messageCacheTtlHours = ttlHoursRaw
+          ? Number(ttlHoursRaw)
+          : previous?.messageCache?.ttlHours ?? 24
+        const maxRowsRaw = toStringValue(item['messageCache:maxRows']).trim()
+        const messageCacheMaxRows = maxRowsRaw
+          ? Number(maxRowsRaw)
+          : previous?.messageCache?.maxRows ?? 200000
         const regex = toStringList(item.regex).map(str => {
           const parts = str.split(' ')
           const reg = parts[0]?.replace(/^<|>$/g, '') || ''
@@ -325,6 +375,9 @@ export default defineConfig({
           messageCache: {
             enable: messageCacheEnable,
             self: messageCacheSelf,
+            level: messageCacheLevel,
+            ttlHours: messageCacheTtlHours,
+            maxRows: messageCacheMaxRows,
           },
           event: { type: eventType },
         }

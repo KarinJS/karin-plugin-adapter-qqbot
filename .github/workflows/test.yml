@@ -1,0 +1,41 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: 设置 pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 9
+
+      - name: 设置 Node.js 环境
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install
+
+      - name: 类型检查
+        run: pnpm exec tsc --noEmit
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: 存储层测试
+        run: pnpm test
