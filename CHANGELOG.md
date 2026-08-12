@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.0.0...adapter-qqbot-v3.0.1) (2026-08-12)
+
+
+### Bug Fixes
+
+* 支持监听进退群和禁言 ([f02d9e1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/f02d9e1905d5c74a4624c9c2a8bcea4c721b387c))
+
 ## [3.0.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v2.2.1...adapter-qqbot-v3.0.0) (2026-08-11)
 
 
