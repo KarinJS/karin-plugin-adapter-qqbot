@@ -1,9 +1,6 @@
 import { Config, MessageCacheLevel } from './types'
 import { config } from './utils'
 import { defineConfig, components } from 'node-karin'
-import { buildFallbackWsUrlFromApi, normalizeProxyConfig } from '@/utils/proxy-url'
-
-const defaultProxy = () => config.getDefaultConfig()[0].proxy
 
 const unwrapValue = (value: unknown): unknown => {
   if (value && typeof value === 'object' && 'value' in value) {
@@ -38,70 +35,13 @@ const toStringList = (value: unknown): string[] => {
   return raw.map(item => toStringValue(item)).filter(Boolean)
 }
 
-const proxyKeys = (sandbox: boolean) => sandbox
-  ? { api: 'sandboxApi', ws: 'sandboxWs' } as const
-  : { api: 'prodApi', ws: 'prodWs' } as const
-
-const getBotProxyInput = (item: Config[number]) => {
-  const keys = proxyKeys(!!item.sandbox)
-  const proxy = item.proxy || defaultProxy()
-  return {
-    'proxy:api': proxy[keys.api] || defaultProxy()[keys.api],
-    'proxy:ws': proxy[keys.ws] || defaultProxy()[keys.ws],
-  }
-}
-
-const proxyFromInput = (item: WebQQBotInput, previous?: Config[number]) => {
-  const def = defaultProxy()
-  const sandbox = toBool(item.sandbox, previous?.sandbox ?? false)
-  const previousSandbox = previous?.sandbox ?? sandbox
-  const keys = proxyKeys(sandbox)
-  const previousVisibleKeys = proxyKeys(previousSandbox)
-  const previousProxy = previous?.proxy
-  const base = { ...def, ...previousProxy }
-  const envChanged = !!previous && previousSandbox !== sandbox
-
-  const rawApi = toStringValue(item['proxy:api']).trim()
-  const rawWs = toStringValue(item['proxy:ws']).trim()
-  const previousVisibleApi = previousProxy?.[previousVisibleKeys.api] || def[previousVisibleKeys.api]
-  const previousVisibleWs = previousProxy?.[previousVisibleKeys.ws] || def[previousVisibleKeys.ws]
-
-  const api = envChanged && rawApi === previousVisibleApi
-    ? base[keys.api] || def[keys.api]
-    : rawApi || base[keys.api] || def[keys.api]
-
-  const previousApi = previousProxy?.[keys.api] || def[keys.api]
-  const previousWs = previousProxy?.[keys.ws] || def[keys.ws]
-  const wsInput = envChanged && rawWs === previousVisibleWs
-    ? base[keys.ws] || def[keys.ws]
-    : rawWs
-
-  let ws = wsInput || previousWs || def[keys.ws]
-  const previousAutoWs = buildFallbackWsUrlFromApi(previousApi)
-  if (!wsInput || (wsInput === previousWs && previousWs === previousAutoWs && api !== previousApi)) {
-    ws = buildFallbackWsUrlFromApi(api)
-  }
-
-  return normalizeProxyConfig({
-    ...base,
-    [keys.api]: api,
-    tokenApi: base.tokenApi || def.tokenApi,
-    [keys.ws]: ws,
-  })
-}
-
 type WebQQBotInput = {
-  name: unknown
   appId: unknown
   secret: unknown
-  'proxy:api': unknown
-  'proxy:ws': unknown
-  sandbox: unknown
   qqEnable: unknown
   guildEnable: unknown
   guildMode: unknown
   regex: unknown
-  'keyboard:enable': unknown
   'markdown:enable': unknown
   'messageCache:enable': unknown
   'messageCache:self': unknown
@@ -133,25 +73,21 @@ export default defineConfig({
     const cfg = config.config()
     cfg.forEach(item => {
       data.push({
-        title: item.name || item.appId,
+        title: item.appId,
         subtitle: item.appId,
-        name: item.name,
         appId: item.appId,
         secret: item.secret,
         'event:type': String(item.event?.type ?? 2),
-        sandbox: item.sandbox,
         qqEnable: item.qqEnable,
         guildEnable: item.guildEnable,
         guildMode: item.guildMode === 1,
         regex: item.regex.map((r: any) => `${r.reg} ${r.rep}`),
-        'keyboard:enable': item.keyboard?.enable !== false,
         'markdown:enable': item.markdown?.enable !== false,
         'messageCache:enable': item.messageCache?.enable === true,
         'messageCache:self': item.messageCache?.self === true,
         'messageCache:level': item.messageCache?.level || 'standard',
         'messageCache:ttlHours': String(item.messageCache?.ttlHours ?? 24),
         'messageCache:maxRows': String(item.messageCache?.maxRows ?? 200000),
-        ...getBotProxyInput(item),
       })
     })
 
@@ -195,10 +131,6 @@ export default defineConfig({
                 description: '基础信息',
                 descPosition: 5,
               }),
-              components.input.create('name', {
-                label: '机器人显示名称',
-                description: '只用于 Karin 配置页和日志里识别这个机器人，不影响 QQ 平台资料。扫码登录写入配置时通常会自动填充。',
-              }),
               components.input.create('appId', {
                 label: '机器人 AppID',
                 description: 'QQ 开放平台机器人应用的 AppID，是识别机器人账号的唯一编号。填错会导致鉴权和收发消息失败。',
@@ -212,11 +144,6 @@ export default defineConfig({
               components.divider.horizontal('bot-scene-section', {
                 description: '场景能力',
                 descPosition: 5,
-              }),
-              components.switch.create('sandbox', {
-                label: '使用沙盒环境',
-                description: '开启后这个机器人会使用沙盒环境的 OpenAPI 和 WebSocket 地址；关闭时使用正式环境地址。正式上线机器人请关闭。',
-                defaultSelected: false,
               }),
               components.switch.create('qqEnable', {
                 label: '启用 QQ 私聊 / 群聊',
@@ -245,11 +172,6 @@ export default defineConfig({
                   label: '一条替换规则',
                   placeholder: '^/ #',
                 }),
-              }),
-              components.switch.create('keyboard:enable', {
-                label: '把链接自动转成按钮',
-                description: '开启后，发送文本里出现的 http(s) 链接会尽量转成 QQ keyboard 按钮，用户可以直接点按钮打开链接。该能力依赖 Markdown 通道。',
-                defaultSelected: true,
               }),
               components.switch.create('markdown:enable', {
                 label: '启用 Markdown 发送通道',
@@ -300,18 +222,6 @@ export default defineConfig({
                 label: '缓存最大消息条数',
                 description: '数据库消息行数硬上限，超出后从最旧的消息开始删除，保证磁盘占用可预期。范围 1000~5000000，默认 200000。',
               }),
-              components.divider.horizontal('bot-proxy-section', {
-                description: '连接代理（高级设置：通常只在使用 Webhook 转 WebSocket 服务时填写，除非你知道你在做什么，否则不建议更改）',
-                descPosition: 5,
-              }),
-              components.input.create('proxy:ws', {
-                label: 'WebSocket 接入地址',
-                description: '事件接收方式为 WebSocket 时连接的地址。常见用途是填写第三方 Webhook 转 WebSocket 服务地址，因为 QQ 后台开启 Webhook 后通常无法再直连官方 WebSocket。不填会使用当前环境的官方默认网关。',
-              }),
-              components.input.create('proxy:api', {
-                label: 'OpenAPI 反代地址',
-                description: '用于发送消息、上传媒体、查询网关和获取机器人资料的 QQ OpenAPI 根地址。多数 Webhook 转 WebSocket 场景不用改这里；只有 OpenAPI 请求也需要走反代时才填写。',
-              }),
             ],
           },
         }
@@ -328,12 +238,10 @@ export default defineConfig({
     try {
       data = input.qqbot.map(item => {
         const previous = prevConfig.find(cfg => cfg.appId === toStringValue(item.appId))
-        const sandbox = toBool(item.sandbox, previous?.sandbox ?? false)
         const qqEnable = toBool(item.qqEnable, previous?.qqEnable ?? true)
         const guildEnable = toBool(item.guildEnable, previous?.guildEnable ?? true)
         const guildMode = toBool(item.guildMode, previous?.guildMode === 1) ? 1 : 0
         const eventType = Number(toStringValue(item['event:type'], String(previous?.event?.type ?? 0))) as 0 | 1 | 2
-        const keyboardEnable = toBool(item['keyboard:enable'], previous?.keyboard?.enable ?? true)
         const markdownEnable = toBool(item['markdown:enable'], previous?.markdown?.enable ?? true)
         const messageCacheEnable = toBool(item['messageCache:enable'], previous?.messageCache?.enable ?? false)
         const messageCacheSelf = toBool(item['messageCache:self'], previous?.messageCache?.self ?? false)
@@ -358,19 +266,13 @@ export default defineConfig({
           return { reg, rep }
         })
 
-        const proxy = proxyFromInput(item, previous)
-
         return {
-          name: toStringValue(item.name),
           appId: toStringValue(item.appId),
           secret: toStringValue(item.secret),
-          proxy,
-          sandbox,
           qqEnable,
           guildEnable,
           guildMode,
           regex,
-          keyboard: { enable: keyboardEnable },
           markdown: { enable: markdownEnable },
           messageCache: {
             enable: messageCacheEnable,

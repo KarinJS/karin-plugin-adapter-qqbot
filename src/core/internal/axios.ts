@@ -1,8 +1,9 @@
 import axios, { AxiosError } from 'node-karin/axios'
 import { log } from '@/utils/logger'
-import { normalizeHttpUrl } from '@/utils/proxy-url'
 import { formatOpenAPIError } from '@/core/api/error'
 import { getUserAgent } from '@/utils/user-agent'
+import path from 'path'
+import { QQAPIBASEURL } from '@/utils/common'
 
 /**
  * 每个 appId 一份 token 状态
@@ -20,21 +21,19 @@ interface AccessTokenResponse {
   access_token: string
   expires_in: number | string
 }
-
 /**
  * 拉取 access_token 并安排下一次刷新
  * - 提前 50s 刷新，防止边界过期
  * - 同一 appId 旧定时器会被清理，避免并发刷新链
  */
 export const getAccessToken = async (
-  url: string,
   appId: string,
   secret: string
 ): Promise<{ accessToken: string; expiresIn: number }> => {
-  const tokenUrl = normalizeHttpUrl(url)
   let res
   try {
-    res = await axios.post<AccessTokenResponse>(tokenUrl, {
+    const tokenurl = path.join(QQAPIBASEURL, '/app/getAppAccessToken')
+    res = await axios.post<AccessTokenResponse>(tokenurl, {
       appId: String(appId),
       clientSecret: secret,
     }, {
@@ -71,7 +70,7 @@ export const getAccessToken = async (
   // 提前 50s 刷新，避免边界过期
   const delay = Math.max(5_000, expiresIn * 1000 - 50_000)
   state.refreshTimer = setTimeout(() => {
-    getAccessToken(tokenUrl, appId, secret).catch(() => { /* 错误已记录 */ })
+    getAccessToken(appId, secret).catch(() => { /* 错误已记录 */ })
   }, delay)
 
   return { accessToken, expiresIn }
@@ -98,11 +97,10 @@ export const stopTokenRefresh = (appId: string): void => {
  * 创建 axios 实例，自动从 tokens map 取最新 access_token
  */
 export const createAxiosInstance = (
-  baseURL: string,
   appId: string
 ) => {
   const instance = axios.create({
-    baseURL: normalizeHttpUrl(baseURL),
+    baseURL: QQAPIBASEURL,
     headers: {
       'Content-Type': 'application/json',
       'User-Agent': getUserAgent(),

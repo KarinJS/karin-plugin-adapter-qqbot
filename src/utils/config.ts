@@ -7,8 +7,7 @@ import {
   logger,
 } from 'node-karin'
 import { pluginDirName } from '@/utils/plugin'
-import { normalizeProxyConfig } from '@/utils/proxy-url'
-import type { Config, MessageCacheLevel, QQBotConfig, RawConfig } from '@/types/config'
+import type { Config, MessageCacheLevel, QQBotConfig } from '@/types/config'
 
 export { pkg, pluginDirName } from '@/utils/plugin'
 
@@ -46,7 +45,7 @@ export const config = (): Config => {
     fs.writeFileSync(configPath, JSON.stringify([], null, 2))
   }
   if (cache) return cache
-  const user = requireFileSync<RawConfig>(configPath)
+  const user = requireFileSync<Config>(configPath)
   const result = formatConfig(user)
   syncCache(result)
   return result
@@ -57,7 +56,7 @@ export const config = (): Config => {
  */
 export const readConfigFile = (): Config => {
   if (!fs.existsSync(configPath)) return config()
-  return formatConfig(requireFileSync<RawConfig>(configPath))
+  return formatConfig(requireFileSync<Config>(configPath))
 }
 
 /**
@@ -78,16 +77,10 @@ export const writeConfig = (data: Config) => {
 /**
  * 用默认值补齐用户配置
  */
-export const formatConfig = (user: RawConfig): Config => {
+export const formatConfig = (user: Config): Config => {
   const def = getDefaultConfig()[0]
   return user.map(item => {
     const {
-      prodApi,
-      sandboxApi,
-      tokenApi,
-      wsUrl,
-      proxy,
-      keyboard,
       markdown,
       messageCache,
       event,
@@ -97,16 +90,6 @@ export const formatConfig = (user: RawConfig): Config => {
     return {
       ...def,
       ...rest,
-      proxy: normalizeProxyConfig({
-        ...def.proxy,
-        ...proxy,
-        prodApi: proxy?.prodApi || prodApi || def.proxy.prodApi,
-        sandboxApi: proxy?.sandboxApi || sandboxApi || def.proxy.sandboxApi,
-        tokenApi: proxy?.tokenApi || tokenApi || def.proxy.tokenApi,
-        prodWs: proxy?.prodWs || proxy?.wsUrl || wsUrl || def.proxy.prodWs,
-        sandboxWs: proxy?.sandboxWs || proxy?.wsUrl || wsUrl || def.proxy.sandboxWs,
-      }),
-      keyboard: { ...def.keyboard, ...keyboard },
       markdown: { ...def.markdown, ...markdown },
       messageCache: normalizeMessageCache(def.messageCache, messageCache),
       event: { ...def.event, ...event },
@@ -157,24 +140,14 @@ const clampNumber = (value: unknown, min: number, max: number, fallback: number)
  */
 export const getDefaultConfig = (): Config => [
   {
-    name: '',
     appId: '',
     secret: '',
-    proxy: {
-      prodApi: 'https://api.sgroup.qq.com',
-      sandboxApi: 'https://sandbox.api.sgroup.qq.com',
-      tokenApi: 'https://bots.qq.com/app/getAppAccessToken',
-      prodWs: 'wss://api.sgroup.qq.com/websocket/',
-      sandboxWs: 'wss://sandbox.api.sgroup.qq.com/websocket/',
-    },
-    sandbox: false,
     qqEnable: true,
     guildEnable: true,
     guildMode: 0,
     regex: [
       { reg: '^/', rep: '#' },
     ],
-    keyboard: { enable: true },
     markdown: { enable: true },
     messageCache: { enable: false, self: false, level: 'standard', ttlHours: 24, maxRows: 200_000 },
     event: { type: 2 },
@@ -185,7 +158,7 @@ export const getDefaultConfig = (): Config => [
  * 监听配置文件，比较前后差异决定重建 / 销毁 bot
  */
 setTimeout(() => {
-  watch<RawConfig>(`${dirConfig}/config.json`, (old, now) => {
+  watch<Config>(`${dirConfig}/config.json`, (old, now) => {
     const oldConfig = formatConfig(old)
     const nowConfig = formatConfig(now)
     syncCache(nowConfig)

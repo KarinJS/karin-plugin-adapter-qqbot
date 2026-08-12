@@ -8,7 +8,7 @@ import {
   normalizeQQBotButton,
 } from './button-enter'
 import { groupElements } from './grouping'
-import { extractUrlButtons, imagesToMarkdown, splitMarkdownImages } from './text-to-md'
+import { imagesToMarkdown, splitMarkdownImages } from './text-to-md'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
 import type { Grouping } from './grouping'
@@ -32,13 +32,6 @@ export const sendGuild = async (
   elements: ElementTypes[]
 ): Promise<SendMsgResults> => {
   const grouping = groupElements<'guild'>(contact.scene, elements)
-
-  if (ctx.cfg.markdown.enable && ctx.cfg.keyboard.enable && grouping.text.length) {
-    const joined = grouping.text.join('')
-    const { text, buttons } = extractUrlButtons(joined, false)
-    grouping.text = [text]
-    grouping.buttons.push(...buttons)
-  }
 
   if (ctx.cfg.markdown.enable) return sendGuildMarkdown(ctx, contact, grouping)
   return sendGuildClassic(ctx, contact, grouping)
@@ -239,10 +232,8 @@ const flushGuild = async (
   const result = ctx.initSendMsgResults()
   const passive = buildPassiveGuild(grouping)
   const send = contact.scene === 'guild'
-    ? (peer: string, subPeer: string, item: SendGuildMsg | FormData) =>
-        ctx.super.messages.sendChannelMsg(subPeer, item)
-    : (peer: string, _subPeer: string, item: SendGuildMsg | FormData) =>
-        ctx.super.messages.sendDmsMsg(peer, item)
+    ? (_peer: string, subPeer: string, item: SendGuildMsg | FormData) => ctx.super.messages.sendChannelMsg(subPeer, item)
+    : (peer: string, _subPeer: string, item: SendGuildMsg | FormData) => ctx.super.messages.sendDmsMsg(peer, item)
 
   for (const item of items) {
     passive(item)

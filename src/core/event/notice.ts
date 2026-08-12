@@ -7,6 +7,8 @@ import {
   createGroupMemberDelNotice,
   createFriendIncreaseNotice,
   createFriendDecreaseNotice,
+  createGroupInviteRequest,
+  createGroupApplyRequest,
 } from 'node-karin'
 import type {
   GroupAddRobotEvent,
@@ -19,6 +21,7 @@ import type {
   FriendDelEvent,
   C2CMsgRejectEvent,
   C2CMsgReceiveEvent,
+  GroupJoinRequestEvent,
 } from '@/types/event'
 
 /**
@@ -217,4 +220,56 @@ export const onC2CMsgReceive = (client: AdapterQQBot, event: C2CMsgReceiveEvent)
 export const onC2CMsgReject = (client: AdapterQQBot, event: C2CMsgRejectEvent) => {
   const userId = event.d.openid
   client.logger('mark', `好友 ${userId} 已拒绝机器人主动发送消息`)
+}
+
+/** 用户申请加群事件 */
+export const onGroupJoinRequest = (client: AdapterQQBot, event: GroupJoinRequestEvent) => {
+  const eventId = event.id
+  const contact = karin.contactGroup(event.d.group_openid)
+  const srcReply: SrcReply = (elements) => client.sendMsg(contact, [...elements, segment.pasmsg(eventId, 'event')])
+  const time = Date.parse(event.d.apply_at)
+  if (event.d.member_openid === client.selfId) {
+    createGroupInviteRequest({
+      bot: client,
+      time,
+      eventId,
+      contact,
+      rawEvent: event,
+      subEvent: 'groupInvite',
+      sender: karin.groupSender(event.d.invited_by!, 'unknown'),
+      srcReply,
+      content: {
+        inviterId: event.d.invited_by!,
+        flag: event.d.join_request_id
+      }
+    })
+  } else {
+    createGroupApplyRequest({
+      bot: client,
+      time,
+      eventId,
+      contact,
+      rawEvent: event,
+      subEvent: 'groupApply',
+      sender: karin.groupSender(event.d.member_openid, 'unknown'),
+      srcReply,
+      content: {
+        inviterId: event.d.invited_by ?? '',
+        flag: event.d.join_request_id,
+        groupId: event.d.group_openid,
+        applierId: event.d.member_openid,
+        reason: (() => {
+          if (event.d.verify_info) {
+            if (event.d.verify_info.method === 'admin_review_qa') {
+              const reason = event.d.verify_info.review_qa_list[0]
+              if (reason) return `问题: ${reason.question}\n答案: ${reason.answer}`
+            } else {
+              return event.d.verify_info.verify_message
+            }
+          }
+          return ''
+        })()
+      }
+    })
+  }
 }

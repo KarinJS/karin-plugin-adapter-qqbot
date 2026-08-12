@@ -170,7 +170,7 @@ const prepareStaticElement = async (
  */
 const selfSender = (ctx: AdapterQQBot, contact: Contact) => {
   const userId = ctx.selfSubId('id') || ctx.selfId
-  const name = ctx.selfName || ctx.cfg.name || ''
+  const name = ctx.selfName || ''
   if (contact.scene === 'friend' || contact.scene === 'direct') {
     return karin.friendSender(userId, name)
   }

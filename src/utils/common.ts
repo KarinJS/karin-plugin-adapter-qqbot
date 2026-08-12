@@ -4,6 +4,8 @@ import lodash from 'node-karin/lodash'
 import GetUrls from '@karinjs/geturls'
 import { common, logger } from 'node-karin'
 
+/** QQBot统一API地址 */
+export const QQAPIBASEURL = 'https://api.bot.q.qq.com'
 /** 睡眠 */
 export const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 

@@ -25,7 +25,8 @@
     "lint:fix": "eslint src --fix",
     "pub": "npm publish --access public",
     "sort": "npx sort-package-json",
-    "test": "node tests/schema-sql.test.mjs && node tests/codec.test.mjs && node tests/store.test.mjs"
+    "test": "node tests/schema-sql.test.mjs && node tests/codec.test.mjs && node tests/store.test.mjs",
+    "typecheck": "npx tsc --noEmit"
   },
   "dependencies": {
     "@karinjs/geturls": "^1.0.2",

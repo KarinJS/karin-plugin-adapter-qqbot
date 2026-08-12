@@ -396,9 +396,13 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
   /**
    * 禁言群成员
    */
-  async setGroupMute (_groupId: string, _targetId: string, _duration: number): Promise<void> {
-    // TODO: QQ 官方 Bot API 暂不支持禁言群成员
-    this.logger('warn', '[setGroupMute] QQ Official Bot API 暂不支持禁言群成员')
+  async setGroupMute (_groupId: string, _targetId: string, duration: number): Promise<void> {
+    let rfc3339 = ''
+    if (duration > 0) {
+      const time = Date.now() + duration * 1000
+      rfc3339 = new Date(time).toISOString()
+    }
+    this.super.groups.setGroupMetu(_groupId, _targetId, rfc3339 ? 'add' : 'del', rfc3339)
   }
 
   /**
@@ -499,7 +503,7 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
         avatar: await this.getGroupAvatarUrl(_groupId),
       }
     } catch (err) {
-      this.logger('warn', `[getGroupInfo] 获取群信息失败（该接口为白名单接口，未开通权限会返回 11253）: ${err instanceof Error ? err.message : err}`)
+      this.logger('warn', `[getGroupInfo] 获取群信息失败: ${err instanceof Error ? err.message : err}`)
       return empty
     }
   }

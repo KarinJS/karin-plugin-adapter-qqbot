@@ -68,6 +68,8 @@ export const enum EventEnum {
   MESSAGE_AUDIT_PASS = 'MESSAGE_AUDIT_PASS',
   /** 消息审核不通过 */
   MESSAGE_AUDIT_REJECT = 'MESSAGE_AUDIT_REJECT',
+  /** 用户申请加群事件 */
+  GROUP_JOIN_REQUEST = 'GROUP_JOIN_REQUEST'
 }
 
 /**
@@ -414,6 +416,34 @@ export interface C2CMsgReceiveEvent extends BaseEvent {
   }
 }
 
+export interface GroupJoinRequestEvent extends BaseEvent {
+  t: EventEnum.GROUP_JOIN_REQUEST
+  id: string
+  d: {
+    group_openid: string
+    join_request_id: string
+    risk_tips: string
+    union_openid?: string
+    member_openid: string
+    username: string
+    apply_at: string
+    apply_source: 'self_apply' | 'invited'
+    invited_by?: string
+    bot: boolean
+    verify_info?: {
+      method: 'verify_message' | 'admin_review_qa'
+      verify_message: string
+      review_qa_list: {
+        question: string
+        answer: string
+      }[]
+    },
+    auto_approved?: {
+      strategy_id: string
+    }
+  }
+}
+
 /**
  * 互动事件（按钮点击 / 单聊快捷菜单）
  */
@@ -528,3 +558,4 @@ export type Event =
   | InteractionEvent
   | MessageAuditPassEvent
   | MessageAuditRejectEvent
+  | GroupJoinRequestEvent

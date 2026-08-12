@@ -2,13 +2,13 @@ import axios, { AxiosError } from 'node-karin/axios'
 import { log } from '@/utils/logger'
 import { random } from '@/utils/common'
 import { getUserAgent } from '@/utils/user-agent'
-import { buildFallbackWsUrlFromApi, joinHttpPath, normalizeHttpUrl, normalizeWsGatewayUrl } from '@/utils/proxy-url'
 import { getAccessToken, getBotAccessToken } from '@/core/internal/axios'
 import { formatOpenAPIError } from '@/core/api/error'
 import { dispatch } from '@/connection/transport'
 import { WSClient, type WSClientCloseEvent } from './client'
 import { computeMax, computeFallback, formatIntentNames, intentBitMap } from './intents'
 import type { QQBotConfig } from '@/types/config'
+import path from 'node:path'
 
 interface ManagedConn {
   /** 已建立的 client；fetchGateway 阶段为 null */
@@ -37,39 +37,17 @@ const QUICK_DISCONNECT_LIMIT = 3
 const QUICK_DISCONNECT_DELAY_MS = 60_000
 
 /**
- * 从 proxy.prodApi / proxy.sandboxApi 推导兜底的 WS 地址
- * 官方实际长期返回的也是 wss://{host}/websocket/，不依赖 /gateway 也能直连
- */
-export const buildFallbackWsUrl = (cfg: QQBotConfig): string => {
-  const apiUrl = cfg.sandbox ? cfg.proxy.sandboxApi : cfg.proxy.prodApi
-  return buildFallbackWsUrlFromApi(apiUrl)
-}
-
-/**
  * 获取网关地址：优先调 /gateway；失败 / 超时 / 限频 → 直接 fallback 到硬编码
  */
 const fetchGateway = async (cfg: QQBotConfig): Promise<string> => {
-  const apiUrl = normalizeHttpUrl(cfg.sandbox ? cfg.proxy.sandboxApi : cfg.proxy.prodApi)
-  const fallback = buildFallbackWsUrl(cfg)
-  const proxyWsValue = cfg.sandbox ? cfg.proxy.sandboxWs : cfg.proxy.prodWs
-  if (proxyWsValue.trim()) {
-    try {
-      const proxyWsUrl = normalizeWsGatewayUrl(proxyWsValue)
-      log('debug', `${cfg.appId}: 使用自定义 WS ${proxyWsUrl}`)
-      return proxyWsUrl
-    } catch (err: any) {
-      const reason = err?.message || 'unknown'
-      log('warn', `${cfg.appId}: 自定义 WS 地址无效 (${reason})，尝试获取 /gateway`)
-    }
-  }
-
+  const apiUrl = 'https://api.bot.qq.com'
   const accessToken = getBotAccessToken(cfg.appId)
   if (!accessToken) {
-    log('warn', `${cfg.appId}: 无 access_token，使用硬编码 WS ${fallback}`)
-    return fallback
+    log('warn', `${cfg.appId}: 无 access_token，使用硬编码 WS`)
+    return 'wss://api.bot.qq.com/websocket'
   }
   try {
-    const { data } = await axios.get(joinHttpPath(apiUrl, 'gateway'), {
+    const { data } = await axios.get(path.join(apiUrl, 'gateway'), {
       headers: {
         Authorization: `QQBot ${accessToken}`,
         'User-Agent': getUserAgent(),
@@ -77,8 +55,8 @@ const fetchGateway = async (cfg: QQBotConfig): Promise<string> => {
       timeout: GATEWAY_FETCH_TIMEOUT_MS,
     })
     if (data?.url) return data.url
-    log('warn', `${cfg.appId}: /gateway 返回为空，使用硬编码 WS ${fallback}`)
-    return fallback
+    log('warn', `${cfg.appId}: /gateway 返回为空，使用硬编码 WS`)
+    return 'wss://api.bot.qq.com/websocket'
   } catch (err: any) {
     if (axios.isAxiosError(err)) {
       const response = (err as AxiosError).response
@@ -89,12 +67,12 @@ const fetchGateway = async (cfg: QQBotConfig): Promise<string> => {
         : typeof data?.code === 'number' ? data.code : undefined
       const msg = typeof data?.message === 'string' ? data.message : undefined
       const detail = formatOpenAPIError(status, code, msg)
-      log('warn', `${cfg.appId}: /gateway 调用失败 | ${detail}，使用硬编码 WS ${fallback}`)
+      log('warn', `${cfg.appId}: /gateway 调用失败 | ${detail}，使用硬编码 WS`)
     } else {
       const reason = err?.message || 'unknown'
-      log('warn', `${cfg.appId}: /gateway 调用失败 (${reason})，使用硬编码 WS ${fallback}`)
+      log('warn', `${cfg.appId}: /gateway 调用失败 (${reason})，使用硬编码 WS`)
     }
-    return fallback
+    return 'wss://api.bot.qq.com/websocket'
   }
 }
 
@@ -271,7 +249,7 @@ const onClose = (
   if (code === 4004) {
     log('warn', `${cfg.appId}: access_token 已失效，刷新 token 后重连...`)
     schedule(cfg.appId, 1000, () => {
-      getAccessToken(cfg.proxy.tokenApi, cfg.appId, cfg.secret)
+      getAccessToken(cfg.appId, cfg.secret)
         .then(() => connect(cfg, intents, 0))
         .catch(() => {
           log('error', `${cfg.appId}: access_token 刷新失败，${RATE_LIMIT_DELAY_MS}ms 后重试连接...`)

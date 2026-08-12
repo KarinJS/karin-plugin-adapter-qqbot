@@ -7,7 +7,7 @@ import {
 } from './button-enter'
 import { groupElements } from './grouping'
 import { resolvePreferredMediaSource } from './media-source'
-import { extractUrlButtons, imagesToMarkdown, splitMarkdownImages } from './text-to-md'
+import { imagesToMarkdown, splitMarkdownImages } from './text-to-md'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
 import type { Grouping, PassiveInfo } from './grouping'
@@ -41,14 +41,6 @@ export const sendQQ = async (
   const target = contact.scene === 'friend' ? 'user' : 'group'
   const grouping = groupElements<'qq'>(contact.scene, elements)
   await resolveOutgoingReferenceQQ(ctx, contact, grouping)
-
-  // 文本是否需要做 URL→ 按钮转化
-  if (ctx.cfg.markdown.enable && ctx.cfg.keyboard.enable && grouping.text.length) {
-    const joined = grouping.text.join('')
-    const { text, buttons } = extractUrlButtons(joined, contact.scene === 'friend')
-    grouping.text = [text]
-    grouping.buttons.push(...buttons)
-  }
 
   /**
    * 自动 Markdown 通道：

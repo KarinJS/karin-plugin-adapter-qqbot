@@ -6,6 +6,7 @@ import {
 import {
   onGroupAddRobot, onGroupDelRobot, onGroupMemberAdd, onGroupMemberRemove, onGroupMsgReceive, onGroupMsgReject,
   onFriendAdd, onFriendDel, onC2CMsgReceive, onC2CMsgReject,
+  onGroupJoinRequest,
 } from './notice'
 import { onInteraction } from './interaction'
 import type { AdapterQQBot } from '@/core/adapter/base'
@@ -97,15 +98,16 @@ export const dispatch = (client: AdapterQQBot, ev: Event): void => {
     case EventEnum.C2C_MSG_REJECT:
       onC2CMsgReject(client, ev)
       return
-
     case EventEnum.INTERACTION_CREATE:
       onInteraction(client, ev)
       return
-
     case EventEnum.MESSAGE_AUDIT_PASS:
       return client.logger('debug', `消息审核通过: audit_id=${ev.d.audit_id}`)
     case EventEnum.MESSAGE_AUDIT_REJECT:
       return client.logger('debug', `消息审核不通过: audit_id=${ev.d.audit_id}`)
+    case EventEnum.GROUP_JOIN_REQUEST:
+      onGroupJoinRequest(client, ev)
+      return
 
     default:
       client.logger('debug', `[QQ Official Bot] 未处理事件: ${(ev as any).t}`)
