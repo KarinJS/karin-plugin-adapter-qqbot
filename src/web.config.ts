@@ -1,6 +1,6 @@
 import { Config, MessageCacheLevel } from './types'
 import { config } from './utils'
-import { defineConfig, components } from 'node-karin'
+import karin, { defineConfig, components } from 'node-karin'
 
 const unwrapValue = (value: unknown): unknown => {
   if (value && typeof value === 'object' && 'value' in value) {
@@ -73,7 +73,13 @@ export default defineConfig({
     const cfg = config.config()
     cfg.forEach(item => {
       data.push({
-        title: item.appId,
+        title: (() => {
+          try {
+            const bot = karin.getBot(item.appId)
+            if (bot) return bot.account.name
+          } catch { }
+          return item.appId
+        })(),
         subtitle: item.appId,
         appId: item.appId,
         secret: item.secret,
