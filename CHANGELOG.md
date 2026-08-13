@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.3](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.0.2...adapter-qqbot-v3.0.3) (2026-08-13)
+
+
+### Bug Fixes
+
+* 优化web配置中显示Bot名称 ([9ab4c45](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/9ab4c454563374eeb49c0b80b4600099c4408f3c))
+
 ## [3.0.2](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.0.1...adapter-qqbot-v3.0.2) (2026-08-13)
 
 
