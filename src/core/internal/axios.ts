@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'node-karin/axios'
 import { log } from '@/utils/logger'
 import { formatOpenAPIError } from '@/core/api/error'
 import { getUserAgent } from '@/utils/user-agent'
-import path from 'path'
+import { URL } from 'url'
 import { QQAPIBASEURL } from '@/utils/common'
 
 /**
@@ -32,7 +32,7 @@ export const getAccessToken = async (
 ): Promise<{ accessToken: string; expiresIn: number }> => {
   let res
   try {
-    const tokenurl = path.join(QQAPIBASEURL, '/app/getAppAccessToken')
+    const tokenurl = new URL('/app/getAppAccessToken', QQAPIBASEURL)
     res = await axios.post<AccessTokenResponse>(tokenurl, {
       appId: String(appId),
       clientSecret: secret,
