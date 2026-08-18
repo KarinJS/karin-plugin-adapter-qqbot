@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.4](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.0.3...adapter-qqbot-v3.0.4) (2026-08-18)
+
+
+### Bug Fixes
+
+* 修复url拼接错误的问题 ([357eb82](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/357eb82ec17ccf53b63599065c5cba7b552e797d))
+
 ## [3.0.3](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.0.2...adapter-qqbot-v3.0.3) (2026-08-13)
 
 
