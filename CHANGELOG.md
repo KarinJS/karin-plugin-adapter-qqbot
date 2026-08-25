@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.5](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.0.4...adapter-qqbot-v3.0.5) (2026-08-25)
+
+
+### Bug Fixes
+
+* 修复qqbot登录指令中，无法被再次触发的问题 ([4466c22](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/4466c222adc622eb3b4beda88c2ddead4e58529f))
+
 ## [3.0.4](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.0.3...adapter-qqbot-v3.0.4) (2026-08-18)
 
 
