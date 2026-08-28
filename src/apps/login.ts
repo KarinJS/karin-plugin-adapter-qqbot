@@ -1,7 +1,7 @@
 import { BindStatus, buildConnectUrl, createBindTask, PollBindResult } from '@/core/qrcode'
 import QRCode from 'qrcode'
 import karin, { segment, SendMessage } from 'node-karin'
-import { config, getDefaultConfig } from '@/utils/config'
+import { config, getDefaultConfig, writeConfig } from '@/utils/config'
 import { QQBotConfig } from '@/types'
 let busy = false
 export const QQBotLogin = karin.command(/^#qqbot(登录|login)$/i, async (e) => {
@@ -45,7 +45,7 @@ export const QQBotLogin = karin.command(/^#qqbot(登录|login)$/i, async (e) => 
         } as QQBotConfig)
         e.reply(`[${ok.appId}] 扫码登录成功`, { reply: true })
       }
-      return
+      return writeConfig(list)
     }
     return await e.reply('二维码过期,请重新触发指令', { reply: true })
   } finally {
