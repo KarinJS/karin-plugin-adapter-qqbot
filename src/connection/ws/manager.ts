@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'node-karin/axios'
 import { log } from '@/utils/logger'
-import { random } from '@/utils/common'
+import { QQAPIBASEURL, random } from '@/utils/common'
 import { getUserAgent } from '@/utils/user-agent'
 import { getAccessToken, getBotAccessToken } from '@/core/internal/axios'
 import { formatOpenAPIError } from '@/core/api/error'
@@ -8,7 +8,6 @@ import { dispatch } from '@/connection/transport'
 import { WSClient, type WSClientCloseEvent } from './client'
 import { computeMax, computeFallback, formatIntentNames, intentBitMap } from './intents'
 import type { QQBotConfig } from '@/types/config'
-import path from 'node:path'
 
 interface ManagedConn {
   /** 已建立的 client；fetchGateway 阶段为 null */
@@ -40,14 +39,13 @@ const QUICK_DISCONNECT_DELAY_MS = 60_000
  * 获取网关地址：优先调 /gateway；失败 / 超时 / 限频 → 直接 fallback 到硬编码
  */
 const fetchGateway = async (cfg: QQBotConfig): Promise<string> => {
-  const apiUrl = 'https://api.bot.qq.com'
   const accessToken = getBotAccessToken(cfg.appId)
   if (!accessToken) {
     log('warn', `${cfg.appId}: 无 access_token，使用硬编码 WS`)
     return 'wss://api.bot.qq.com/websocket'
   }
   try {
-    const { data } = await axios.get(path.join(apiUrl, 'gateway'), {
+    const { data } = await axios.get(`${QQAPIBASEURL}/gateway`, {
       headers: {
         Authorization: `QQBot ${accessToken}`,
         'User-Agent': getUserAgent(),
