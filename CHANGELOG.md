@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.7](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.0.6...adapter-qqbot-v3.0.7) (2026-08-28)
+
+
+### Bug Fixes
+
+* 修复扫码登录未保存文件的问题 ([527626b](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/527626b1f5080108e8494e3ef1c3e8216306dd0a))
+
 ## [3.0.6](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.0.5...adapter-qqbot-v3.0.6) (2026-08-25)
 
 
