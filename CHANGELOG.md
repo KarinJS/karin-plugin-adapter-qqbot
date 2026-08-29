@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.1.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.0.8...adapter-qqbot-v3.1.0) (2026-08-29)
+
+
+### Features
+
+* `bot.getGroupMuteList`,`bot.setInvitedJoinGroupResult`,`bot.setGroupApplyResult` ([c12ebd8](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/c12ebd8067ab3bb2ae7c3b1b4b77dd3f986bff80))
+* 客户端同步接口文档 v1.27.1 ([c12ebd8](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/c12ebd8067ab3bb2ae7c3b1b4b77dd3f986bff80))
+* 提取底层请求模块，开放 bot.super.request 裸请求入口 ([073796d](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/073796dd42c96f5a62baa443f335fdbd9ea9d476))
+
 ## [3.0.8](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.0.7...adapter-qqbot-v3.0.8) (2026-08-28)
 
 
