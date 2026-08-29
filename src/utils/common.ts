@@ -49,9 +49,14 @@ export const qrs = async (urls: string[]) => {
 
 /**
  * 读取图片宽高
+ *
+ * @param source 图片来源，支持 URL、本地路径、base64 字符串与已在内存中的 Buffer。
+ * @returns 图片宽高；解析失败时回落到 100x100。
  */
-export const getImageSize = async (url: string): Promise<{ width: number; height: number }> => {
-  const buffer = await common.buffer(url)
+export const getImageSize = async (
+  source: string | Buffer | Uint8Array
+): Promise<{ width: number; height: number }> => {
+  const buffer = await common.buffer(source)
   const { width = 100, height = 100 } = size(buffer)
   return { width, height }
 }

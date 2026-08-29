@@ -397,6 +397,16 @@ export interface UploadMediaResponse {
   ttl: number
   /** 发送消息的唯一ID，当srv_send_msg设置为true时返回 */
   id: string
+  /**
+   * 文件下载链接（COS 预签名 GET URL），有效期与 `ttl` 一致。
+   *
+   * 仅分片上传合并（走 `upload_id` 路径）且 `file_type` 为图片/视频/语音时返回；
+   * URL 直传和文件类型（`file_type=4`）不返回该字段。
+   *
+   * 这是把 QQ 分片上传当图床用的关键：拿到该直链后，图片就能以 markdown
+   * 图片语法嵌入 msg_type=2，不必再走 msg_type=7 富媒体单独发送。
+   */
+  raw_url?: string
 }
 
 // ==============以下是自定义菜单相关的接口================

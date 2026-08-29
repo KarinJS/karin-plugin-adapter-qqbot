@@ -7,6 +7,7 @@ import {
 } from './button-enter'
 import { groupElements } from './grouping'
 import { resolvePreferredMediaSource } from './media-source'
+import type { UploadOrigin } from './media-source'
 import { imagesToMarkdown, splitMarkdownImages } from './text-to-md'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
@@ -65,12 +66,15 @@ const sendQQMarkdown = async (
 ): Promise<SendMsgResults> => {
   const items: SendQQMsg[] = []
 
+  /** 上传归属会话固定为本次发送目标，保证 openid 与执行发送的 bot 同域。 */
+  const origin: UploadOrigin = { scene: target, peer: contact.peer }
+
   // 1) 把文本 + 可公网访问的图片合并为一段 markdown content
   const lines: string[] = []
   if (grouping.text.length) lines.push(grouping.text.join(''))
-  const fallbackImages = await appendMarkdownImages(ctx, lines, grouping.qqImages)
+  const fallbackImages = await appendMarkdownImages(ctx, lines, grouping.qqImages, origin)
 
-  const markdownFallbackImages = await appendExplicitMarkdown(ctx, lines, grouping)
+  const markdownFallbackImages = await appendExplicitMarkdown(ctx, lines, grouping, origin)
   fallbackImages.push(...markdownFallbackImages)
 
   if (contact.scene === 'group') {
@@ -87,7 +91,7 @@ const sendQQMarkdown = async (
   }
 
   for (const m of grouping.media) {
-    const source = await resolvePreferredMediaSource(ctx, m.kind, m.source, m.name)
+    const source = await resolvePreferredMediaSource(ctx, m.kind, m.source, m.name, origin)
     const res = source.via === 'fallback'
       ? await ctx.super.media.uploadFallback(target, contact.peer, m.kind, source.source, false, m.name)
       : await ctx.super.media.upload(target, contact.peer, m.kind, source.source, false, m.name)
@@ -166,7 +170,10 @@ const appendExplicitMarkdownItems = async (
   if (!grouping.markdowns.length) return
 
   const lines: string[] = []
-  const fallbackImages = await appendExplicitMarkdown(ctx, lines, grouping)
+  const fallbackImages = await appendExplicitMarkdown(ctx, lines, grouping, {
+    scene: target,
+    peer: contact.peer,
+  })
 
   if (contact.scene === 'group') {
     warnUnsupportedCommandEnterButtons(ctx, collectCommandEnterButtons(grouping.buttons, grouping.keyboards))
@@ -231,7 +238,7 @@ const buildQQMediaItem = async (
   source: string,
   name?: string
 ): Promise<SendQQMsg> => {
-  const resolved = await resolvePreferredMediaSource(ctx, type, source, name)
+  const resolved = await resolvePreferredMediaSource(ctx, type, source, name, { scene: target, peer })
   const res = resolved.via === 'fallback'
     ? await ctx.super.media.uploadFallback(target, peer, type, resolved.source, false, name)
     : await ctx.super.media.upload(target, peer, type, resolved.source, false, name)
@@ -244,17 +251,19 @@ const buildQQMediaItem = async (
  * @param ctx 适配器实例，用于输出降级日志。
  * @param lines markdown 行数组。
  * @param files QQ 图片消息段的 file 字段。
+ * @param origin 本次发送归属的上传会话。
  * @returns 需要改走 msg_type=7 富媒体发送的图片列表。
  */
 const appendMarkdownImages = async (
   ctx: AdapterQQBot,
   lines: string[],
-  files: string[]
+  files: string[],
+  origin: UploadOrigin
 ): Promise<string[]> => {
   const fallback: string[] = []
 
   for (const file of files) {
-    const resolved = await resolvePreferredMediaSource(ctx, 'image', file)
+    const resolved = await resolvePreferredMediaSource(ctx, 'image', file, undefined, origin, 'markdown')
     if (resolved.via === 'fallback') {
       fallback.push(file)
       continue
@@ -268,11 +277,18 @@ const appendMarkdownImages = async (
 
 /**
  * 处理显式 segment.markdown 中的图片：可转公网 URL 的继续嵌入，无法转的改走富媒体。
+ *
+ * @param ctx 适配器实例，用于输出降级日志。
+ * @param lines markdown 行数组。
+ * @param grouping 已归类的消息段。
+ * @param origin 本次发送归属的上传会话。
+ * @returns 需要改走 msg_type=7 富媒体发送的图片列表。
  */
 const appendExplicitMarkdown = async (
   ctx: AdapterQQBot,
   lines: string[],
-  grouping: Grouping<'qq'>
+  grouping: Grouping<'qq'>,
+  origin: UploadOrigin
 ): Promise<string[]> => {
   const fallback: string[] = []
 
@@ -284,7 +300,7 @@ const appendExplicitMarkdown = async (
         continue
       }
 
-      const resolved = await resolvePreferredMediaSource(ctx, 'image', part.source)
+      const resolved = await resolvePreferredMediaSource(ctx, 'image', part.source, undefined, origin, 'markdown')
       if (resolved.via === 'fallback') {
         fallback.push(part.source)
         continue

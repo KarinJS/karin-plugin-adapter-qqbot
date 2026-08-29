@@ -9,6 +9,7 @@ import {
 } from './button-enter'
 import { groupElements } from './grouping'
 import { imagesToMarkdown, splitMarkdownImages } from './text-to-md'
+import type { FileToUrlExtra } from './media-source'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
 import type { Grouping } from './grouping'
@@ -50,14 +51,23 @@ const sendGuildMarkdown = async (
 
   if (grouping.text.length) lines.push(grouping.text.join(''))
 
+  /**
+   * 频道用的是 channel_id，不存在 QQ 上传接口要求的 group_openid / user_openid，
+   * 所以只能标明执行发送的 bot，拿不出可用的上传会话。
+   */
+  const extra: FileToUrlExtra = { selfId: ctx.selfId, purpose: 'markdown' }
+
   // guild 场景：把 imageUrls 和 imageFiles 一并塞进 markdown
   const allImages = [...grouping.guildImageUrls]
   for (const file of grouping.guildImageFiles) {
-    const { url } = await fileToUrl('image', file, 'image.jpg')
-    allImages.push(url)
+    const result = await fileToUrl('image', file, 'image.jpg', extra)
+    if (!result?.url) {
+      throw new Error('[Handler][Error]: 没有 fileToUrl 处理器接手图片转 URL')
+    }
+    allImages.push(result.url)
   }
   if (allImages.length) {
-    const mdImages = await imagesToMarkdown(allImages)
+    const mdImages = await imagesToMarkdown(allImages, extra)
     lines.push(...mdImages)
   }
   for (const markdown of grouping.markdowns) {
@@ -66,7 +76,7 @@ const sendGuildMarkdown = async (
         const text = part.value.trim()
         if (text) lines.push(text)
       } else {
-        const [mdImage] = await imagesToMarkdown([part.source])
+        const [mdImage] = await imagesToMarkdown([part.source], extra)
         lines.push(mdImage)
       }
     }
@@ -133,6 +143,7 @@ const appendExplicitGuildMarkdownItems = async (
 ): Promise<void> => {
   if (!grouping.markdowns.length) return
 
+  const extra: FileToUrlExtra = { selfId: ctx.selfId, purpose: 'markdown' }
   const lines: string[] = []
   for (const markdown of grouping.markdowns) {
     for (const part of splitMarkdownImages(markdown.markdown)) {
@@ -140,7 +151,7 @@ const appendExplicitGuildMarkdownItems = async (
         const text = part.value.trim()
         if (text) lines.push(text)
       } else {
-        const [mdImage] = await imagesToMarkdown([part.source])
+        const [mdImage] = await imagesToMarkdown([part.source], extra)
         lines.push(mdImage)
       }
     }
