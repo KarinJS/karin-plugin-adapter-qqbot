@@ -1,4 +1,5 @@
 import type { AdapterQQBot } from '@/core/adapter/base'
+import { cacheJoinRequest } from '@/core/adapter/join-request-cache'
 import {
   karin,
   SrcReply,
@@ -228,6 +229,13 @@ export const onGroupJoinRequest = (client: AdapterQQBot, event: GroupJoinRequest
   const contact = karin.contactGroup(event.d.group_openid)
   const srcReply: SrcReply = (elements) => client.sendMsg(contact, [...elements, segment.pasmsg(eventId, 'event')])
   const time = Date.parse(event.d.apply_at)
+
+  /** 审批接口需要群 / 申请人 openid，而 Karin 只透传 join_request_id */
+  cacheJoinRequest(client, event.d.join_request_id, {
+    groupId: event.d.group_openid,
+    memberId: event.d.member_openid,
+  })
+  if (event.d.username) client.nicknameCache.set(event.d.member_openid, event.d.username)
   if (event.d.member_openid === client.selfId) {
     createGroupInviteRequest({
       bot: client,

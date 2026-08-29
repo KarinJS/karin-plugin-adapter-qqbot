@@ -4,6 +4,7 @@ import { QQBotApi } from '@/core/api'
 import { config, pkg, bindHandlers } from '@/utils/config'
 import { createAxiosInstance, getAccessToken, stopTokenRefresh } from '@/core/internal/axios'
 import { AdapterQQBot } from '@/core/adapter/base'
+import { clearJoinRequests } from '@/core/adapter/join-request-cache'
 import { dispatch as dispatchEvent } from '@/core/event/dispatcher'
 import { bus, offAll } from '@/connection/transport'
 import * as ws from '@/connection/ws/manager'
@@ -112,13 +113,14 @@ export const createBot = async (input: QQBotConfig): Promise<void> => {
 }
 
 /**
- * 销毁 bot：注销 + 关 WS + 取消监听 + 停止 token 刷新
+ * 销毁 bot：注销 + 关 WS + 取消监听 + 停止 token 刷新 + 清理入群申请索引
  */
 export const destroyBot = (appId: string): void => {
   unregisterBot('selfId', appId)
   ws.stop(appId)
   offAll(appId)
   stopTokenRefresh(appId)
+  clearJoinRequests(appId)
 }
 
 // 把 createBot / destroyBot 注入到 config watch 回调

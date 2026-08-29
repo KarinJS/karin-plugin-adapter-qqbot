@@ -386,3 +386,555 @@ export interface UploadMediaResponse {
   /** 发送消息的唯一ID，当srv_send_msg设置为true时返回 */
   id: string
 }
+
+// ==============以下是自定义菜单相关的接口================
+
+/** 自定义菜单按钮类型 */
+export type MenuItemType = 'switch' | 'send_message' | 'link' | 'menu'
+
+/** 自定义菜单开关配置（仅 type=switch 时有效） */
+export interface MenuSwitch {
+  /**
+   * 开关唯一标识
+   *
+   * 用户切换开关状态后会发送一条消息，消息 `ext` 字段中携带 `{switch_id}=1`；
+   * 关闭后不携带该标识。
+   */
+  switch_id?: string
+  /** 开关的初始状态，true 默认打开 */
+  default?: boolean
+}
+
+/** 自定义菜单二级菜单项（不支持再嵌套子菜单） */
+export interface SubMenuItem {
+  /** 按钮名称，最多 14 个字符（约 7 个中文汉字） */
+  name?: string
+  /** 按钮类型，二级菜单仅支持 send_message / link */
+  type?: Extract<MenuItemType, 'send_message' | 'link'>
+  /** 发送的内容，仅 type=send_message 时有效，用户点击后自动填入输入框 */
+  send_message?: string
+  /** 跳转链接，仅 type=link 时有效，必须以 https:// 开头 */
+  link?: string
+}
+
+/** 自定义菜单一级菜单项 */
+export interface MenuItem {
+  /** 按钮名称，最多 10 个字符（一个中文汉字算 2 个字符） */
+  name?: string
+  /** 按钮类型 */
+  type?: MenuItemType
+  /** 子菜单列表，仅 type=menu 时有效，最多 5 个 */
+  sub_menu_items?: SubMenuItem[]
+  /** 发送的内容，仅 type=send_message 时有效，用户点击后自动填入输入框 */
+  send_message?: string
+  /** 跳转链接，仅 type=link 时有效，必须以 https:// 开头 */
+  link?: string
+  /** 开关配置，仅 type=switch 时有效 */
+  switch?: MenuSwitch
+}
+
+/** 自定义菜单配置 */
+export interface Menu {
+  /** 菜单项列表，最多 10 个，按列表顺序从左到右展示 */
+  items?: MenuItem[]
+}
+
+/** 查询全局自定义菜单响应（GET /v2/menu） */
+export interface GetMenuResponse {
+  /** 当前菜单的版本号 */
+  version: number
+  /** 当前生效的菜单配置；未设置过菜单时该字段为空 */
+  menu?: Menu
+}
+
+/** 修改全局自定义菜单响应（PUT /v2/menu） */
+export interface UpdateMenuResponse {
+  /** 本次修改后的菜单版本号，可用于后续判断配置是否有变更 */
+  version: number
+}
+
+// ==============以下是指令面板相关的接口================
+
+/** 指令面板生效场景：c2c 单聊 / group 群聊 / channel 文字子频道 / dm 频道私信 */
+export type PanelScope = 'c2c' | 'group' | 'channel' | 'dm'
+
+/** 指令面板作用范围：all 全局生效 / specific 指定用户或群生效 */
+export type PanelTargetType = 'all' | 'specific'
+
+/** 指令面板元素类型 */
+export type PanelItemType = 'command' | 'link'
+
+/** 指令面板元素 */
+export interface PanelItem {
+  /**
+   * 元素名称，最多 14 个字符（约 7 个中文汉字）
+   *
+   * type=command 时用户点击后该内容会填入聊天输入框；type=link 时仅用于面板展示。
+   */
+  name?: string
+  /** 元素描述，最多 30 个字符（约 15 个中文汉字），在面板中展示给用户 */
+  desc?: string
+  /** 元素类型 */
+  type?: PanelItemType
+  /** 是否仅管理员可操作，true 时仅频道/群管理员可点击 */
+  only_admin?: boolean
+  /** 跳转链接，仅 type=link 时有效，必须以 https:// 开头 */
+  link?: string
+}
+
+/** 指令面板配置内容 */
+export interface Panel {
+  /** 面板元素列表，一个面板最多配置 20 个元素 */
+  items?: PanelItem[]
+  /** 面板备注，最多 255 个字符，不对用户展示 */
+  remark?: string
+  /** 当前版本号 */
+  version?: number
+}
+
+/** 查询指令面板列表查询参数（GET /v2/panels） */
+export interface GetPanelListParams {
+  /** 生效场景，必填 */
+  scope: PanelScope
+  /** 分页游标，首次请求不传或传空串，后续传上次响应的 next_cursor */
+  cursor?: string
+  /** 每页拉取条数，默认 20，最大 50 */
+  limit?: number
+}
+
+/** 指令面板记录 */
+export interface PanelRecord {
+  /** 面板 ID */
+  panel_id: string
+  /** 生效场景 */
+  scope: PanelScope
+  /** 作用范围，仅 c2c/group 场景可能为 specific */
+  target_type: PanelTargetType
+  /** 面板配置内容 */
+  panel: Panel
+  /** 面板创建时间，RFC3339 格式 */
+  created_at?: string
+  /** 面板更新时间，RFC3339 格式 */
+  updated_at?: string
+  /** 面板版本号 */
+  version: number
+}
+
+/** 查询指令面板列表响应（GET /v2/panels） */
+export interface GetPanelListResponse {
+  /** 面板记录列表，按设置时间倒序排列 */
+  records: PanelRecord[]
+  /** 下一页游标，空串表示已到最后一页 */
+  next_cursor: string
+  /** 是否已拉取到最后一页 */
+  is_end: boolean
+}
+
+/** 创建指令面板请求体（POST /v2/panels） */
+export interface CreatePanelRequest {
+  /** 生效场景，channel / dm 场景 target_type 只能为 all */
+  scope: PanelScope
+  /** 作用范围，仅 c2c / group 场景支持 specific */
+  target_type?: PanelTargetType
+  /** 用户 openid 列表，仅 c2c 场景且 target_type=specific 时有效，一次最多 20 个 */
+  user_openids?: string[]
+  /** 群 openid 列表，仅 group 场景且 target_type=specific 时有效，一次最多 20 个 */
+  group_openids?: string[]
+  /** 面板配置内容 */
+  panel: Panel
+}
+
+/** 创建指令面板响应（POST /v2/panels） */
+export interface CreatePanelResponse {
+  /** 新创建的面板 ID，后续修改、删除、查询详情均需使用此 ID */
+  panel_id: string
+}
+
+/** 查询指令面板详情响应（GET /v2/panels/{panel_id}） */
+export interface GetPanelResponse extends PanelRecord {
+  /** 关联的用户 openid 列表，仅 c2c 场景且 target_type=specific 时返回，最多 1000 条 */
+  user_openids?: string[]
+  /** 关联的群 openid 列表，仅 group 场景且 target_type=specific 时返回，最多 1000 条 */
+  group_openids?: string[]
+}
+
+/** 修改指令面板响应（PUT /v2/panels/{panel_id}） */
+export interface UpdatePanelResponse {
+  /** 本次修改后的面板版本号 */
+  version: number
+}
+
+/** 修改指令面板关联对象请求体（PUT /v2/panels/{panel_id}/target） */
+export interface UpdatePanelTargetRequest {
+  /** 操作类型：add 添加关联对象 / del 移除关联对象 */
+  op: 'add' | 'del'
+  /** 用户 openid 列表，仅 c2c 场景有效，一次最多 20 个 */
+  user_openids?: string[]
+  /** 群 openid 列表，仅 group 场景有效，一次最多 20 个 */
+  group_openids?: string[]
+}
+
+// ==============以下是频道 / 子频道相关的接口================
+
+/** 频道信息 */
+export interface GuildInfo {
+  /** 频道 ID */
+  id: string
+  /** 频道名称 */
+  name: string
+  /** 频道头像 URL */
+  icon?: string
+  /** 频道创建者 ID */
+  owner_id?: string
+  /** 当前机器人是否为频道创建者 */
+  owner?: boolean
+  /** 加入时间，ISO8601 格式 */
+  joined_at?: string
+  /** 频道成员数 */
+  member_count?: number
+  /** 频道成员上限 */
+  max_members?: number
+  /** 频道简介 */
+  description?: string
+}
+
+/** 获取机器人加入的频道列表查询参数（GET /users/@me/guilds） */
+export interface GetGuildListParams {
+  /** 读取此 guild_id 之前的数据，设置时先反序再分页 */
+  before?: string
+  /** 读取此 guild_id 之后的数据，与 before 同时设置时 after 无效 */
+  after?: string
+  /** 每次拉取条数，默认 100，最大 100 */
+  limit?: number
+}
+
+/** 子频道类型：0=文字，2=语音，4=分组，10005=直播，10006=应用，10007=论坛 */
+export type ChannelType = 0 | 2 | 4 | 10005 | 10006 | 10007
+
+/** 文字子频道子类型：0=闲聊，1=公告，2=攻略，3=开黑 */
+export type ChannelSubType = 0 | 1 | 2 | 3
+
+/** 子频道私密类型：0=公开，1=群主管理员可见，2=群主管理员+指定成员 */
+export type ChannelPrivateType = 0 | 1 | 2
+
+/** 子频道发言权限：0=无效，1=所有人，2=群主管理员+指定成员 */
+export type ChannelSpeakPermission = 0 | 1 | 2
+
+/** 子频道信息 */
+export interface ChannelInfo {
+  /** 子频道 ID */
+  id: string
+  /** 所属频道 ID */
+  guild_id: string
+  /** 子频道名 */
+  name: string
+  /** 子频道类型 */
+  type: ChannelType
+  /** 子频道子类型（文字子频道） */
+  sub_type?: ChannelSubType
+  /** 排序值，从 1 开始 */
+  position?: number
+  /** 所属分组 ID（仅子频道有效） */
+  parent_id?: string
+  /** 创建人 ID */
+  owner_id?: string
+  /** 子频道私密类型 */
+  private_type?: ChannelPrivateType
+  /** 子频道发言权限 */
+  speak_permission?: ChannelSpeakPermission
+  /** 应用子频道标识 */
+  application_id?: string
+  /** 用户拥有的子频道权限 */
+  permissions?: string
+}
+
+/** 创建子频道请求体（POST /guilds/{guild_id}/channels） */
+export interface CreateChannelRequest {
+  /** 子频道名称 */
+  name?: string
+  /** 子频道类型 */
+  type?: ChannelType
+  /** 子频道子类型 */
+  sub_type?: ChannelSubType
+  /** 排序值（分组类型必须 >= 2） */
+  position?: number
+  /** 所属分组 ID */
+  parent_id?: string
+  /** 私密类型 */
+  private_type?: ChannelPrivateType
+  /** 私密成员 ID 列表 */
+  private_user_ids?: string[]
+  /** 发言权限 */
+  speak_permission?: ChannelSpeakPermission
+  /** 应用子频道 AppID */
+  application_id?: string
+}
+
+/** 修改子频道请求体（PATCH /channels/{channel_id}），只需传入要修改的字段 */
+export interface UpdateChannelRequest {
+  /** 子频道名 */
+  name?: string
+  /** 排序 */
+  position?: number
+  /** 分组 ID */
+  parent_id?: string
+  /** 私密类型 */
+  private_type?: ChannelPrivateType
+  /** 发言权限 */
+  speak_permission?: ChannelSpeakPermission
+}
+
+/** 生成分享链接请求体（POST /v2/generate_url_link） */
+export interface GenerateUrlLinkRequest {
+  /** 需要跳转的 URL */
+  url_link?: string
+  /**
+   * 开发者自定义回调数据，最长 32 字符
+   *
+   * 用户通过该链接添加机器人时会透传回 `FRIEND_ADD` 事件的 `scene_param`。
+   */
+  callback_data?: string
+}
+
+/** 生成分享链接响应（POST /v2/generate_url_link） */
+export interface GenerateUrlLinkResponse {
+  /** 生成的分享链接 */
+  url_link: string
+}
+
+// ==============以下是群禁言状态 / 入群审批相关的接口================
+
+/** 全员禁言模式：none 未开启 / always 始终禁言 / schedule 定时或周期性禁言 */
+export type GroupMuteMode = 'none' | 'always' | 'schedule'
+
+/** 定时禁言规则 */
+export interface MuteScheduleRule {
+  /** 任务 ID */
+  task_id: string
+  /** 禁言开始时间（RFC3339 格式） */
+  start_at: string
+  /** 禁言结束时间（RFC3339 格式） */
+  end_at: string
+  /** 此规则是否启用 */
+  enabled: boolean
+}
+
+/** 周期禁言规则 */
+export interface MuteRecurringRule {
+  /** 任务 ID */
+  task_id: string
+  /** 生效星期几列表，取值 1~7（1=周一，7=周日） */
+  weekdays: number[]
+  /** 时段开始时间，格式 HH:mm（北京时间） */
+  start_time: string
+  /** 时段结束时间，格式 HH:mm（北京时间）；小于 start_time 表示跨天到次日 */
+  end_time: string
+  /** 此规则是否启用 */
+  enabled: boolean
+}
+
+/** 群级禁言规则（全员禁言配置） */
+export interface GlobalMuteRule {
+  /** 全员禁言模式 */
+  mode: GroupMuteMode
+  /** 定时禁言规则列表 */
+  schedule_rules?: MuteScheduleRule[]
+  /** 周期禁言规则列表 */
+  recurring_rules?: MuteRecurringRule[]
+}
+
+/** 成员禁言状态 */
+export interface MemberMuteState {
+  /** 被禁言成员的 openid */
+  member_openid: string
+  /** 禁言到期时间（RFC3339 格式） */
+  mute_expire_at: string
+  /** 被禁言成员的昵称 */
+  username?: string
+  /** 用户在应用/开放平台下的统一标识 */
+  union_openid?: string
+}
+
+/** 查询群禁言状态响应（GET /v2/groups/{group_openid}/restrict_chat_setting） */
+export interface GetGroupMuteSettingResponse {
+  /** 群级禁言规则 */
+  global_rule?: GlobalMuteRule
+  /** 当前处于禁言中的用户列表（不含已过期） */
+  members?: MemberMuteState[]
+}
+
+/** 入群验证方式 */
+export interface JoinRequestVerifyInfo {
+  /** 入群验证方式 */
+  method: 'verify_message' | 'admin_review_qa'
+  /** 验证消息内容，仅 method=verify_message 时可能携带 */
+  verify_message?: string
+  /** 问答列表，仅 method=admin_review_qa 时可能携带 */
+  review_qa_list?: {
+    /** 管理员设置的问题 */
+    question: string
+    /** 申请人填写的答案 */
+    answer: string
+  }[]
+}
+
+/** 入群申请 */
+export interface JoinRequest {
+  /** 申请 ID，需要在审批接口回传 */
+  join_request_id: string
+  /** 安全提示语 */
+  risk_tips?: string
+  /** 用户在应用/开放平台下的统一标识 */
+  union_openid?: string
+  /** 申请人 openid */
+  member_openid: string
+  /** 申请人昵称 */
+  username?: string
+  /** 申请时间戳（RFC3339 格式） */
+  apply_at?: string
+  /** 申请来源：self_apply 主动申请，invited 被邀请 */
+  apply_source?: 'self_apply' | 'invited'
+  /** 邀请人 openid（apply_source=invited 时有效） */
+  invited_by?: string
+  /** 是否为机器人账号 */
+  bot?: boolean
+  /** 用户入群验证方式 */
+  verify_info?: JoinRequestVerifyInfo
+}
+
+/** 入群申请列表查询参数（GET /v2/groups/{group_openid}/join_request_list） */
+export interface GetJoinRequestListParams {
+  /** 分页游标，首次请求可不传或传空串 */
+  cursor?: string
+  /** 单页数量，默认 20，最大 100 */
+  limit?: number
+}
+
+/** 入群申请列表响应（GET /v2/groups/{group_openid}/join_request_list） */
+export interface GetJoinRequestListResponse {
+  /** 入群申请列表 */
+  list: JoinRequest[]
+  /** 下一页游标，空串表示已到末页 */
+  next_cursor: string
+}
+
+/** 入群申请审批请求体（POST /v2/groups/{group_openid}/approval_join_request/{member_openid}） */
+export interface ApprovalJoinRequestBody {
+  /** 审批动作：approve 通过，decline 拒绝 */
+  op: 'approve' | 'decline'
+  /** 申请 ID */
+  join_request_id?: string
+  /** 拒绝理由，op=decline 时可填 */
+  reject_reason?: string
+  /** 是否同时加入群黑名单，默认 false，op=decline 时可填 */
+  add_to_member_blacklist?: boolean
+}
+
+// ==============以下是入群自动审批策略相关的接口================
+
+/** 入群自动审批策略 */
+export interface JoinApprovalStrategy {
+  /** 策略 ID */
+  strategy_id: string
+  /** 关联的群 openid 列表（创建时使用 group_openids 时返回） */
+  group_openids?: string[]
+  /** 关联的 QQ 群号列表（创建时使用 group_ids 时返回） */
+  group_ids?: string[]
+  /** 白名单中的号码数量（估算，可能存在少量误差） */
+  whitelist_user_count?: number
+  /** 策略是否启用：on 启用 / off 关闭 */
+  is_enable: 'on' | 'off'
+  /** 过期时间（RFC3339 格式） */
+  expire_at?: string
+  /** 创建时间（RFC3339 格式） */
+  created_at?: string
+  /** 最近更新时间（RFC3339 格式） */
+  updated_at?: string
+  /** 策略备注 */
+  remark?: string
+}
+
+/** 查询入群自动审批策略列表查询参数（GET /v2/groups/join_approval_strategy） */
+export interface GetJoinApprovalStrategyListParams {
+  /** 分页游标，首次请求可不传或传空串 */
+  cursor?: string
+  /** 单页数量，默认 20，最大 100 */
+  limit?: number
+}
+
+/** 查询入群自动审批策略列表响应 */
+export interface GetJoinApprovalStrategyListResponse {
+  /** 生效中的策略列表 */
+  strategies: JoinApprovalStrategy[]
+  /** 下一页游标，空串表示已到末页 */
+  next_cursor: string
+}
+
+/** 创建入群自动审批策略请求体（POST /v2/groups/join_approval_strategy） */
+export interface CreateJoinApprovalStrategyRequest {
+  /** 关联的群 openid 列表，最多 100 个；与 group_ids 互斥且二选一必填 */
+  group_openids?: string[]
+  /** 关联的 QQ 群号列表，最多 100 个；与 group_openids 互斥且二选一必填 */
+  group_ids?: string[]
+  /** 是否启用策略，默认 on */
+  is_enable?: 'on' | 'off'
+  /** 过期时间（RFC3339 格式），不传默认一年过期 */
+  expire_at?: string
+  /** 策略备注，最多 255 个汉字 */
+  remark?: string
+}
+
+/** 创建入群自动审批策略响应 */
+export interface CreateJoinApprovalStrategyResponse {
+  /** 服务端生成的策略 ID */
+  strategy_id: string
+  /** 是否启用 */
+  is_enable: 'on' | 'off'
+  /** 过期时间（RFC3339 格式） */
+  expire_at?: string
+}
+
+/** 修改入群自动审批策略请求体（PATCH /v2/groups/join_approval_strategy/{strategy_id}） */
+export interface UpdateJoinApprovalStrategyRequest {
+  /** 是否启用策略 */
+  is_enable?: 'on' | 'off'
+  /** 过期时间（RFC3339 格式） */
+  expire_at?: string
+  /** 关联群增删操作；群标识形式须与创建时一致 */
+  group_action?: {
+    /** 操作类型：add 新增关联群，del 删除关联群 */
+    op: 'add' | 'del'
+    /** 待操作的群 openid 列表；与 group_ids 互斥 */
+    group_openids?: string[]
+    /** 待操作的 QQ 群号列表；与 group_openids 互斥 */
+    group_ids?: string[]
+  }
+  /** 策略备注，最多 255 个汉字 */
+  remark?: string
+}
+
+/** 修改入群自动审批策略响应 */
+export interface UpdateJoinApprovalStrategyResponse {
+  /** 是否启用 */
+  is_enable: 'on' | 'off'
+  /** 过期时间（RFC3339 格式） */
+  expire_at?: string
+}
+
+/** 修改策略白名单号码请求体（POST /v2/groups/join_approval_strategy/{strategy_id}/whitelist_users） */
+export interface UpdateWhitelistUsersRequest {
+  /** 操作类型：add 新增号码，del 删除号码 */
+  op: 'add' | 'del'
+  /** QQ 号码列表，单次最多 10000 个；使用字符串类型避免 JS 精度问题 */
+  whitelist_users: string[]
+}
+
+/** 修改策略白名单号码响应 */
+export interface UpdateWhitelistUsersResponse {
+  /** 策略 ID */
+  strategy_id: string
+  /** 操作后策略当前白名单号码数（估算） */
+  whitelist_user_count: number
+  /** 策略更新时间（RFC3339 格式） */
+  updated_at?: string
+}

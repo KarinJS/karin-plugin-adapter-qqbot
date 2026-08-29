@@ -9,12 +9,16 @@ import type { InteractionEvent } from '@/types/event'
  * 取得互动事件真正用于 ACK 的平台 ID。
  *
  * WebSocket Dispatch 外层也有一个 `id`，形如 `INTERACTION_CREATE:uuid`；按钮 ACK
- * 接口需要的是事件体内的 `d.id`，也就是不带事件名前缀的 uuid。
+ * 接口需要的是事件体内的 `d.id`，也就是不带事件名前缀的 uuid。缺少 `d.id` 时
+ * 退回外层 `id`，并按官方要求剥掉 `INTERACTION_CREATE:` 前缀。
  *
  * @param ev QQBot 原始互动事件。
  * @returns 可传给 `/interactions/{interaction_id}` 的 ID。
  */
-const getInteractionId = (ev: InteractionEvent): string => ev.d.id || ev.id
+const getInteractionId = (ev: InteractionEvent): string => {
+  if (ev.d.id) return ev.d.id
+  return ev.id.replace(/^INTERACTION_CREATE:/, '')
+}
 
 /** 按钮回调元信息的 JSON 值类型。 */
 type ButtonInteractionMetaValue = string | number

@@ -112,6 +112,20 @@ export class Http {
     }
   }
 
+  protected async patch<T> (
+    path: string,
+    body: unknown = {},
+    headers?: Record<string, string>,
+    timeout?: number
+  ): Promise<T> {
+    try {
+      const { data } = await this.axios.patch(path, body, { headers, timeout })
+      return data
+    } catch (err) {
+      throw formatError(path, body, err)
+    }
+  }
+
   protected async delete<T> (path: string): Promise<T> {
     try {
       const { data } = await this.axios.delete(path)

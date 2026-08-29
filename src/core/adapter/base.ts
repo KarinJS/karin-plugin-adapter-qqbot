@@ -3,6 +3,7 @@ import { QQBotApi } from '@/core/api'
 import { sendQQ } from './pipeline-qq'
 import { sendGuild } from './pipeline-guild'
 import { cacheSelfMessage, prepareSelfMessageCache, shouldCacheSelfMessage } from './self-message-cache'
+import { getJoinRequest, removeJoinRequest } from './join-request-cache'
 import { getMessageStore, type MessageStore } from '@/core/storage/message'
 import { getImageSize } from '@/utils/common'
 import type {
@@ -20,6 +21,9 @@ const adapterConfigStore = new WeakMap<object, QQBotConfig>()
 
 /** HTTP(S) URL 可直接交给 QQ 平台拉取上传 */
 const HTTP_URL_RE = /^https?:\/\//i
+
+/** 平台限制的最大禁言时长：30 天 */
+const MAX_GROUP_MUTE_SECONDS = 30 * 24 * 60 * 60
 
 /**
  * QQ Official Bot 适配器
@@ -395,22 +399,39 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
 
   /**
    * 禁言群成员
+   *
+   * 机器人需拥有群管理员身份；平台限制最大禁言时长为 30 天，
+   * 超出部分会被截断到 30 天而不是直接失败。
+   *
+   * @param _groupId 群 openid
+   * @param _targetId 群成员 openid
+   * @param duration 禁言时长（秒），传 0 或负数表示解除禁言
    */
   async setGroupMute (_groupId: string, _targetId: string, duration: number): Promise<void> {
     let rfc3339 = ''
     if (duration > 0) {
-      const time = Date.now() + duration * 1000
-      rfc3339 = new Date(time).toISOString()
+      let seconds = duration
+      if (seconds > MAX_GROUP_MUTE_SECONDS) {
+        this.logger(
+          'warn',
+          `[setGroupMute] 禁言时长 ${seconds}s 超出平台上限 30 天，已截断为 ${MAX_GROUP_MUTE_SECONDS}s`
+        )
+        seconds = MAX_GROUP_MUTE_SECONDS
+      }
+      rfc3339 = new Date(Date.now() + seconds * 1000).toISOString()
     }
-    this.super.groups.setGroupMetu(_groupId, _targetId, rfc3339 ? 'add' : 'del', rfc3339)
+    await this.super.groups.setGroupMute(_groupId, _targetId, rfc3339 ? 'add' : 'del', rfc3339)
   }
 
   /**
    * 群全员禁言
    */
   async setGroupAllMute (_groupId: string, _isBan: boolean): Promise<void> {
-    // TODO: QQ 官方 Bot API 暂不支持群全员禁言
-    this.logger('warn', '[setGroupAllMute] QQ Official Bot API 暂不支持群全员禁言')
+    // TODO: 官方仅提供全员禁言的查询能力（restrict_chat_setting 的 global_rule），设置接口未开放
+    this.logger(
+      'warn',
+      '[setGroupAllMute] QQ Official Bot API 暂不支持设置群全员禁言，仅可通过 bot.super.groups.getGroupMuteSetting() 查询 global_rule'
+    )
   }
 
   /**
@@ -477,8 +498,11 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
   /**
    * 获取群信息
    *
-   * 走官方 `GET /v2/groups/{group_openid}/info`（白名单接口）。
-   * 未开通权限（11253）或查询失败时降级为空结构并告警。
+   * QQ 群走官方 `GET /v2/groups/{group_openid}/info`（白名单接口）；传入的是频道
+   * ID 时退回 `GET /guilds/{guild_id}`，这样频道场景下的插件调用也能拿到名称和
+   * 人数。两者都不可用（如白名单未开通返回 11253）时降级为空结构并告警。
+   *
+   * @param _groupId 群 openid 或频道 ID。
    */
   async getGroupInfo (_groupId: string, _noCache?: boolean): Promise<GroupInfo> {
     const empty: GroupInfo = {
@@ -503,6 +527,18 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
         avatar: await this.getGroupAvatarUrl(_groupId),
       }
     } catch (err) {
+      const guild = await this.super.guilds.getGuild(_groupId).catch(() => null)
+      if (guild) {
+        return {
+          ...empty,
+          groupName: guild.name || '',
+          owner: guild.owner_id || '',
+          memberCount: guild.member_count ?? 0,
+          maxMemberCount: guild.max_members ?? 0,
+          groupDesc: guild.description || '',
+          avatar: guild.icon || '',
+        }
+      }
       this.logger('warn', `[getGroupInfo] 获取群信息失败: ${err instanceof Error ? err.message : err}`)
       return empty
     }
@@ -510,10 +546,13 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
 
   /**
    * 获取群列表
+   *
+   * 官方没有 QQ 群列表接口。频道列表可用 `bot.super.guilds.getGuildList()` 获取，
+   * 但频道在 Karin 里属于 guild 场景，与 QQ 群不是同一类会话，因此不在此处混用。
    */
   async getGroupList (_refresh?: boolean): Promise<Array<GroupInfo>> {
-    // TODO: QQ 官方 Bot API 暂不支持获取群列表
-    this.logger('warn', '[getGroupList] QQ Official Bot API 暂不支持获取群列表')
+    // TODO: QQ 官方 Bot API 暂不支持获取 QQ 群列表（频道列表见 bot.super.guilds.getGuildList）
+    this.logger('warn', '[getGroupList] QQ Official Bot API 暂不支持获取群列表，频道列表请用 bot.super.guilds.getGuildList()')
     return []
   }
 
@@ -594,19 +633,51 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
   }
 
   /**
-   * 设置申请加入群请求结果
+   * 审批入群申请。
+   *
+   * 走官方 `POST /v2/groups/{group_openid}/approval_join_request/{member_openid}`，
+   * 机器人需拥有群管理员身份。Karin 只透传 flag（`join_request_id`），群与申请人
+   * openid 由 `join-request-cache` 在收到申请事件时记录，因此仅支持审批本次运行
+   * 期间收到过的申请；历史申请请改用
+   * `bot.super.groups.getJoinRequestList()` + `bot.super.groups.approvalJoinRequest()`。
+   *
+   * @param requestId 申请 ID（Karin 请求事件的 flag）。
+   * @param isApprove 是否通过。
+   * @param denyReason 拒绝理由，仅拒绝时生效。
    */
-  async setGroupApplyResult (_requestId: string, _isApprove: boolean, _denyReason?: string): Promise<void> {
-    // TODO: QQ 官方 Bot API 暂不支持设置群申请结果
-    this.logger('warn', '[setGroupApplyResult] QQ Official Bot API 暂不支持设置群申请结果')
+  async setGroupApplyResult (requestId: string, isApprove: boolean, denyReason?: string): Promise<void> {
+    const cached = getJoinRequest(this, requestId)
+    if (!cached) {
+      this.logger(
+        'warn',
+        `[setGroupApplyResult] 未找到入群申请索引，无法还原群/申请人 openid: ${requestId || '(empty)'}`
+      )
+      return
+    }
+
+    try {
+      await this.super.groups.approvalJoinRequest(cached.groupId, cached.memberId, {
+        op: isApprove ? 'approve' : 'decline',
+        join_request_id: requestId,
+        ...(isApprove ? {} : { reject_reason: denyReason }),
+      })
+      removeJoinRequest(this, requestId)
+    } catch (err) {
+      this.logger('error', '[setGroupApplyResult] 审批入群申请失败:', err)
+    }
   }
 
   /**
-   * 设置邀请加入群请求结果
+   * 设置邀请加入群请求结果。
+   *
+   * 机器人被邀请入群与用户主动申请入群在官方侧是同一条 `GROUP_JOIN_REQUEST`
+   * 事件，审批走同一个接口，因此直接复用 {@link AdapterQQBot.setGroupApplyResult}。
+   *
+   * @param requestId 申请 ID（Karin 请求事件的 flag）。
+   * @param isApprove 是否通过。
    */
-  async setInvitedJoinGroupResult (_requestId: string, _isApprove: boolean): Promise<void> {
-    // TODO: QQ 官方 Bot API 暂不支持设置邀请入群结果
-    this.logger('warn', '[setInvitedJoinGroupResult] QQ Official Bot API 暂不支持设置邀请入群结果')
+  async setInvitedJoinGroupResult (requestId: string, isApprove: boolean): Promise<void> {
+    await this.setGroupApplyResult(requestId, isApprove)
   }
 
   /**
@@ -767,11 +838,31 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
 
   /**
    * 获取群被禁言用户列表
+   *
+   * 走官方 `GET /v2/groups/{group_openid}/restrict_chat_setting`，只返回仍在
+   * 禁言中的成员（不含已过期）。机器人需拥有群管理员身份，无权限或查询失败时
+   * 降级为空数组并告警。
+   *
+   * `muteTime` 为禁言到期时间的 Unix 秒，而非剩余时长；全员禁言规则不在该返回
+   * 结构内，需要时请用 `bot.super.groups.getGroupMuteSetting()` 读取 `global_rule`。
+   *
+   * @param _groupId 群 openid
    */
   async getGroupMuteList (_groupId: string): Promise<Array<GetGroupMuteListResponse>> {
-    // TODO: QQ 官方 Bot API 暂不支持获取群被禁言用户列表
-    this.logger('warn', '[getGroupMuteList] QQ Official Bot API 暂不支持获取群被禁言用户列表')
-    return []
+    try {
+      const setting = await this.super.groups.getGroupMuteSetting(_groupId)
+      return (setting.members ?? []).map(member => {
+        if (member.username) this.nicknameCache.set(member.member_openid, member.username)
+        const expireAt = member.mute_expire_at ? Date.parse(member.mute_expire_at) : NaN
+        return {
+          userId: member.member_openid,
+          muteTime: Number.isNaN(expireAt) ? 0 : Math.floor(expireAt / 1000),
+        }
+      })
+    } catch (err) {
+      this.logger('warn', `[getGroupMuteList] 获取群禁言列表失败（需机器人具备群管理员身份）: ${err instanceof Error ? err.message : err}`)
+      return []
+    }
   }
 
   /**
