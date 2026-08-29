@@ -115,7 +115,7 @@
 
 |名称|类型|必填|描述|
 |---|---|---|---|
-|message\_id|string|否|被引用消息 ID|
+|message\_id|string|否|被引用消息 ID，例如REFIDX\_xxxxxx<br />\- 非机器人发的消息，从消息事件的`MessageScene`的`ext`数组，`msg_idx`字段中获取<br />\- 机器人自己发的消息，从发消息请求响应`ext_info.ref_idx`获取|
 
 **InputNotify**
 

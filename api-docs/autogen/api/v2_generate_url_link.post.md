@@ -68,7 +68,7 @@ POST /v2/generate_url_link
 |10044|从协议头获取uin失败|请检查 Authorization Header 是否正确|
 |11004|生成分享ARK失败|请稍后重试|
 
-← [获取机器人加入的频道列表](/wiki/develop/api-v2/autogen/api/users_me_guilds.get.html) [用户添加好友](/wiki/develop/api-v2/autogen/event/friend_add.html) →
+← [获取机器人加入的频道列表](/wiki/develop/api-v2/autogen/api/users_me_guilds.get.html) [查询全局自定义菜单](/wiki/develop/api-v2/autogen/api/v2_menu.get.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)

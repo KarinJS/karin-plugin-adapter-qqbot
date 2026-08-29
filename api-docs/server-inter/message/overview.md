@@ -18,7 +18,7 @@
 
 |单聊|群聊|文字子频道|频道私信|
 |---|---|---|---|
-|![单聊](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.22.0/assets/img/chat-single.c4f33531.jpg)|![群聊](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.22.0/assets/img/chat-group.d5318db5.jpg)|![文字子频道](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.22.0/assets/img/chat-text-channel.6dfae006.jpg)|![频道私信](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.22.0/assets/img/chat-c2c.33e2820c.jpg)|
+|![单聊](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.27.1/assets/img/chat-single.c4f33531.jpg)|![群聊](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.27.1/assets/img/chat-group.d5318db5.jpg)|![文字子频道](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.27.1/assets/img/chat-text-channel.6dfae006.jpg)|![频道私信](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.27.1/assets/img/chat-c2c.33e2820c.jpg)|
 
 ## [#](#主动消息与被动消息) 主动消息与被动消息
 

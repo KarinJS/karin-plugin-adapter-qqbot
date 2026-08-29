@@ -18,7 +18,7 @@
 
 |名称|类型|必填|描述|
 |---|---|---|---|
-|interaction\_id|string|是|互动事件 ID，从 INTERACTION\_CREATE 事件的 id 字段获取|
+|interaction\_id|string|是|互动事件 ID，从 INTERACTION\_CREATE 事件的 d.id 字段获取，注意该 ID 不带“INTERACTION\_CREATE:”前缀|
 
 ## [#](#请求体) 请求体
 

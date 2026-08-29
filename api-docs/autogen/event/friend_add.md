@@ -18,6 +18,7 @@
 |scene|integer|加好友场景值。1000=缺省默认, 1001=网络搜索（全部tab）, 1002=网络搜索（机器人tab）, 1003=群场景, 1004=空间场景, 2001=站内分享资料页, 2002=站外分享资料页, 2003=开发者生成的分享链接（站内）, 2004=开发者生成的分享链接（站外）|
 |scene\_param|string|开发者自定义的回调数据（callback\_data），用于区分不同来源|
 |author|[FriendAuthor](#schema-friendauthor)|用户信息|
+|short\_code|string|机器人分享链接的短链code|
 
 **FriendAuthor**
 
@@ -75,7 +76,7 @@
 8  
 9
 
-← [生成分享链接](/wiki/develop/api-v2/autogen/api/v2_generate_url_link.post.html) [用户删除好友](/wiki/develop/api-v2/autogen/event/friend_del.html) →
+← [修改指令面板关联对象](/wiki/develop/api-v2/autogen/api/v2_panels_panel_id_target.put.html) [用户删除好友](/wiki/develop/api-v2/autogen/event/friend_del.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)

@@ -7,7 +7,7 @@
 |||||
 |---|---|---|---|
 |图片|语音|视频|文件|
-|![图片消息](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.22.0/assets/img/image-send.35813305.jpg)|![语音消息](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.22.0/assets/img/voice-send.21dce8bf.jpg)|![视频消息](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.22.0/assets/img/video-send.9416079c.jpg)|![文件消息](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.22.0/assets/img/large-file-transfer.f49ff1e2.jpg)|
+|![图片消息](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.27.1/assets/img/image-send.35813305.jpg)|![语音消息](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.27.1/assets/img/voice-send.21dce8bf.jpg)|![视频消息](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.27.1/assets/img/video-send.9416079c.jpg)|![文件消息](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.27.1/assets/img/large-file-transfer.f49ff1e2.jpg)|
 |支持 jpg/png/gif/webp/bmp 格式，发送后直接展示图片|支持 silk/mp3/wav/ogg 格式，发送后展示语音条|支持 mp4 格式，发送后展示视频封面可播放|支持任意格式，发送后展示文件卡片可下载|
 
 ## [#](#文件类型与限制) 文件类型与限制

@@ -6,7 +6,7 @@
 
 |消息按钮|文字链|
 |---|---|
-|![消息按钮](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.22.0/assets/img/message-btn.94002609.jpg)|![文字链](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.22.0/assets/img/text-chain.b2f9b0fb.jpg)|
+|![消息按钮](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.27.1/assets/img/message-btn.94002609.jpg)|![文字链](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.27.1/assets/img/text-chain.b2f9b0fb.jpg)|
 
 ## [#](#消息按钮互动流程) 消息按钮互动流程
 
