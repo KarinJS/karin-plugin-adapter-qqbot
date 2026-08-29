@@ -100,6 +100,18 @@ export interface SendQQMediaMessageRequest extends SendQQMessageRequest, QQMessa
     /** 文件信息，用于发消息接口的 media 字段使用 */
     file_info: string
   }
+  /**
+   * 按钮。
+   *
+   * `keyboard` 在官方发消息接口中是与 `content` / `markdown` / `media` 平级的独立字段，
+   * 文档未声明它与 `media` 互斥（互斥约束只写在 `content` / `markdown` / `ark` 之间），
+   * 接口说明也写明「支持文本/Markdown/富媒体等类型，可附带内嵌键盘」。
+   *
+   * 用于图片走 QQ 上传兜底（无法进入 markdown）时，让按钮随富媒体一起发出，
+   * 避免额外产生一条只有按钮的空消息。若平台拒绝（305007），发送层会去掉
+   * keyboard 重试一次，保证富媒体本身能送达。
+   */
+  keyboard?: Keyboard
 }
 
 /** 发送QQ输入中状态请求参数（仅单聊，客户端展示"正在输入"，窗口约 60 秒） */
