@@ -531,7 +531,7 @@ export class MediaApi extends Http {
 
     const path = `/v2/${scene}s/${peer}/files`
     try {
-      return await this.post(path, body, undefined, MEDIA_UPLOAD_TIMEOUT)
+      return await this.post(path, body, { timeout: MEDIA_UPLOAD_TIMEOUT })
     } catch (err) {
       if (!sourceBody.url) throw err
 
@@ -540,7 +540,7 @@ export class MediaApi extends Http {
         file_data: await downloadRemoteAsBase64(sourceBody.url),
       }
       delete fallbackBody.url
-      return this.post(path, fallbackBody, undefined, MEDIA_UPLOAD_TIMEOUT)
+      return this.post(path, fallbackBody, { timeout: MEDIA_UPLOAD_TIMEOUT })
     }
   }
 
@@ -588,7 +588,7 @@ export class MediaApi extends Http {
     }
     if (type === 'file') body.file_name = fallbackSource.fileName
 
-    const response = await this.post<UploadMediaResponse>(`/v2/${scene}s/${peer}/files`, body, undefined, MEDIA_UPLOAD_TIMEOUT)
+    const response = await this.post<UploadMediaResponse>(`/v2/${scene}s/${peer}/files`, body, { timeout: MEDIA_UPLOAD_TIMEOUT })
     if (hashes) await setCachedUpload(scene, peer, type, hashes.md5, response)
     return response
   }
@@ -614,7 +614,7 @@ export class MediaApi extends Http {
 
     for (let attempt = 0; attempt <= PART_FINISH_RETRIES; attempt++) {
       try {
-        await this.post(`/v2/${scene}s/${peer}/upload_part_finish`, body, undefined, MEDIA_UPLOAD_TIMEOUT)
+        await this.post(`/v2/${scene}s/${peer}/upload_part_finish`, body, { timeout: MEDIA_UPLOAD_TIMEOUT })
         return
       } catch (err) {
         if (shouldRetryPartFinishPersistently(err)) {
@@ -655,7 +655,7 @@ export class MediaApi extends Http {
 
     while (Date.now() < deadline) {
       try {
-        await this.post(`/v2/${scene}s/${peer}/upload_part_finish`, body, undefined, MEDIA_UPLOAD_TIMEOUT)
+        await this.post(`/v2/${scene}s/${peer}/upload_part_finish`, body, { timeout: MEDIA_UPLOAD_TIMEOUT })
         return
       } catch (err) {
         lastError = err
@@ -686,7 +686,7 @@ export class MediaApi extends Http {
 
     for (let attempt = 0; attempt <= COMPLETE_UPLOAD_RETRIES; attempt++) {
       try {
-        return await this.post(`/v2/${scene}s/${peer}/files`, body, undefined, MEDIA_UPLOAD_TIMEOUT)
+        return await this.post(`/v2/${scene}s/${peer}/files`, body, { timeout: MEDIA_UPLOAD_TIMEOUT })
       } catch (err) {
         lastError = err
         if (attempt < COMPLETE_UPLOAD_RETRIES) {
@@ -730,8 +730,7 @@ export class MediaApi extends Http {
     const prepare = await this.post<UploadPrepareResponse>(
       `/v2/${scene}s/${peer}/upload_prepare`,
       prepareBody,
-      undefined,
-      MEDIA_UPLOAD_TIMEOUT
+      { timeout: MEDIA_UPLOAD_TIMEOUT }
     ).catch((err): never => {
       if (openApiCode(err) === UPLOAD_PREPARE_DAILY_LIMIT_CODE) {
         throw new Error(`QQ 大文件上传额度已达上限，${MEDIA_TYPE_LABEL[type]}暂时无法通过 fallback 直传：${source.fileName} (${formatBytes(source.size)})`)

@@ -1,9 +1,41 @@
 import axios, { AxiosError } from 'node-karin/axios'
 import lodash from 'node-karin/lodash'
 import { formatOpenAPIError } from './error'
+import type { AxiosRequestConfig, AxiosResponse } from 'node-karin/axios'
 import type { createAxiosInstance } from '@/core/internal/axios'
 
 export type AxiosInstance = ReturnType<typeof createAxiosInstance>
+
+/**
+ * 单次请求的可选配置。
+ *
+ * 这是 axios 请求配置的常用子集；需要完整能力时用
+ * {@link Http.request} 或直接使用 `axios` 实例。
+ */
+export interface RequestOptions {
+  /** 追加请求头，会与实例默认头合并 */
+  headers?: Record<string, string>
+  /** 超时毫秒数，默认取实例配置（5500ms） */
+  timeout?: number
+  /** query 参数，axios 会自动序列化后拼到 URL */
+  params?: Record<string, unknown>
+  /** 中断信号 */
+  signal?: AbortSignal
+  /** 响应类型，下载二进制时可传 `arraybuffer` */
+  responseType?: AxiosRequestConfig['responseType']
+}
+
+/**
+ * 把 {@link RequestOptions} 转为 axios 请求配置。
+ *
+ * @param options 请求可选配置。
+ * @returns axios 请求配置。
+ */
+const toAxiosConfig = (options?: RequestOptions): AxiosRequestConfig => {
+  if (!options) return {}
+  const { headers, timeout, params, signal, responseType } = options
+  return { headers, timeout, params, signal, responseType }
+}
 
 /**
  * 包装 axios 错误为可读多行 message
@@ -71,13 +103,16 @@ const redactRequestData = (value: unknown): unknown => {
 
 /**
  * Http 基础类，子模块继承此类共享 axios 实例与错误格式化
+ *
+ * 各请求方法均为 `protected`，只供各领域 API 子类内部使用；
+ * 需要给下游插件开放的裸请求入口见 {@link RequestApi}。
  */
 export class Http {
   constructor (public readonly axios: AxiosInstance) { }
 
-  protected async get<T> (path: string): Promise<T> {
+  protected async get<T> (path: string, options?: RequestOptions): Promise<T> {
     try {
-      const { data } = await this.axios.get(path)
+      const { data } = await this.axios.get(path, toAxiosConfig(options))
       return data
     } catch (err) {
       throw formatError(path, undefined, err)
@@ -87,11 +122,10 @@ export class Http {
   protected async post<T> (
     path: string,
     body: unknown = {},
-    headers?: Record<string, string>,
-    timeout?: number
+    options?: RequestOptions
   ): Promise<T> {
     try {
-      const { data } = await this.axios.post(path, body, { headers, timeout })
+      const { data } = await this.axios.post(path, body, toAxiosConfig(options))
       return data
     } catch (err) {
       throw formatError(path, body, err)
@@ -101,11 +135,10 @@ export class Http {
   protected async put<T> (
     path: string,
     body: unknown = {},
-    headers?: Record<string, string>,
-    timeout?: number
+    options?: RequestOptions
   ): Promise<T> {
     try {
-      const { data } = await this.axios.put(path, body, { headers, timeout })
+      const { data } = await this.axios.put(path, body, toAxiosConfig(options))
       return data
     } catch (err) {
       throw formatError(path, body, err)
@@ -115,23 +148,55 @@ export class Http {
   protected async patch<T> (
     path: string,
     body: unknown = {},
-    headers?: Record<string, string>,
-    timeout?: number
+    options?: RequestOptions
   ): Promise<T> {
     try {
-      const { data } = await this.axios.patch(path, body, { headers, timeout })
+      const { data } = await this.axios.patch(path, body, toAxiosConfig(options))
       return data
     } catch (err) {
       throw formatError(path, body, err)
     }
   }
 
-  protected async delete<T> (path: string): Promise<T> {
+  protected async delete<T> (path: string, options?: RequestOptions): Promise<T> {
     try {
-      const { data } = await this.axios.delete(path)
+      const { data } = await this.axios.delete(path, toAxiosConfig(options))
       return data
     } catch (err) {
       throw formatError(path, undefined, err)
+    }
+  }
+
+  /**
+   * 任意 method 的裸请求，返回响应体。
+   *
+   * @param config axios 请求配置，`url` 相对 `baseURL`。
+   * @returns 响应体 `data`。
+   */
+  protected async request<T> (config: AxiosRequestConfig): Promise<T> {
+    const label = `${String(config.method ?? 'GET').toUpperCase()} ${config.url ?? ''}`
+    try {
+      const { data } = await this.axios.request<T>(config)
+      return data
+    } catch (err) {
+      throw formatError(label, config.data, err)
+    }
+  }
+
+  /**
+   * 任意 method 的裸请求，返回完整 axios 响应。
+   *
+   * 需要读取响应头或状态码时使用。
+   *
+   * @param config axios 请求配置，`url` 相对 `baseURL`。
+   * @returns 完整 axios 响应。
+   */
+  protected async requestRaw<T> (config: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    const label = `${String(config.method ?? 'GET').toUpperCase()} ${config.url ?? ''}`
+    try {
+      return await this.axios.request<T>(config)
+    } catch (err) {
+      throw formatError(label, config.data, err)
     }
   }
 }

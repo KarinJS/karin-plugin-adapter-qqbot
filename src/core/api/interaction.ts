@@ -15,6 +15,6 @@ export class InteractionApi extends Http {
    * @param code 0 成功 / 1 操作失败 / 2 操作频繁 / 3 重复操作 / 4 无权限 / 5 仅管理员
    */
   async ack (interactionId: string, code: AckCode = 0): Promise<void> {
-    await this.put(`/interactions/${interactionId}`, { code }, undefined, INTERACTION_ACK_TIMEOUT)
+    await this.put(`/interactions/${interactionId}`, { code }, { timeout: INTERACTION_ACK_TIMEOUT })
   }
 }

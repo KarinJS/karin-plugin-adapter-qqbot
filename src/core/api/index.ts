@@ -1,4 +1,5 @@
 import type { AxiosInstance } from './http'
+import { RequestApi } from './request'
 import { MessagesApi } from './messages'
 import { MediaApi } from './media'
 import { InteractionApi } from './interaction'
@@ -23,10 +24,25 @@ import { buildQQMsg, buildGuildMsg } from './builders'
  * - menu：全局自定义菜单（仅单聊）
  * - panels：指令面板
  * - joinApproval：入群自动审批策略
+ * - request：裸请求入口，用于调用尚未封装的官方接口
  *
  * 请求体构造器 {@link buildQQMsg} / {@link buildGuildMsg} 独立导出，避免与 HTTP 调用耦合
  */
 export class QQBotApi {
+  /**
+   * 裸请求入口，直接调用官方 OpenAPI。
+   *
+   * 官方新接口还没被适配器封装时可用它兜底，会自动带鉴权、解包 `data`、
+   * 格式化错误码：
+   *
+   * ```ts
+   * await bot.super.request.get('/v2/menu')
+   * await bot.super.request.post('/v2/xxx', { foo: 1 })
+   * ```
+   *
+   * @see {@link RequestApi}
+   */
+  public readonly request: RequestApi
   public readonly messages: MessagesApi
   public readonly media: MediaApi
   public readonly interaction: InteractionApi
@@ -42,6 +58,7 @@ export class QQBotApi {
   public readonly guild = buildGuildMsg
 
   constructor (public readonly axios: AxiosInstance) {
+    this.request = new RequestApi(axios)
     this.messages = new MessagesApi(axios)
     this.media = new MediaApi(axios)
     this.interaction = new InteractionApi(axios)
@@ -55,8 +72,11 @@ export class QQBotApi {
 }
 
 export { buildQQMsg, buildGuildMsg } from './builders'
+export { Http } from './http'
+export { RequestApi } from './request'
 export { GuildsApi } from './guilds'
 export { MenuApi } from './menu'
 export { PanelsApi } from './panels'
 export { JoinApprovalApi } from './join-approval'
 export type { AckCode } from './interaction'
+export type { AxiosInstance, RequestOptions } from './http'

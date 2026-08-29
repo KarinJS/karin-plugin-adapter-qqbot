@@ -55,7 +55,7 @@ export class MessagesApi extends Http {
   /** 文字子频道消息 */
   sendChannelMsg (channelId: string, body: SendGuildMsg | FormData): Promise<SendGuildResponse> {
     const headers = body instanceof FormData ? body.getHeaders() : undefined
-    return this.post(`/channels/${channelId}/messages`, body, headers)
+    return this.post(`/channels/${channelId}/messages`, body, { headers })
   }
 
   /**
@@ -76,10 +76,10 @@ export class MessagesApi extends Http {
         source_guild_id: b,
       })
       const headers = c instanceof FormData ? c.getHeaders() : undefined
-      return this.post(`/dms/${dms.guild_id}/messages`, c, headers)
+      return this.post(`/dms/${dms.guild_id}/messages`, c, { headers })
     }
     const headers = b instanceof FormData ? b.getHeaders() : undefined
-    return this.post(`/dms/${a}/messages`, b, headers)
+    return this.post(`/dms/${a}/messages`, b, { headers })
   }
 
   /**
