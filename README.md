@@ -119,9 +119,9 @@ export const menuKeyboard = karin.button(/^菜单(?:\s+\d+)?$/, (next, args) => 
 - 较大的图片或视频直接交给 QQ 发送时，QQ 客户端可能会把它显示成群文件，而不是图片或视频卡片；配置 `fileToUrl` 后通常可以避免这种显示问题。
 - 直接交给 QQ 只是兜底方案，生产环境仍然建议准备自己的文件服务。
 
-> **注意：Markdown 里的图片必须配置 `fileToUrl`。**
+> **注意：Markdown 里的图片依赖 `fileToUrl`。**
 >
-> 只要你发送的内容包含 Markdown，并且 Markdown 里有图片、本地生成图、Base64 图等资源，就必须配置 `fileToUrl`。因为 Markdown 里的图片只能写成 QQ 能访问的链接，适配器不能把 Markdown 文本里的图片自动当成附件上传。
+> Markdown 里的图片只能写成 QQ 能访问的链接，适配器不能把 Markdown 文本里的图片自动当成附件上传。QQ 单聊和群聊有下面提到的内置临时图床可以兜住，频道场景则必须自己配置 `fileToUrl`。
 
 你可以在自己的 Karin 插件中编写并注册 `fileToUrl` Handler：
 
@@ -153,6 +153,8 @@ export const uploadResource = karin.handler('fileToUrl', async (args) => {
 > 图片必须返回 `{ url, width, height }`；其他资源返回 `{ url }`。
 
 建议生产环境都配置 `fileToUrl`。这样图片、视频和文件都可以先上传到你自己的文件服务，再交给 QQ 发送，成功率和可控性都会更好。
+
+没有自己的图床也不至于完全用不了 Markdown 图片：适配器内置了一个基于 QQ 官方分片上传的临时图床，QQ 单聊和群聊里会自动生效，把本地图片、截图、Base64 图片换成临时直链后嵌进 Markdown。它排在你自己的 `fileToUrl` 之后，只在你没有配置、或者你的图床这次没接手时才出手，拿到的地址会过期，因此仅供当次发送使用。频道场景和文件类型用不了它，仍然需要自备 `fileToUrl`。
 
 ## 事件
 

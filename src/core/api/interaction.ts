@@ -1,7 +1,5 @@
 import { Http } from './http'
-
-/** QQ 客户端回调按钮需要快速 ACK，超时必须小于平台等待窗口。 */
-const INTERACTION_ACK_TIMEOUT = 2800
+import { INTERACTION_ACK_TIMEOUT } from '@/core/constants'
 
 /** ack 返回码 */
 export type AckCode = 0 | 1 | 2 | 3 | 4 | 5

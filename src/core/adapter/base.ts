@@ -4,8 +4,11 @@ import { sendQQ } from './pipeline-qq'
 import { sendGuild } from './pipeline-guild'
 import { cacheSelfMessage, prepareSelfMessageCache, shouldCacheSelfMessage } from './self-message-cache'
 import { getJoinRequest, removeJoinRequest } from './join-request-cache'
+import { getAdapterConfig, setAdapterConfig } from './config-store'
 import { getMessageStore, type MessageStore } from '@/core/storage/message'
 import { getImageSize } from '@/utils/common'
+import { HTTP_URL_RE, MAX_GROUP_MUTE_SECONDS } from '@/core/constants'
+import { normalizeMediaElements, normalizeMediaSource, type UploadOrigin } from './media-source'
 import type {
   LogMethodNames, Contact, ElementTypes, Message, SendMsgResults,
   NodeElement, ForwardOptions, MessageResponse, UserInfo, GroupInfo,
@@ -16,14 +19,6 @@ import type {
   AdapterType,
 } from 'node-karin'
 import type { QQBotConfig } from '@/types/config'
-
-const adapterConfigStore = new WeakMap<object, QQBotConfig>()
-
-/** HTTP(S) URL 可直接交给 QQ 平台拉取上传 */
-const HTTP_URL_RE = /^https?:\/\//i
-
-/** 平台限制的最大禁言时长：30 天 */
-const MAX_GROUP_MUTE_SECONDS = 30 * 24 * 60 * 60
 
 /**
  * QQ Official Bot 适配器
@@ -39,7 +34,7 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
 
   constructor (cfg: QQBotConfig, api: QQBotApi) {
     super()
-    adapterConfigStore.set(this, cfg)
+    setAdapterConfig(this, cfg)
     this.super = api
     this.adapter.name = 'QQ Official Bot'
     this.adapter.protocol = 'qqbot'
@@ -49,9 +44,7 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
 
   /** 当前 bot 配置。真实配置存放在 WeakMap，避免被系统接口序列化整个适配器时带出。 */
   public get cfg (): QQBotConfig {
-    const cfg = adapterConfigStore.get(this)
-    if (!cfg) throw new Error('QQBot adapter config missing')
-    return cfg
+    return getAdapterConfig(this)
   }
 
   /** 接收消息的一天热缓存 + SQLite 缓存，用于实现 Karin 标准 `getMsg`。 */
@@ -79,16 +72,17 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
     elements: Array<ElementTypes>,
     _retryCount?: number
   ): Promise<SendMsgResults> {
+    const normalizedElements = normalizeMediaElements(elements)
     /** 发送成功后始终记录消息 ID 映射；正文是否入库由 cacheSelfMessage 内部按开关决定。 */
     if (contact.scene === 'direct' || contact.scene === 'guild') {
-      const prepared = shouldCacheSelfMessage(this) ? await prepareSelfMessageCache(this, elements) : undefined
-      const result = await sendGuild(this, contact as Contact<'guild' | 'direct'>, prepared?.sendElements ?? elements)
+      const prepared = shouldCacheSelfMessage(this) ? await prepareSelfMessageCache(this, normalizedElements) : undefined
+      const result = await sendGuild(this, contact as Contact<'guild' | 'direct'>, prepared?.sendElements ?? normalizedElements)
       cacheSelfMessage(this, contact, prepared?.cacheElements ?? [], result)
       return result
     }
     if (contact.scene === 'group' || contact.scene === 'friend') {
-      const prepared = shouldCacheSelfMessage(this) ? await prepareSelfMessageCache(this, elements) : undefined
-      const result = await sendQQ(this, contact as Contact<'friend' | 'group'>, prepared?.sendElements ?? elements)
+      const prepared = shouldCacheSelfMessage(this) ? await prepareSelfMessageCache(this, normalizedElements) : undefined
+      const result = await sendQQ(this, contact as Contact<'friend' | 'group'>, prepared?.sendElements ?? normalizedElements)
       cacheSelfMessage(this, contact, prepared?.cacheElements ?? [], result)
       return result
     }
@@ -201,19 +195,39 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
             lines.push(el.text)
             break
           case 'image': {
-            if (el.file.startsWith('http')) {
+            const imageSource = typeof el.file === 'string' ? normalizeMediaSource(el.file) : el.file
+            if (typeof imageSource === 'string' && imageSource.startsWith('http')) {
               try {
-                const { width, height } = await getImageSize(el.file)
-                lines.push(`![${el.name || '图片'} #${width}px #${height}px](${el.file})`)
+                const { width, height } = await getImageSize(imageSource)
+                lines.push(`![${el.name || '图片'} #${width}px #${height}px](${imageSource})`)
               } catch {
-                lines.push(`![${el.name || '图片'} #300px #300px](${el.file})`)
+                lines.push(`![${el.name || '图片'} #300px #300px](${imageSource})`)
               }
             } else {
+              /**
+               * 必须带上 selfId / purpose / origin：内置图床按这三个字段决定
+               * 是否接手，缺任何一个都会直接放行给后续处理器。频道场景没有
+               * 可用的 openid，origin 只能是 undefined。
+               */
+              const origin: UploadOrigin | undefined = contact.scene === 'group'
+                ? { scene: 'group', peer: contact.peer }
+                : contact.scene === 'friend'
+                  ? { scene: 'user', peer: contact.peer }
+                  : undefined
               try {
-                const { url, width, height } = await fileToUrl('image', el.file, el.name || 'image.jpg')
-                lines.push(`![${el.name || '图片'} #${width}px #${height}px](${url})`)
+                const result = await fileToUrl('image', imageSource, el.name || 'image.jpg', {
+                  selfId: this.selfId,
+                  purpose: 'markdown',
+                  origin,
+                })
+                if (result?.url) {
+                  lines.push(`![${el.name || '图片'} #${result.width || 300}px #${result.height || 300}px](${result.url})`)
+                } else {
+                  /** 没有处理器接手时不能留空 URL 的图片语法（客户端渲染为空白），改走富媒体补发 */
+                  mediaElements.push(el)
+                }
               } catch {
-                lines.push(`![${el.name || '图片'} #300px #300px]()`)
+                mediaElements.push(el)
               }
             }
             break

@@ -1,6 +1,7 @@
 import axios, { AxiosError } from 'node-karin/axios'
 import { log } from '@/utils/logger'
-import { QQAPIBASEURL, random } from '@/utils/common'
+import { random } from '@/utils/common'
+import { QQAPIBASEURL } from '@/core/constants'
 import { getUserAgent } from '@/utils/user-agent'
 import { getAccessToken, getBotAccessToken } from '@/core/internal/axios'
 import { formatOpenAPIError } from '@/core/api/error'
