@@ -16,6 +16,7 @@ import type {
   AdapterType,
 } from 'node-karin'
 import type { QQBotConfig } from '@/types/config'
+import type { UploadOrigin } from './media-source'
 
 const adapterConfigStore = new WeakMap<object, QQBotConfig>()
 
@@ -209,11 +210,30 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
                 lines.push(`![${el.name || '图片'} #300px #300px](${el.file})`)
               }
             } else {
+              /**
+               * 必须带上 selfId / purpose / origin：内置图床按这三个字段决定
+               * 是否接手，缺任何一个都会直接放行给后续处理器。频道场景没有
+               * 可用的 openid，origin 只能是 undefined。
+               */
+              const origin: UploadOrigin | undefined = contact.scene === 'group'
+                ? { scene: 'group', peer: contact.peer }
+                : contact.scene === 'friend'
+                  ? { scene: 'user', peer: contact.peer }
+                  : undefined
               try {
-                const { url, width, height } = await fileToUrl('image', el.file, el.name || 'image.jpg')
-                lines.push(`![${el.name || '图片'} #${width}px #${height}px](${url})`)
+                const result = await fileToUrl('image', el.file, el.name || 'image.jpg', {
+                  selfId: this.selfId,
+                  purpose: 'markdown',
+                  origin,
+                })
+                if (result?.url) {
+                  lines.push(`![${el.name || '图片'} #${result.width || 300}px #${result.height || 300}px](${result.url})`)
+                } else {
+                  /** 没有处理器接手时不能留空 URL 的图片语法（客户端渲染为空白），改走富媒体补发 */
+                  mediaElements.push(el)
+                }
               } catch {
-                lines.push(`![${el.name || '图片'} #300px #300px]()`)
+                mediaElements.push(el)
               }
             }
             break
