@@ -10,16 +10,11 @@ import {
 import { groupElements } from './grouping'
 import { imagesToMarkdown, splitMarkdownImages } from './text-to-md'
 import type { FileToUrlExtra } from './media-source'
+import { BUTTON_ONLY_MARKDOWN, KEYBOARD_MAX_BUTTONS_PER_ROW, KEYBOARD_MAX_ROWS } from '@/core/constants'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
 import type { Grouping } from './grouping'
 import type { SendGuildMsg, SendGuildResponse } from '@/core/api/types'
-
-/** QQ keyboard 限制：最多 5 行，每行最多 5 个按钮。 */
-const KEYBOARD_MAX_ROWS = 5
-const KEYBOARD_MAX_BUTTONS_PER_ROW = 5
-/** 只有按钮没有文本时仍需提供非空 markdown 内容。 */
-const BUTTON_ONLY_MARKDOWN = '\u200b'
 
 /**
  * 处理频道场景（子频道 + 私信）的发送

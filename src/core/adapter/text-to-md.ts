@@ -1,5 +1,6 @@
 import { segment, fileToUrl } from 'node-karin'
 import { getImageSize } from '@/utils/common'
+import { normalizeMediaSource } from './media-source'
 import type { FileToUrlExtra } from './media-source'
 import type { MarkdownElement } from 'node-karin'
 
@@ -25,7 +26,7 @@ const imageToUrl = async (
   source: string,
   extra?: FileToUrlExtra
 ): Promise<{ url: string; width: number; height: number }> => {
-  const result = await fileToUrl('image', source, 'image.jpg', extra)
+  const result = await fileToUrl('image', normalizeMediaSource(source), 'image.jpg', extra)
   if (!result?.url) {
     throw new Error('[Handler][Error]: 没有 fileToUrl 处理器接手图片转 URL')
   }
@@ -68,7 +69,7 @@ export const splitMarkdownImages = (markdown: string): MarkdownImagePart[] => {
     }
 
     const source = (match[1] || '').trim().replace(/^<|>$/g, '')
-    if (source) parts.push({ type: 'image', source })
+    if (source) parts.push({ type: 'image', source: normalizeMediaSource(source) })
     lastIndex = index + match[0].length
   }
 

@@ -1,4 +1,6 @@
 import { fileToUrl, fileToUrlHandlerKey, handler } from 'node-karin'
+import { DATA_URL_BASE64_RE, DEFAULT_FILENAME, HTTP_URL_RE } from '@/core/constants'
+import type { ElementTypes } from 'node-karin'
 import type { AdapterQQBot } from './base'
 import type { MediaType, Scene } from '@/core/api/types'
 
@@ -40,14 +42,43 @@ export interface FileToUrlExtra {
 }
 
 /** HTTP(S) 资源已经是可直接传给 QQ 平台的公网地址。 */
-const HTTP_URL_RE = /^https?:\/\//i
 
-/** fileToUrl 需要文件名来推断上传类型；没有业务文件名时使用这些默认值。 */
-const DEFAULT_FILENAME: Record<MediaType, string> = {
-  image: 'image.jpg',
-  video: 'video.mp4',
-  record: 'record.mp3',
-  file: 'file.bin',
+/**
+ * 把带 MIME 头的完整 data URL（`data:image/png;base64,...`）归一为 Karin 标准
+ * 的 `base64://` 形式，其余来源原样返回。
+ *
+ * 下游插件经常直接给出完整 data URL；QQ 上传层认识它，但 karin 的
+ * `common.buffer` 和不少第三方 fileToUrl 处理器只认 `base64://`，因此在进入
+ * 发送链路时统一归一，避免同一资源在不同环节表现不一致。
+ *
+ * @param source Karin 消息段里的 file 字段。
+ * @returns 归一后的来源字符串。
+ */
+export const normalizeMediaSource = (source: string): string => {
+  return DATA_URL_BASE64_RE.test(source)
+    ? source.replace(DATA_URL_BASE64_RE, 'base64://')
+    : source
+}
+
+/** 带 file 字段的富媒体消息段类型。 */
+const MEDIA_ELEMENT_TYPES = new Set(['image', 'video', 'record', 'file'])
+
+/**
+ * 把消息段里带 MIME 头的完整 data URL（`data:image/png;base64,...`）统一归一为
+ * Karin 标准的 `base64://` 形式。下游的 fileToUrl 处理器与 karin `common.buffer`
+ * 大多只认后者，在进入发送链路前归一可以保证各环节行为一致。
+ *
+ * @param elements 待发送的消息段。
+ * @returns 归一后的消息段；无需归一时返回原数组。
+ */
+export const normalizeMediaElements = (elements: Array<ElementTypes>): Array<ElementTypes> => {
+  return elements.map((el) => {
+    if (!MEDIA_ELEMENT_TYPES.has(el.type)) return el
+    const file = (el as { file?: unknown }).file
+    if (typeof file !== 'string') return el
+    const normalized = normalizeMediaSource(file)
+    return normalized === file ? el : ({ ...el, file: normalized } as ElementTypes)
+  })
 }
 
 /** 富媒体来源解析结果。 */
@@ -93,17 +124,18 @@ export const resolvePreferredMediaSource = async (
   origin?: UploadOrigin,
   purpose: UploadPurpose = 'media'
 ): Promise<PreferredMediaSource> => {
-  if (isHttpMediaSource(source)) {
-    return { source, via: 'public-url' }
+  const normalized = normalizeMediaSource(source)
+  if (isHttpMediaSource(normalized)) {
+    return { source: normalized, via: 'public-url' }
   }
 
   if (!hasFileToUrlHandler()) {
-    return { source, via: 'fallback' }
+    return { source: normalized, via: 'fallback' }
   }
 
   try {
     const extra: FileToUrlExtra = { selfId: ctx.selfId, purpose, origin }
-    const result = await fileToUrl(type, source, filename || DEFAULT_FILENAME[type], extra)
+    const result = await fileToUrl(type, normalized, filename || DEFAULT_FILENAME[type], extra)
 
     /**
      * `handler.has` 只判断该 key 下是否注册过处理器，不代表真的有处理器接手：
@@ -112,12 +144,12 @@ export const resolvePreferredMediaSource = async (
      */
     if (!result?.url) {
       ctx.logger('debug', `[sendQQ] 没有 fileToUrl 处理器接手 ${type}，改用 QQ 上传兜底`)
-      return { source, via: 'fallback' }
+      return { source: normalized, via: 'fallback' }
     }
 
     return { source: result.url, via: 'file-to-url' }
   } catch (err) {
     ctx.logger('warn', `[sendQQ] ${type} 转 URL 失败，改用 QQ 上传兜底:`, err)
-    return { source, via: 'fallback' }
+    return { source: normalized, via: 'fallback' }
   }
 }

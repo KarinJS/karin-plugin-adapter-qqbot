@@ -9,27 +9,18 @@ import { groupElements } from './grouping'
 import { resolvePreferredMediaSource } from './media-source'
 import type { UploadOrigin } from './media-source'
 import { imagesToMarkdown, splitMarkdownImages } from './text-to-md'
+import {
+  BUTTON_ONLY_MARKDOWN,
+  C2C_PASSIVE_REPLY_LIMIT,
+  FRIEND_EVENT_WHITELIST,
+  GROUP_EVENT_WHITELIST,
+  KEYBOARD_MAX_BUTTONS_PER_ROW,
+  KEYBOARD_MAX_ROWS,
+} from '@/core/constants'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
 import type { Grouping, PassiveInfo } from './grouping'
 import type { MediaType, SendQQMediaMessageRequest, SendQQMsg, SendQQMsgResponse } from '@/core/api/types'
-
-/** QQ 官方限制：单聊中同一 `msg_id` 最多发送四次被动回复。 */
-const C2C_PASSIVE_REPLY_LIMIT = 4
-/** QQ keyboard 限制：最多 5 行，每行最多 5 个按钮。 */
-const KEYBOARD_MAX_ROWS = 5
-const KEYBOARD_MAX_BUTTONS_PER_ROW = 5
-/** 只有按钮没有文本时仍需提供非空 markdown 内容。 */
-const BUTTON_ONLY_MARKDOWN = '\u200b'
-
-/** 群聊 event_id 白名单 */
-const GROUP_EVENT_WHITELIST = new Set([
-  'INTERACTION_CREATE', 'GROUP_ADD_ROBOT', 'GROUP_MSG_RECEIVE',
-])
-/** 单聊 event_id 白名单 */
-const FRIEND_EVENT_WHITELIST = new Set([
-  'INTERACTION_CREATE', 'C2C_MSG_RECEIVE', 'FRIEND_ADD',
-])
 
 /**
  * 处理 QQ 场景（单聊 + 群聊）的发送
