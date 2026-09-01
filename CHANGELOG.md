@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.2.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.1.0...adapter-qqbot-v3.2.0) (2026-09-01)
+
+
+### Features
+
+* 尝试添加内置图床 ([#65](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/65)) ([b7bb3f5](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/b7bb3f5f24edde5725422ed24eca4b83bcea3955))
+
+
+### Bug Fixes
+
+* 更新富媒体消息构造，支持内嵌键盘并优化发送逻辑 ([c966b5b](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/c966b5be5f8c41837e940fc584bb0978bb149421))
+
 ## [3.1.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.0.8...adapter-qqbot-v3.1.0) (2026-08-29)
 
 
