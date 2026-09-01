@@ -100,6 +100,18 @@ export interface SendQQMediaMessageRequest extends SendQQMessageRequest, QQMessa
     /** 文件信息，用于发消息接口的 media 字段使用 */
     file_info: string
   }
+  /**
+   * 按钮。
+   *
+   * `keyboard` 在官方发消息接口中是与 `content` / `markdown` / `media` 平级的独立字段，
+   * 文档未声明它与 `media` 互斥（互斥约束只写在 `content` / `markdown` / `ark` 之间），
+   * 接口说明也写明「支持文本/Markdown/富媒体等类型，可附带内嵌键盘」。
+   *
+   * 用于图片走 QQ 上传兜底（无法进入 markdown）时，让按钮随富媒体一起发出，
+   * 避免额外产生一条只有按钮的空消息。若平台拒绝（305007），发送层会去掉
+   * keyboard 重试一次，保证富媒体本身能送达。
+   */
+  keyboard?: Keyboard
 }
 
 /** 发送QQ输入中状态请求参数（仅单聊，客户端展示"正在输入"，窗口约 60 秒） */
@@ -385,6 +397,16 @@ export interface UploadMediaResponse {
   ttl: number
   /** 发送消息的唯一ID，当srv_send_msg设置为true时返回 */
   id: string
+  /**
+   * 文件下载链接（COS 预签名 GET URL），有效期与 `ttl` 一致。
+   *
+   * 仅分片上传合并（走 `upload_id` 路径）且 `file_type` 为图片/视频/语音时返回；
+   * URL 直传和文件类型（`file_type=4`）不返回该字段。
+   *
+   * 这是把 QQ 分片上传当图床用的关键：拿到该直链后，图片就能以 markdown
+   * 图片语法嵌入 msg_type=2，不必再走 msg_type=7 富媒体单独发送。
+   */
+  raw_url?: string
 }
 
 // ==============以下是自定义菜单相关的接口================

@@ -1,12 +1,10 @@
 import FormData from 'form-data'
 import { Http } from './http'
+import { INPUT_NOTIFY_DEFAULT_SECOND } from '@/core/constants'
 import type {
   SendQQMsg, SendQQMsgResponse, SendGuildMsg, SendGuildResponse, Scene,
   SendQQStreamMessageRequest, SendQQStreamMessageResponse, QQMessageID,
 } from './types'
-
-/** 输入中状态默认展示时长（秒），平台 typing 窗口约 60s */
-const INPUT_NOTIFY_DEFAULT_SECOND = 60
 
 /**
  * 消息发送 + 撤回

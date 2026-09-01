@@ -7,28 +7,20 @@ import {
 } from './button-enter'
 import { groupElements } from './grouping'
 import { resolvePreferredMediaSource } from './media-source'
-import { imagesToMarkdown, splitMarkdownImages } from './text-to-md'
+import type { UploadOrigin } from './media-source'
+import { splitMarkdownImages, buildMarkdownImageLine } from './text-to-md'
+import {
+  BUTTON_ONLY_MARKDOWN,
+  C2C_PASSIVE_REPLY_LIMIT,
+  FRIEND_EVENT_WHITELIST,
+  GROUP_EVENT_WHITELIST,
+  KEYBOARD_MAX_BUTTONS_PER_ROW,
+  KEYBOARD_MAX_ROWS,
+} from '@/core/constants'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
 import type { Grouping, PassiveInfo } from './grouping'
-import type { MediaType, SendQQMsg, SendQQMsgResponse } from '@/core/api/types'
-
-/** QQ 官方限制：单聊中同一 `msg_id` 最多发送四次被动回复。 */
-const C2C_PASSIVE_REPLY_LIMIT = 4
-/** QQ keyboard 限制：最多 5 行，每行最多 5 个按钮。 */
-const KEYBOARD_MAX_ROWS = 5
-const KEYBOARD_MAX_BUTTONS_PER_ROW = 5
-/** 只有按钮没有文本时仍需提供非空 markdown 内容。 */
-const BUTTON_ONLY_MARKDOWN = '\u200b'
-
-/** 群聊 event_id 白名单 */
-const GROUP_EVENT_WHITELIST = new Set([
-  'INTERACTION_CREATE', 'GROUP_ADD_ROBOT', 'GROUP_MSG_RECEIVE',
-])
-/** 单聊 event_id 白名单 */
-const FRIEND_EVENT_WHITELIST = new Set([
-  'INTERACTION_CREATE', 'C2C_MSG_RECEIVE', 'FRIEND_ADD',
-])
+import type { MediaType, SendQQMediaMessageRequest, SendQQMsg, SendQQMsgResponse } from '@/core/api/types'
 
 /**
  * 处理 QQ 场景（单聊 + 群聊）的发送
@@ -65,12 +57,15 @@ const sendQQMarkdown = async (
 ): Promise<SendMsgResults> => {
   const items: SendQQMsg[] = []
 
+  /** 上传归属会话固定为本次发送目标，保证 openid 与执行发送的 bot 同域。 */
+  const origin: UploadOrigin = { scene: target, peer: contact.peer }
+
   // 1) 把文本 + 可公网访问的图片合并为一段 markdown content
   const lines: string[] = []
   if (grouping.text.length) lines.push(grouping.text.join(''))
-  const fallbackImages = await appendMarkdownImages(ctx, lines, grouping.qqImages)
+  const fallbackImages = await appendMarkdownImages(ctx, lines, grouping.qqImages, origin)
 
-  const markdownFallbackImages = await appendExplicitMarkdown(ctx, lines, grouping)
+  const markdownFallbackImages = await appendExplicitMarkdown(ctx, lines, grouping, origin)
   fallbackImages.push(...markdownFallbackImages)
 
   if (contact.scene === 'group') {
@@ -78,31 +73,34 @@ const sendQQMarkdown = async (
     warnUnsupportedCommandEnterMarkdowns(ctx, grouping.markdowns.map(m => m.markdown))
   }
 
-  // markdown 主消息：有任意可渲染内容才推
-  if (lines.length || grouping.buttons.length || grouping.keyboards.length) {
-    if (shouldUseTextForReference(grouping)) {
-      items.push(ctx.super.qq.text(lines.join('\n')))
-    } else {
-      const keyboard = buildKeyboard(grouping)
-      const content = lines.length ? lines.join('\n') : BUTTON_ONLY_MARKDOWN
-      items.push(ctx.super.qq.markdown({ content }, keyboard))
-    }
-  }
+  // 2) 先备好富媒体：无法进入 markdown 的图片走 QQ 上传兜底，视频 / 语音 / 文件本就单独发送
+  const mediaItems: SendQQMediaMessageRequest[] = []
 
-  // 无法进入 markdown 的图片单独走 QQ 上传 fallback，避免依赖 fileToUrl 处理器。
   for (const file of fallbackImages) {
     const res = await ctx.super.media.uploadFallback(target, contact.peer, 'image', file, false)
-    items.push(ctx.super.qq.media(res.file_info))
+    mediaItems.push(ctx.super.qq.media(res.file_info))
   }
 
-  // 视频 / 语音 / 文件 → msg_type=7 单独补发
   for (const m of grouping.media) {
-    const source = await resolvePreferredMediaSource(ctx, m.kind, m.source, m.name)
+    const source = await resolvePreferredMediaSource(ctx, m.kind, m.source, m.name, origin)
     const res = source.via === 'fallback'
       ? await ctx.super.media.uploadFallback(target, contact.peer, m.kind, source.source, false, m.name)
       : await ctx.super.media.upload(target, contact.peer, m.kind, source.source, false, m.name)
-    items.push(ctx.super.qq.media(res.file_info))
+    mediaItems.push(ctx.super.qq.media(res.file_info))
   }
+
+  // 3) markdown 主消息：有任意可渲染内容才推
+  if (lines.length || grouping.buttons.length || grouping.keyboards.length) {
+    if (shouldUseTextForReference(grouping)) {
+      items.push(ctx.super.qq.text(lines.join('\n')))
+    } else if (lines.length) {
+      items.push(ctx.super.qq.markdown({ content: lines.join('\n') }, buildKeyboard(grouping)))
+    } else {
+      attachKeyboardWithoutMarkdown(ctx, grouping, mediaItems, items)
+    }
+  }
+
+  items.push(...mediaItems)
 
   if (!items.length) {
     items.push(ctx.super.qq.text('不支持发送的消息类型'))
@@ -163,21 +161,64 @@ const appendExplicitMarkdownItems = async (
   if (!grouping.markdowns.length) return
 
   const lines: string[] = []
-  const fallbackImages = await appendExplicitMarkdown(ctx, lines, grouping)
+  const fallbackImages = await appendExplicitMarkdown(ctx, lines, grouping, {
+    scene: target,
+    peer: contact.peer,
+  })
 
   if (contact.scene === 'group') {
     warnUnsupportedCommandEnterButtons(ctx, collectCommandEnterButtons(grouping.buttons, grouping.keyboards))
     warnUnsupportedCommandEnterMarkdowns(ctx, grouping.markdowns.map(m => m.markdown))
   }
 
-  const keyboard = buildKeyboard(grouping)
-  const content = lines.length ? lines.join('\n') : BUTTON_ONLY_MARKDOWN
-  items.push(ctx.super.qq.markdown({ content }, keyboard))
-
+  const mediaItems: SendQQMediaMessageRequest[] = []
   for (const file of fallbackImages) {
     const res = await ctx.super.media.uploadFallback(target, contact.peer, 'image', file, false)
-    items.push(ctx.super.qq.media(res.file_info))
+    mediaItems.push(ctx.super.qq.media(res.file_info))
   }
+
+  if (lines.length) {
+    items.push(ctx.super.qq.markdown({ content: lines.join('\n') }, buildKeyboard(grouping)))
+  } else {
+    attachKeyboardWithoutMarkdown(ctx, grouping, mediaItems, items)
+  }
+
+  items.push(...mediaItems)
+}
+
+/**
+ * 处理「没有任何 markdown 正文，但存在按钮」的边缘情况。
+ *
+ * 典型触发路径：下游只发一张 markdown 语法图片 + 若干按钮，而这张图片没能通过
+ * `fileToUrl` 取到公网地址，被降级成 msg_type=7 富媒体。此时 markdown 正文为空，
+ * 旧实现会补一个零宽字符当正文，把按钮单独发成一条消息，客户端就会看到
+ * 「一条空的按钮消息 + 一条富媒体消息」两条消息。
+ *
+ * 这里改为把 keyboard 挂到第一条富媒体上，合并成一条消息；只有在连富媒体都没有时，
+ * 才保留零宽字符 markdown 兜底（纯按钮消息是正常用法，不能丢）。
+ *
+ * @param ctx 适配器实例，用于输出日志。
+ * @param grouping 已归类的消息段。
+ * @param mediaItems 本次待发送的富媒体消息体，keyboard 会挂到第一条上。
+ * @param items 最终发送队列，仅在没有富媒体时追加纯按钮 markdown。
+ */
+const attachKeyboardWithoutMarkdown = (
+  ctx: AdapterQQBot,
+  grouping: Grouping<'qq'>,
+  mediaItems: SendQQMediaMessageRequest[],
+  items: SendQQMsg[]
+): void => {
+  const keyboard = buildKeyboard(grouping)
+  if (!keyboard) return
+
+  const [first] = mediaItems
+  if (!first) {
+    items.push(ctx.super.qq.markdown({ content: BUTTON_ONLY_MARKDOWN }, keyboard))
+    return
+  }
+
+  first.keyboard = keyboard
+  ctx.logger('debug', '图片未能进入 markdown 通道，按钮已随富媒体一起发送，避免拆成两条消息')
 }
 
 const buildQQMediaItem = async (
@@ -188,7 +229,7 @@ const buildQQMediaItem = async (
   source: string,
   name?: string
 ): Promise<SendQQMsg> => {
-  const resolved = await resolvePreferredMediaSource(ctx, type, source, name)
+  const resolved = await resolvePreferredMediaSource(ctx, type, source, name, { scene: target, peer })
   const res = resolved.via === 'fallback'
     ? await ctx.super.media.uploadFallback(target, peer, type, resolved.source, false, name)
     : await ctx.super.media.upload(target, peer, type, resolved.source, false, name)
@@ -201,17 +242,19 @@ const buildQQMediaItem = async (
  * @param ctx 适配器实例，用于输出降级日志。
  * @param lines markdown 行数组。
  * @param files QQ 图片消息段的 file 字段。
+ * @param origin 本次发送归属的上传会话。
  * @returns 需要改走 msg_type=7 富媒体发送的图片列表。
  */
 const appendMarkdownImages = async (
   ctx: AdapterQQBot,
   lines: string[],
-  files: string[]
+  files: string[],
+  origin: UploadOrigin
 ): Promise<string[]> => {
   const fallback: string[] = []
 
   for (const file of files) {
-    const resolved = await resolvePreferredMediaSource(ctx, 'image', file)
+    const resolved = await resolvePreferredMediaSource(ctx, 'image', file, undefined, origin, 'markdown')
     if (resolved.via === 'fallback') {
       fallback.push(file)
       continue
@@ -225,11 +268,18 @@ const appendMarkdownImages = async (
 
 /**
  * 处理显式 segment.markdown 中的图片：可转公网 URL 的继续嵌入，无法转的改走富媒体。
+ *
+ * @param ctx 适配器实例，用于输出降级日志。
+ * @param lines markdown 行数组。
+ * @param grouping 已归类的消息段。
+ * @param origin 本次发送归属的上传会话。
+ * @returns 需要改走 msg_type=7 富媒体发送的图片列表。
  */
 const appendExplicitMarkdown = async (
   ctx: AdapterQQBot,
   lines: string[],
-  grouping: Grouping<'qq'>
+  grouping: Grouping<'qq'>,
+  origin: UploadOrigin
 ): Promise<string[]> => {
   const fallback: string[] = []
 
@@ -241,13 +291,14 @@ const appendExplicitMarkdown = async (
         continue
       }
 
-      const resolved = await resolvePreferredMediaSource(ctx, 'image', part.source)
+      const resolved = await resolvePreferredMediaSource(ctx, 'image', part.source, undefined, origin, 'markdown')
       if (resolved.via === 'fallback') {
         fallback.push(part.source)
         continue
       }
 
-      await appendImageUrlLine(lines, resolved.source)
+      /** 保留开发者写下的 alt 与显式尺寸，只替换图片来源 */
+      lines.push(await buildMarkdownImageLine(resolved.source, part.alt))
     }
   }
 
@@ -262,12 +313,7 @@ const appendExplicitMarkdown = async (
  * @param url 图片 URL。
  */
 const appendImageUrlLine = async (lines: string[], url: string): Promise<void> => {
-  try {
-    const [line] = await imagesToMarkdown([url])
-    lines.push(line)
-  } catch {
-    lines.push(`![karin #300px #300px](${url})`)
-  }
+  lines.push(await buildMarkdownImageLine(url))
 }
 
 /**
@@ -432,6 +478,13 @@ const sendQQWithEventFallback = async (
   try {
     return await send(contact.peer, item)
   } catch (err) {
+    if (item.msg_type === 7 && item.keyboard && isInvalidKeyboardError(err)) {
+      ctx.logger('warn', '富媒体消息附带 keyboard 被 QQ 拒绝，已去掉按钮重试，本条消息将不显示按钮')
+      const retryItem: SendQQMediaMessageRequest = { ...item }
+      delete retryItem.keyboard
+      return send(contact.peer, retryItem)
+    }
+
     if (!item.event_id || !isInvalidEventIdError(err)) throw err
 
     ctx.logger('warn', `event_id 被 QQ 拒绝，已改用普通消息重试: ${item.event_id}`)
@@ -440,6 +493,22 @@ const sendQQWithEventFallback = async (
     delete retryItem.msg_seq
     return send(contact.peer, retryItem)
   }
+}
+
+/**
+ * 判断发送失败是否来自 QQ 对 `keyboard` 的参数校验。
+ *
+ * 官方文档未声明 `keyboard` 与 `media` 互斥，但实际平台行为无法完全确认，
+ * 因此富媒体带按钮失败时基于键盘相关错误码兜底降级，保证图片本身能发出去。
+ *
+ * @param err 捕获到的发送异常。
+ * @returns 是否可以通过移除 `keyboard` 重试。
+ */
+const isInvalidKeyboardError = (err: unknown): boolean => {
+  const message = err instanceof Error ? err.message : String(err)
+  return message.includes('305007') ||
+    message.includes('键盘') ||
+    message.includes('keyboard')
 }
 
 /**

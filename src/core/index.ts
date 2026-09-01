@@ -10,7 +10,7 @@ import { bus, offAll } from '@/connection/transport'
 import * as ws from '@/connection/ws/manager'
 import type { QQBotConfig } from '@/types/config'
 import type { Event } from '@/types/event'
-import { QQAPIBASEURL } from '@/utils/common'
+import { QQAPIBASEURL } from '@/core/constants'
 
 /**
  * 初始化所有 Bot

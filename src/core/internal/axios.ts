@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'node-karin/axios'
 import { log } from '@/utils/logger'
 import { formatOpenAPIError } from '@/core/api/error'
 import { getUserAgent } from '@/utils/user-agent'
-import { QQAPIBASEURL } from '@/utils/common'
+import { QQAPIBASEURL } from '@/core/constants'
 
 /**
  * 每个 appId 一份 token 状态

@@ -3,102 +3,89 @@ import { createReadStream } from 'node:fs'
 import { open, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { getMimeType } from 'node-karin'
 import axios from 'node-karin/axios'
 import { Http } from './http'
 import { getCachedUpload, setCachedUpload } from './upload-cache'
+import {
+  BASE64_PREFIX_RE,
+  COMPLETE_UPLOAD_BASE_DELAY,
+  COMPLETE_UPLOAD_RETRIES,
+  DATA_URL_BASE64_RE,
+  DEFAULT_FILENAME,
+  DEFAULT_MIME,
+  DEFAULT_PART_CONCURRENCY,
+  FILE_TYPE,
+  HTTP_URL_RE,
+  LARGE_UPLOAD_THRESHOLD,
+  MAX_PART_CONCURRENCY,
+  MAX_UPLOAD_SIZE,
+  MD5_10M_SIZE,
+  MEDIA_DOWNLOAD_TIMEOUT,
+  MEDIA_TYPE_LABEL,
+  MEDIA_UPLOAD_TIMEOUT,
+  PART_FINISH_BASE_DELAY,
+  PART_FINISH_DEFAULT_RETRY_TIMEOUT,
+  PART_FINISH_MAX_RETRY_TIMEOUT,
+  PART_FINISH_RETRIES,
+  PART_FINISH_RETRY_INTERVAL,
+  PART_FINISH_RETRYABLE_CODES,
+  PART_UPLOAD_RETRIES,
+  PART_UPLOAD_TIMEOUT,
+  RESPONSE_TYPE_PARAM,
+  UPLOAD_PREPARE_DAILY_LIMIT_CODE,
+} from '@/core/constants'
 import type { Scene, MediaType, UploadMediaResponse } from './types'
 import type { FileHandle } from 'node:fs/promises'
 
-const FILE_TYPE: Record<MediaType, number> = {
-  image: 1,
-  video: 2,
-  record: 3,
-  file: 4,
+/**
+ * 推断直链应当声明的 MIME。
+ *
+ * 优先按文件名判断，这样 png / gif 不会被统一说成 jpeg；文件名没有扩展名或
+ * 扩展名不认识时，退回该富媒体类型的兜底值。
+ *
+ * @param type 富媒体类型。
+ * @param fileName 可选文件名。
+ * @returns MIME 字符串；该类型拿不到直链时返回 undefined。
+ */
+const resolveDirectLinkMime = (type: MediaType, fileName?: string): string | undefined => {
+  const fallback = DEFAULT_MIME[type]
+  if (!fallback) return undefined
+  if (!fileName) return fallback
+
+  const guessed = getMimeType(fileName)
+  /** karin 认不出的扩展名会返回 octet-stream，此时用类型兜底更准确。 */
+  if (!guessed || guessed === 'application/octet-stream') return fallback
+
+  /** 扩展名与富媒体类型不是同一族时同样以类型为准，避免声明成错误的族。 */
+  const family = fallback.split('/')[0]
+  return guessed.startsWith(`${family}/`) ? guessed : fallback
 }
 
-/** 各类资源的 QQ 上传上限。 */
-const MAX_UPLOAD_SIZE: Record<MediaType, number> = {
-  image: 30 * 1024 * 1024,
-  video: 100 * 1024 * 1024,
-  record: 20 * 1024 * 1024,
-  file: 100 * 1024 * 1024,
+/**
+ * 把 QQ 返回的下载直链改造成可直接嵌入消息的地址。
+ *
+ * 直链本身不声明 Content-Type，客户端可能因此拒绝按图片/视频渲染，所以要追加
+ * COS 的响应类型参数。这里用 URL 对象改写 query，避免手工拼接破坏预签名参数。
+ *
+ * @param rawUrl QQ 分片合并返回的下载直链。
+ * @param type 富媒体类型。
+ * @param fileName 可选文件名，用于推断更精确的 MIME。
+ * @returns 已声明响应类型的直链；类型不支持或直链无法解析时原样返回。
+ */
+export const buildDirectLink = (rawUrl: string, type: MediaType, fileName?: string): string => {
+  const mime = resolveDirectLinkMime(type, fileName)
+  if (!mime) return rawUrl
+
+  try {
+    const url = new URL(rawUrl)
+    url.searchParams.set(RESPONSE_TYPE_PARAM, mime)
+    return url.toString()
+  } catch {
+    /** QQ 返回了非法 URL 时不做改写，交给调用方按原样使用。 */
+    return rawUrl
+  }
 }
-
-/** 上传错误中展示的资源类型名称。 */
-const MEDIA_TYPE_LABEL: Record<MediaType, string> = {
-  image: '图片',
-  video: '视频',
-  record: '语音',
-  file: '文件',
-}
-
-/** fallback 上传超过该大小时走 QQ 分片上传。 */
-const LARGE_UPLOAD_THRESHOLD = 5 * 1024 * 1024
-
-/** QQ upload_prepare 需要的前 10,002,432 字节 MD5。 */
-const MD5_10M_SIZE = 10_002_432
-
-/** 分片上传时没有业务文件名的默认值。 */
-const DEFAULT_FILENAME: Record<MediaType, string> = {
-  image: 'image.jpg',
-  video: 'video.mp4',
-  record: 'record.mp3',
-  file: 'file.bin',
-}
-
-/** 富媒体上传比普通接口慢，尤其本地视频会走 file_data。 */
-const MEDIA_UPLOAD_TIMEOUT = 120_000
-
-/** URL 回源下载兜底超时。 */
-const MEDIA_DOWNLOAD_TIMEOUT = 120_000
-
-/** 每个分片 PUT 到 QQ 临时地址的超时时间。 */
-const PART_UPLOAD_TIMEOUT = 300_000
-
-/** 每个分片 PUT 失败后的重试次数。 */
-const PART_UPLOAD_RETRIES = 2
-
-/** upload_part_finish 普通失败重试次数。 */
-const PART_FINISH_RETRIES = 2
-
-/** upload_part_finish 普通失败重试基础间隔。 */
-const PART_FINISH_BASE_DELAY = 1000
-
-/** upload_part_finish 命中这些业务码时，需要按服务端给出的窗口持续重试。 */
-const PART_FINISH_RETRYABLE_CODES = new Set([40093001])
-
-/** 服务端未返回 retry_timeout 时，持续重试的默认时间。 */
-const PART_FINISH_DEFAULT_RETRY_TIMEOUT = 2 * 60 * 1000
-
-/** 持续重试窗口上限，避免服务端返回异常值导致任务长时间占用。 */
-const PART_FINISH_MAX_RETRY_TIMEOUT = 10 * 60 * 1000
-
-/** 持续重试时的固定间隔。 */
-const PART_FINISH_RETRY_INTERVAL = 1000
-
-/** 分片完成接口失败重试次数。 */
-const COMPLETE_UPLOAD_RETRIES = 2
-
-/** 分片完成接口失败重试基础间隔。 */
-const COMPLETE_UPLOAD_BASE_DELAY = 2000
-
-/** upload_prepare 返回该业务码时表示大文件上传额度受限。 */
-const UPLOAD_PREPARE_DAILY_LIMIT_CODE = 40093002
-
-/** QQ 没返回建议并发数时的默认并发。 */
-const DEFAULT_PART_CONCURRENCY = 1
-
-/** 本地限制的最大分片并发，避免服务端返回过大值。 */
-const MAX_PART_CONCURRENCY = 10
-
-/** HTTP(S) URL 可直接交给 QQ 平台拉取。 */
-const HTTP_URL_RE = /^https?:\/\//i
-
-/** Karin 常见 base64 图片/媒体前缀。 */
-const BASE64_PREFIX_RE = /^base64:\/\//i
-
-/** 标准 data URL 的 base64 前缀。 */
-const DATA_URL_BASE64_RE = /^data:[^;,]+;base64,/i
 
 /** QQ 分片上传准备接口返回的单个分片信息。 */
 interface UploadPart {
@@ -591,6 +578,56 @@ export class MediaApi extends Http {
     const response = await this.post<UploadMediaResponse>(`/v2/${scene}s/${peer}/files`, body, { timeout: MEDIA_UPLOAD_TIMEOUT })
     if (hashes) await setCachedUpload(scene, peer, type, hashes.md5, response)
     return response
+  }
+
+  /**
+   * 上传资源并取回它的公网直链。
+   *
+   * 分片上传的合并响应里带 `raw_url`，等价于一个临时图床：拿到地址后图片就能以
+   * markdown 图片语法嵌进 msg_type=2，和文本、按钮合成一条消息，不必退化成
+   * 独立的 msg_type=7 富媒体消息。
+   *
+   * 与 `uploadFallback` 的差别只有一处：那边按体积决定是否分片，目标是拿
+   * `file_info`；这里必须无条件分片，否则服务端不会给出 `raw_url`。
+   *
+   * 直链的存活时间等于响应里的 `ttl`，属于临时地址，只适合当次发送使用。
+   *
+   * @param scene user(单聊) / group(群聊)
+   * @param peer openid 或 group_openid，决定上传归属的会话
+   * @param type 文件类型；`file` 无直链可取
+   * @param source 本地路径、http url、data URL、base64:// 或裸 base64
+   * @param fileName 文件名，同时用于推断直链声明的 MIME
+   * @returns 可直接嵌入消息的直链，以及原始上传响应
+   */
+  async uploadForUrl (
+    scene: Scene,
+    peer: string,
+    type: MediaType,
+    source: string,
+    fileName?: string
+  ): Promise<{ url: string; response: UploadMediaResponse }> {
+    if (type === 'file') {
+      throw new Error(`QQ 不为${MEDIA_TYPE_LABEL.file}类型返回下载直链，无法当图床使用`)
+    }
+
+    const prepared = await buildFallbackSource(type, source, fileName)
+    assertUploadSize(type, prepared.size)
+    const hashes = await computeUploadHashes(prepared)
+
+    const reused = await getCachedUpload(scene, peer, type, hashes.md5)
+    const response = reused?.raw_url
+      ? reused
+      : await this.uploadChunked(scene, peer, type, prepared, hashes)
+
+    if (!response.raw_url) {
+      throw new Error(`${MEDIA_TYPE_LABEL[type]}上传完成但未返回下载直链，无法当图床使用`)
+    }
+
+    if (response !== reused) {
+      await setCachedUpload(scene, peer, type, hashes.md5, response)
+    }
+
+    return { url: buildDirectLink(response.raw_url, type, prepared.fileName), response }
   }
 
   /**

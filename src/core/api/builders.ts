@@ -19,9 +19,14 @@ export const buildQQMsg = {
   ark (ark: SendQQArkMessageRequest['ark']): SendQQArkMessageRequest {
     return { msg_type: 3, ark }
   },
-  /** 构造 msg_type=7 富媒体消息体 */
-  media (fileInfo: string): SendQQMediaMessageRequest {
-    return { msg_type: 7, media: { file_info: fileInfo } }
+  /**
+   * 构造 msg_type=7 富媒体消息体
+   *
+   * @param fileInfo 上传富媒体返回的 file_info。
+   * @param keyboard 可选内嵌键盘，用于按钮随富媒体一起发送。
+   */
+  media (fileInfo: string, keyboard?: Keyboard): SendQQMediaMessageRequest {
+    return { msg_type: 7, media: { file_info: fileInfo }, keyboard }
   },
 }
 
