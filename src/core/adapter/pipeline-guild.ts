@@ -8,7 +8,7 @@ import {
   normalizeQQBotButton,
 } from './button-enter'
 import { groupElements } from './grouping'
-import { imagesToMarkdown, splitMarkdownImages } from './text-to-md'
+import { imagesToMarkdown, splitMarkdownImages, markdownPartToLine } from './text-to-md'
 import type { FileToUrlExtra } from './media-source'
 import { BUTTON_ONLY_MARKDOWN, KEYBOARD_MAX_BUTTONS_PER_ROW, KEYBOARD_MAX_ROWS } from '@/core/constants'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
@@ -77,8 +77,8 @@ const sendGuildMarkdown = async (
         continue
       }
       try {
-        const [mdImage] = await imagesToMarkdown([part.source], extra)
-        lines.push(mdImage)
+        /** 保留开发者写下的 alt 与显式尺寸，只替换图片来源 */
+        lines.push(await markdownPartToLine(part, extra))
       } catch {
         ctx.logger('debug', '[sendGuild] markdown 内嵌图片转 URL 失败，改走 file_image 单独发送')
         fallbackImages.push(part.source)
@@ -162,8 +162,8 @@ const appendExplicitGuildMarkdownItems = async (
         continue
       }
       try {
-        const [mdImage] = await imagesToMarkdown([part.source], extra)
-        lines.push(mdImage)
+        /** 保留开发者写下的 alt 与显式尺寸，只替换图片来源 */
+        lines.push(await markdownPartToLine(part, extra))
       } catch {
         ctx.logger('debug', '[sendGuild] markdown 内嵌图片转 URL 失败，改走 file_image 单独发送')
         fallbackImages.push(part.source)

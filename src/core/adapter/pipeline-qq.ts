@@ -8,7 +8,7 @@ import {
 import { groupElements } from './grouping'
 import { resolvePreferredMediaSource } from './media-source'
 import type { UploadOrigin } from './media-source'
-import { imagesToMarkdown, splitMarkdownImages } from './text-to-md'
+import { splitMarkdownImages, buildMarkdownImageLine } from './text-to-md'
 import {
   BUTTON_ONLY_MARKDOWN,
   C2C_PASSIVE_REPLY_LIMIT,
@@ -297,7 +297,8 @@ const appendExplicitMarkdown = async (
         continue
       }
 
-      await appendImageUrlLine(lines, resolved.source)
+      /** 保留开发者写下的 alt 与显式尺寸，只替换图片来源 */
+      lines.push(await buildMarkdownImageLine(resolved.source, part.alt))
     }
   }
 
@@ -312,12 +313,7 @@ const appendExplicitMarkdown = async (
  * @param url 图片 URL。
  */
 const appendImageUrlLine = async (lines: string[], url: string): Promise<void> => {
-  try {
-    const [line] = await imagesToMarkdown([url])
-    lines.push(line)
-  } catch {
-    lines.push(`![karin #300px #300px](${url})`)
-  }
+  lines.push(await buildMarkdownImageLine(url))
 }
 
 /**
