@@ -1,5 +1,6 @@
 import { fileToUrl, karin } from 'node-karin'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
+import { DEFAULT_FILENAME } from '@/core/constants'
 import type { AdapterQQBot } from './base'
 
 type StaticElement = Extract<ElementTypes, { type: 'image' | 'video' | 'record' | 'file' }>
@@ -119,7 +120,7 @@ const prepareSelfCacheElement = async (
 }
 
 /**
- * 静态资源统一转 HTTP URL 后再缓存；转换失败时跳过该元素。
+ * 静态资源统一转 HTTP URL 后再缓存；转换失败或没有处理器接手时跳过该元素。
  */
 const prepareStaticElement = async (
   ctx: AdapterQQBot,
@@ -131,33 +132,24 @@ const prepareStaticElement = async (
   }
 
   try {
-    switch (element.type) {
-      case 'image': {
-        const res = await fileToUrl('image', element.file, element.name || 'image.jpg')
-        const cached = {
-          ...element,
-          file: res.url,
-          width: res.width,
-          height: res.height,
-        } as ElementTypes
-        return { send: cached, cache: cached }
-      }
-      case 'video': {
-        const res = await fileToUrl('video', element.file, element.name || 'video.mp4')
-        const cached = { ...element, file: res.url } as ElementTypes
-        return { send: cached, cache: cached }
-      }
-      case 'record': {
-        const res = await fileToUrl('record', element.file, element.name || 'record.mp3')
-        const cached = { ...element, file: res.url } as ElementTypes
-        return { send: cached, cache: cached }
-      }
-      case 'file': {
-        const res = await fileToUrl('file', element.file, element.name || 'file.bin')
-        const cached = { ...element, file: res.url } as ElementTypes
-        return { send: cached, cache: cached }
-      }
+    const res = await fileToUrl(element.type, element.file, element.name || DEFAULT_FILENAME[element.type])
+
+    /**
+     * 链路上的处理器全部放行时 fileToUrl 实际返回 undefined（类型声明未涵盖
+     * 这种情况），不属于异常：发送继续使用原始来源，仅跳过该元素的缓存。
+     */
+    if (!res?.url) {
+      ctx.logger('debug', `[getMsg] 没有 fileToUrl 处理器接手 ${element.type}，跳过该元素的缓存`)
+      return { send: element, cache: null }
     }
+
+    const cached = { ...element, file: res.url } as ElementTypes
+    if (cached.type === 'image') {
+      const { width, height } = res as { width?: number, height?: number }
+      cached.width = width
+      cached.height = height
+    }
+    return { send: cached, cache: cached }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     ctx.logger('debug', `[getMsg] 跳过自己消息资源缓存: ${element.type} ${message}`)

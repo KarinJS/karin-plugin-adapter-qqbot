@@ -16,6 +16,7 @@ import {
   GROUP_EVENT_WHITELIST,
   KEYBOARD_MAX_BUTTONS_PER_ROW,
   KEYBOARD_MAX_ROWS,
+  QQ_NUMBER_RE,
 } from '@/core/constants'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
@@ -30,6 +31,7 @@ export const sendQQ = async (
   contact: Contact<'friend' | 'group'>,
   elements: ElementTypes[]
 ): Promise<SendMsgResults> => {
+  assertOpenIdPeer(contact)
   const target = contact.scene === 'friend' ? 'user' : 'group'
   const grouping = groupElements<'qq'>(contact.scene, elements)
   await resolveOutgoingReferenceQQ(ctx, contact, grouping)
@@ -44,6 +46,22 @@ export const sendQQ = async (
    */
   if (ctx.cfg.markdown.enable) return sendQQMarkdown(ctx, contact, grouping, target)
   return sendQQClassic(ctx, contact, grouping, target)
+}
+
+/**
+ * QQ 官方接口只接受 openid（32 位十六进制或 UUID 形态）寻址。纯数字 peer 一定是
+ * QQ 号/群号，继续走下去只会在媒体上传或消息下发时被平台以 40011028
+ * 「请求的资源不存在」拒绝，且平台错误信息没有指向性（上游常见场景：把 karin
+ * 主人列表里的 QQ 号直接当私聊目标）。这里提前拦截，给出可操作的说明。
+ */
+const assertOpenIdPeer = (contact: Contact<'friend' | 'group'>): void => {
+  if (!QQ_NUMBER_RE.test(contact.peer)) return
+
+  const sceneLabel = contact.scene === 'friend' ? '私聊' : '群聊'
+  throw new Error(
+    `[sendQQ] ${sceneLabel} peer 不是有效 openid: ${contact.peer}。` +
+    'QQ 官方 Bot API 不使用 QQ 号/群号寻址，请让对方先给机器人发一条消息，从事件中获取其 openid 后填入配置'
+  )
 }
 
 /**
