@@ -59,10 +59,14 @@ const sendGuildMarkdown = async (
 
   // guild 场景：把 imageUrls 和 imageFiles 一并塞进 markdown
   const allImages = [...grouping.guildImageUrls]
+  /** 没有 fileToUrl 处理器接手的本地图片，降级为 file_image 单独发送。 */
+  const fallbackImages: string[] = []
   for (const file of grouping.guildImageFiles) {
     const result = await fileToUrl('image', file, 'image.jpg', extra)
     if (!result?.url) {
-      throw new Error('[Handler][Error]: 没有 fileToUrl 处理器接手图片转 URL')
+      ctx.logger('debug', '[sendGuild] 没有 fileToUrl 处理器接手图片转 URL，改走 file_image 单独发送')
+      fallbackImages.push(file)
+      continue
     }
     allImages.push(result.url)
   }
@@ -75,9 +79,14 @@ const sendGuildMarkdown = async (
       if (part.type === 'text') {
         const text = part.value.trim()
         if (text) lines.push(text)
-      } else {
+        continue
+      }
+      try {
         const [mdImage] = await imagesToMarkdown([part.source], extra)
         lines.push(mdImage)
+      } catch {
+        ctx.logger('debug', '[sendGuild] markdown 内嵌图片转 URL 失败，改走 file_image 单独发送')
+        fallbackImages.push(part.source)
       }
     }
   }
@@ -89,6 +98,10 @@ const sendGuildMarkdown = async (
     const keyboard = buildKeyboard(grouping)
     const content = lines.length ? lines.join('\n') : BUTTON_ONLY_MARKDOWN
     items.push(ctx.super.guild.markdown({ content }, keyboard))
+  }
+
+  for (const file of fallbackImages) {
+    items.push(await buildGuildImageItem(file))
   }
 
   if (!items.length) {
@@ -145,14 +158,20 @@ const appendExplicitGuildMarkdownItems = async (
 
   const extra: FileToUrlExtra = { selfId: ctx.selfId, purpose: 'markdown' }
   const lines: string[] = []
+  const fallbackImages: string[] = []
   for (const markdown of grouping.markdowns) {
     for (const part of splitMarkdownImages(markdown.markdown)) {
       if (part.type === 'text') {
         const text = part.value.trim()
         if (text) lines.push(text)
-      } else {
+        continue
+      }
+      try {
         const [mdImage] = await imagesToMarkdown([part.source], extra)
         lines.push(mdImage)
+      } catch {
+        ctx.logger('debug', '[sendGuild] markdown 内嵌图片转 URL 失败，改走 file_image 单独发送')
+        fallbackImages.push(part.source)
       }
     }
   }
@@ -163,6 +182,10 @@ const appendExplicitGuildMarkdownItems = async (
   const keyboard = buildKeyboard(grouping)
   const content = lines.length ? lines.join('\n') : BUTTON_ONLY_MARKDOWN
   items.push(ctx.super.guild.markdown({ content }, keyboard))
+
+  for (const file of fallbackImages) {
+    items.push(await buildGuildImageItem(file))
+  }
 }
 
 const buildGuildImageItem = async (source: string): Promise<SendGuildMsg | FormData> => {
