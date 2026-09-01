@@ -21,12 +21,13 @@
     "build": "tsc && tsdown",
     "dev": "tsx watch --include \"src/**/*.ts\" src/app.ts",
     "karin": "karin",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
+    "lint": "eslint src tests",
+    "lint:fix": "eslint src tests --fix",
     "pub": "npm publish --access public",
     "sort": "npx sort-package-json",
-    "test": "node tests/schema-sql.test.mjs && node tests/codec.test.mjs && node tests/store.test.mjs",
-    "typecheck": "npx tsc --noEmit"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "npx tsc --noEmit && npx tsc --noEmit -p tests/tsconfig.json"
   },
   "dependencies": {
     "@karinjs/geturls": "^1.0.2",
@@ -46,7 +47,8 @@
     "node-karin": "1.16.3",
     "tsdown": "^0.22.13",
     "tsx": "^4.23.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
   },
   "publishConfig": {
     "access": "public",

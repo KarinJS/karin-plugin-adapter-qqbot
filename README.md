@@ -25,7 +25,6 @@ pnpm add @karinjs/adapter-qqbot
     "qqEnable": true,
     "guildEnable": true,
     "guildMode": 0,
-    "markdown": { "enable": true },
     "event": { "type": 2 }
   }
 ]
@@ -33,7 +32,14 @@ pnpm add @karinjs/adapter-qqbot
 
 - `event.type`: `0` 关闭、`1` Webhook、`2` WebSocket（默认）。
 - `guildMode`: `0` 公域，只收 @ 消息；`1` 私域，接收全部频道消息。
-- `markdown.enable`: 是否让普通文本和图片自动合并为 Markdown 消息，默认开启。关闭后普通图片会改为单独上传发送；插件显式传入的 `segment.markdown` 不受此开关影响。
+
+> 旧版本里的 `markdown.enable` 已移除。发送通道现在由平台能力决定，不再需要用户配置：
+> QQ 单聊和群聊的自定义 Markdown 已对所有机器人开放，固定走 Markdown 通道；频道场景仍需向 QQ
+> 申请内邀开通，适配器会先尝试 Markdown，被平台以权限错误拒绝后自动降级为普通消息，并记住这个
+> 机器人，本次运行内不再重试。开通后重启 Karin（或改一次配置）即可恢复。配置文件里残留的
+> `markdown` 字段会被忽略，下次保存配置时自动清除。
+>
+> 频道降级为普通消息后按钮无法发送——平台的 `keyboard` 只能挂在 Markdown 消息上。
 
 ## 按钮
 

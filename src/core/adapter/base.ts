@@ -1,4 +1,4 @@
-import { AdapterBase, logger, buttonHandle, segment, fileToUrl, senderGroup } from 'node-karin'
+import { AdapterBase, logger, buttonHandle, segment, senderGroup } from 'node-karin'
 import { QQBotApi } from '@/core/api'
 import { sendQQ } from './pipeline-qq'
 import { sendGuild } from './pipeline-guild'
@@ -6,9 +6,9 @@ import { cacheSelfMessage, prepareSelfMessageCache, shouldCacheSelfMessage } fro
 import { getJoinRequest, removeJoinRequest } from './join-request-cache'
 import { getAdapterConfig, setAdapterConfig } from './config-store'
 import { getMessageStore, type MessageStore } from '@/core/storage/message'
-import { getImageSize } from '@/utils/common'
 import { HTTP_URL_RE, MAX_GROUP_MUTE_SECONDS } from '@/core/constants'
-import { normalizeMediaElements, normalizeMediaSource, type UploadOrigin } from './media-source'
+import { normalizeMediaElements } from './media-source'
+import { buildPendingMarkdownImageLine } from './text-to-md'
 import type {
   LogMethodNames, Contact, ElementTypes, Message, SendMsgResults,
   NodeElement, ForwardOptions, MessageResponse, UserInfo, GroupInfo,
@@ -23,8 +23,10 @@ import type { QQBotConfig } from '@/types/config'
 /**
  * QQ Official Bot 适配器
  *
- * 全场景统一走 msg_type=2 Markdown 通道（详见 pipeline-qq / pipeline-guild）。
- * 视频 / 语音 / 文件由 pipeline 内部以 msg_type=7 紧随主消息补发。
+ * 发送通道由平台能力决定，没有对应的用户配置项：QQ 单聊 / 群聊的自定义 Markdown
+ * 已对所有机器人开放，固定走 msg_type=2；频道场景仍需内邀开通，先乐观尝试
+ * Markdown，被拒后自动降级为普通消息（详见 pipeline-qq / pipeline-guild 与
+ * guild-markdown）。视频 / 语音 / 文件由 pipeline 内部以 msg_type=7 紧随主消息补发。
  */
 export class AdapterQQBot extends AdapterBase implements AdapterType {
   /** 与官方 API 交互 */
@@ -75,13 +77,17 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
     const normalizedElements = normalizeMediaElements(elements)
     /** 发送成功后始终记录消息 ID 映射；正文是否入库由 cacheSelfMessage 内部按开关决定。 */
     if (contact.scene === 'direct' || contact.scene === 'guild') {
-      const prepared = shouldCacheSelfMessage(this) ? await prepareSelfMessageCache(this, normalizedElements) : undefined
+      const prepared = shouldCacheSelfMessage(this)
+        ? await prepareSelfMessageCache(this, contact, normalizedElements)
+        : undefined
       const result = await sendGuild(this, contact as Contact<'guild' | 'direct'>, prepared?.sendElements ?? normalizedElements)
       cacheSelfMessage(this, contact, prepared?.cacheElements ?? [], result)
       return result
     }
     if (contact.scene === 'group' || contact.scene === 'friend') {
-      const prepared = shouldCacheSelfMessage(this) ? await prepareSelfMessageCache(this, normalizedElements) : undefined
+      const prepared = shouldCacheSelfMessage(this)
+        ? await prepareSelfMessageCache(this, contact, normalizedElements)
+        : undefined
       const result = await sendQQ(this, contact as Contact<'friend' | 'group'>, prepared?.sendElements ?? normalizedElements)
       cacheSelfMessage(this, contact, prepared?.cacheElements ?? [], result)
       return result
@@ -167,8 +173,16 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
   /**
    * 发送合并转发消息
    *
-   * 将 NodeElement 拆解为文本 + 图片等元素，拼接成 markdown 发送。
-   * 节点之间仅用换行隔开，不添加任何前缀提示文本。
+   * QQ 官方没有合并转发能力，这里把各节点摊平成一段 Markdown 正文，节点之间用
+   * 强制换行隔开，不添加任何前缀提示文本。
+   *
+   * 图片以 markdown 图片语法写入，**保留原始来源**（本地路径 / base64 / URL）：
+   * 究竟走内置图床、第三方 fileToUrl，还是降级成 msg_type=7 富媒体，由发送
+   * pipeline 统一决定。这里不自己上传，也不自己判断通道——否则频道场景在没有
+   * Markdown 权限时会绕过降级逻辑，直接被平台拒掉。
+   *
+   * 视频 / 语音 / 文件进不了 markdown，作为普通消息段跟随主消息一起交给 pipeline，
+   * 由它在同一次发送里以 msg_type=7 补发。
    */
   async sendForwardMsg (
     contact: Contact,
@@ -194,44 +208,13 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
           case 'text':
             lines.push(el.text)
             break
-          case 'image': {
-            const imageSource = typeof el.file === 'string' ? normalizeMediaSource(el.file) : el.file
-            if (typeof imageSource === 'string' && imageSource.startsWith('http')) {
-              try {
-                const { width, height } = await getImageSize(imageSource)
-                lines.push(`![${el.name || '图片'} #${width}px #${height}px](${imageSource})`)
-              } catch {
-                lines.push(`![${el.name || '图片'} #300px #300px](${imageSource})`)
-              }
-            } else {
-              /**
-               * 必须带上 selfId / purpose / origin：内置图床按这三个字段决定
-               * 是否接手，缺任何一个都会直接放行给后续处理器。频道场景没有
-               * 可用的 openid，origin 只能是 undefined。
-               */
-              const origin: UploadOrigin | undefined = contact.scene === 'group'
-                ? { scene: 'group', peer: contact.peer }
-                : contact.scene === 'friend'
-                  ? { scene: 'user', peer: contact.peer }
-                  : undefined
-              try {
-                const result = await fileToUrl('image', imageSource, el.name || 'image.jpg', {
-                  selfId: this.selfId,
-                  purpose: 'markdown',
-                  origin,
-                })
-                if (result?.url) {
-                  lines.push(`![${el.name || '图片'} #${result.width || 300}px #${result.height || 300}px](${result.url})`)
-                } else {
-                  /** 没有处理器接手时不能留空 URL 的图片语法（客户端渲染为空白），改走富媒体补发 */
-                  mediaElements.push(el)
-                }
-              } catch {
-                mediaElements.push(el)
-              }
-            }
+          case 'image':
+            lines.push(buildPendingMarkdownImageLine(
+              el.file,
+              el.name || '图片',
+              el.width && el.height ? { width: el.width, height: el.height } : undefined
+            ))
             break
-          }
           case 'at': {
             if (contact.scene === 'friend' || contact.scene === 'direct') break
             if (el.targetId === 'all') {
@@ -265,11 +248,19 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
     }
 
     const content = parts.join('\r\r\n\n')
-    const result = await this.sendMsg(contact, [segment.markdown(content)])
+    /**
+     * 正文可能整段为空（例如只转发了一个视频节点）。此时不能塞一条空 markdown：
+     * 平台会以 50041「markdown 有空值」拒绝，pipeline 也会因为没有可发内容而
+     * 回落成一条"不支持发送的消息类型"。
+     */
+    const sendElements = content ? [segment.markdown(content), ...mediaElements] : mediaElements
 
-    if (mediaElements.length) {
-      await this.sendMsg(contact, mediaElements)
+    if (!sendElements.length) {
+      this.logger('warn', '[sendForwardMsg] 转发节点里没有可发送的内容，已跳过')
+      return { messageId: '', forwardId: '' }
     }
+
+    const result = await this.sendMsg(contact, sendElements)
 
     return {
       messageId: result.messageId,

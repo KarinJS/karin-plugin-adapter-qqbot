@@ -8,6 +8,11 @@ import {
   normalizeQQBotButton,
 } from './button-enter'
 import { groupElements } from './grouping'
+import {
+  canSendGuildMarkdown,
+  disableGuildMarkdown,
+  isGuildMarkdownForbiddenError,
+} from './guild-markdown'
 import { imagesToMarkdown, splitMarkdownImages, markdownPartToLine } from './text-to-md'
 import type { FileToUrlExtra } from './media-source'
 import { BUTTON_ONLY_MARKDOWN, KEYBOARD_MAX_BUTTONS_PER_ROW, KEYBOARD_MAX_ROWS } from '@/core/constants'
@@ -19,8 +24,10 @@ import type { SendGuildMsg, SendGuildResponse } from '@/core/api/types'
 /**
  * 处理频道场景（子频道 + 私信）的发送
  *
- * 默认把普通文本 / at / 图片通过 markdown 渲染。关闭自动 Markdown 通道后，
- * 普通文本和图片改走经典发送；显式 segment.markdown 仍按调用方指定走 Markdown。
+ * 频道的自定义 Markdown 目前仍需向 QQ 申请内邀开通（见
+ * `api-docs/server-inter/message/type/markdown.md`），所以这里不靠用户配置开关，
+ * 而是先乐观走 Markdown：被平台以权限类错误拒绝后记住这个 bot，本次立刻降级重发，
+ * 之后的频道消息直接走普通消息通道。
  */
 export const sendGuild = async (
   ctx: AdapterQQBot,
@@ -29,8 +36,26 @@ export const sendGuild = async (
 ): Promise<SendMsgResults> => {
   const grouping = groupElements<'guild'>(contact.scene, elements)
 
-  if (ctx.cfg.markdown.enable) return sendGuildMarkdown(ctx, contact, grouping)
-  return sendGuildClassic(ctx, contact, grouping)
+  if (!canSendGuildMarkdown(ctx.selfId)) return sendGuildClassic(ctx, contact, grouping)
+
+  try {
+    return await sendGuildMarkdown(ctx, contact, grouping)
+  } catch (err) {
+    if (!isGuildMarkdownForbiddenError(err)) throw err
+
+    /**
+     * markdown 主消息一定是 items[0]，被拒时本次还没有任何消息发出去，
+     * 因此可以安全地整条重发，不会出现重复消息。
+     */
+    if (disableGuildMarkdown(ctx.selfId)) {
+      ctx.logger(
+        'warn',
+        '频道 Markdown 未开通（需向 QQ 申请内邀），已降级为普通消息发送；' +
+        '本进程后续频道消息不再尝试 Markdown，开通后重启或改一次配置即可恢复'
+      )
+    }
+    return sendGuildClassic(ctx, contact, grouping)
+  }
 }
 
 /**
@@ -107,7 +132,11 @@ const sendGuildMarkdown = async (
 }
 
 /**
- * 经典通道：文本走 content，图片按文档走 image / file_image 单独发送。
+ * 降级通道：频道 Markdown 权限不可用时使用。
+ *
+ * 文本走 content，图片按文档走 image / file_image 单独发送。这条通道不会产出任何
+ * markdown 消息体——显式 `segment.markdown` 也一样：内嵌图片被拆出来单独发送，
+ * 其余部分按普通文本下发。否则同一条消息只会再被平台以同样的权限错误拒绝一次。
  */
 const sendGuildClassic = async (
   ctx: AdapterQQBot,
@@ -120,8 +149,24 @@ const sendGuildClassic = async (
 
   if (grouping.text.length) lines.push(grouping.text.join(''))
 
-  if (!grouping.markdowns.length && (grouping.buttons.length || grouping.keyboards.length)) {
-    ctx.logger('warn', 'Markdown 通道已关闭，button / keyboard 无法随普通文本发送，已跳过')
+  /** 频道 keyboard 只能挂在 markdown 消息体上，没有 markdown 就无处附着。 */
+  if (grouping.buttons.length || grouping.keyboards.length) {
+    ctx.logger('warn', '频道 Markdown 不可用，button / keyboard 无法发送，已跳过')
+  }
+
+  if (grouping.markdowns.length) {
+    /** 内容没有丢，只是渲染成纯文本，用 debug 避免每条消息都刷一条 warn。 */
+    ctx.logger('debug', '[sendGuild] Markdown 不可用，segment.markdown 已按普通文本发送，内嵌图片改为单独发送')
+    for (const markdown of grouping.markdowns) {
+      for (const part of splitMarkdownImages(markdown.markdown)) {
+        if (part.type === 'text') {
+          const text = part.value.trim()
+          if (text) lines.push(text)
+          continue
+        }
+        images.push(part.source)
+      }
+    }
   }
 
   const content = lines.join('\n').trim()
@@ -131,56 +176,11 @@ const sendGuildClassic = async (
     items.push(await buildGuildImageItem(image))
   }
 
-  await appendExplicitGuildMarkdownItems(ctx, contact, grouping, items)
-
   if (!items.length) {
     items.push(ctx.super.guild.text('不支持发送的消息类型'))
   }
 
   return flushGuild(ctx, contact, grouping, items)
-}
-
-/**
- * 显式 `segment.markdown` 是调用方指定的发送类型，不受 Markdown 自动通道开关影响。
- */
-const appendExplicitGuildMarkdownItems = async (
-  ctx: AdapterQQBot,
-  contact: Contact<'guild' | 'direct'>,
-  grouping: Grouping<'guild'>,
-  items: Array<SendGuildMsg | FormData>
-): Promise<void> => {
-  if (!grouping.markdowns.length) return
-
-  const extra: FileToUrlExtra = { selfId: ctx.selfId, purpose: 'markdown' }
-  const lines: string[] = []
-  const fallbackImages: string[] = []
-  for (const markdown of grouping.markdowns) {
-    for (const part of splitMarkdownImages(markdown.markdown)) {
-      if (part.type === 'text') {
-        const text = part.value.trim()
-        if (text) lines.push(text)
-        continue
-      }
-      try {
-        /** 保留开发者写下的 alt 与显式尺寸，只替换图片来源 */
-        lines.push(await markdownPartToLine(part, extra))
-      } catch {
-        ctx.logger('debug', '[sendGuild] markdown 内嵌图片转 URL 失败，改走 file_image 单独发送')
-        fallbackImages.push(part.source)
-      }
-    }
-  }
-
-  warnUnsupportedCommandEnterButtons(ctx, contact.scene, collectCommandEnterButtons(grouping.buttons, grouping.keyboards))
-  warnUnsupportedCommandEnterMarkdowns(ctx, contact.scene, grouping.markdowns.map(m => m.markdown))
-
-  const keyboard = buildKeyboard(grouping)
-  const content = lines.length ? lines.join('\n') : BUTTON_ONLY_MARKDOWN
-  items.push(ctx.super.guild.markdown({ content }, keyboard))
-
-  for (const file of fallbackImages) {
-    items.push(await buildGuildImageItem(file))
-  }
 }
 
 const buildGuildImageItem = async (source: string): Promise<SendGuildMsg | FormData> => {

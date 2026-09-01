@@ -75,22 +75,33 @@ export const writeConfig = (data: Config) => {
 }
 
 /**
- * 用默认值补齐用户配置
+ * 已废弃的历史配置字段。
+ *
+ * `markdown.enable` 在 2.0 之前默认为 false，2.0 把字段整个删除，2.1 又以默认 true
+ * 重新引入——老配置里残留的 false 会静默覆盖新默认值，把用户按回已经不需要的经典
+ * 通道，表现为"一部分消息走 Markdown 一部分不走"。现在通道由适配器自行决定
+ * （QQ 单聊 / 群聊直接走 Markdown，频道按平台权限自动降级），因此读到这个字段
+ * 就丢弃，下次写盘时它会自然从 config.json 里消失。
+ */
+type LegacyQQBotConfig = QQBotConfig & { markdown?: unknown }
+
+/**
+ * 用默认值补齐用户配置，并清理已废弃字段
  */
 export const formatConfig = (user: Config): Config => {
   const def = getDefaultConfig()[0]
   return user.map(item => {
+    /** markdown 是历史字段，解构出来即丢弃，见 {@link LegacyQQBotConfig}。 */
     const {
       markdown,
       messageCache,
       event,
       ...rest
-    } = item
+    } = item as LegacyQQBotConfig
 
     return {
       ...def,
       ...rest,
-      markdown: { ...def.markdown, ...markdown },
       messageCache: normalizeMessageCache(def.messageCache, messageCache),
       event: { ...def.event, ...event },
     }
@@ -148,7 +159,6 @@ export const getDefaultConfig = (): Config => [
     regex: [
       { reg: '^/', rep: '#' },
     ],
-    markdown: { enable: true },
     messageCache: { enable: false, self: false, level: 'standard', ttlHours: 24, maxRows: 200_000 },
     event: { type: 2 },
   },

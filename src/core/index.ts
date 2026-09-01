@@ -5,6 +5,7 @@ import { config, pkg, bindHandlers } from '@/utils/config'
 import { createAxiosInstance, getAccessToken, stopTokenRefresh } from '@/core/internal/axios'
 import { AdapterQQBot } from '@/core/adapter/base'
 import { clearJoinRequests } from '@/core/adapter/join-request-cache'
+import { resetGuildMarkdown } from '@/core/adapter/guild-markdown'
 import { dispatch as dispatchEvent } from '@/core/event/dispatcher'
 import { bus, offAll } from '@/connection/transport'
 import * as ws from '@/connection/ws/manager'
@@ -36,7 +37,6 @@ const hashConfig = (bot: QQBotConfig): string => JSON.stringify({
   appId: bot.appId,
   secret: bot.secret,
   event: bot.event,
-  markdown: bot.markdown,
   messageCache: bot.messageCache,
 })
 
@@ -68,6 +68,8 @@ export const createBot = async (input: QQBotConfig): Promise<void> => {
     ws.stop(appId)
     offAll(appId)
     stopTokenRefresh(appId)
+    /** 重建即重新探测频道 Markdown，拿到内邀后不必重启整个 Karin。 */
+    resetGuildMarkdown(appId)
 
     logger.info(`[QQ Official Bot][${appId}] 获取 access_token...`)
     await getAccessToken(appId, bot.secret)

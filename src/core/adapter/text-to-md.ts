@@ -1,8 +1,7 @@
-import { segment, fileToUrl } from 'node-karin'
+import { fileToUrl } from 'node-karin'
 import { getImageSize } from '@/utils/common'
 import { normalizeMediaSource } from './media-source'
 import type { FileToUrlExtra } from './media-source'
-import type { MarkdownElement } from 'node-karin'
 
 const MARKDOWN_IMAGE_RE = /!\[([^\]]*)]\(\s*(<[^>]+>|[^\s)]+)(?:\s+["'][^"']*["'])?\s*\)/g
 
@@ -72,6 +71,31 @@ export const buildMarkdownImageLine = async (
 }
 
 /**
+ * 生成一行"来源未解析"的 markdown 图片。
+ *
+ * 用于适配器自己拼 markdown 正文的场景（如合并转发）：只把原始来源写进图片语法，
+ * 具体走内置图床、第三方 fileToUrl 还是降级成富媒体，留给发送 pipeline 在
+ * `splitMarkdownImages` 之后统一决定，避免在 pipeline 之外重复一套上传逻辑。
+ *
+ * 本地路径可能带空格、`)` 等会截断图片语法的字符，因此来源统一用尖括号包住——
+ * `splitMarkdownImages` 取出时会剥掉。
+ *
+ * @param source 原始来源：本地路径、`base64://` 或 URL。
+ * @param alt 图片描述；`]` 与换行会截断语法，统一压成空格。
+ * @param size 已知的真实宽高，写成显式尺寸可省掉 pipeline 的一次探测。
+ * @returns markdown 图片行，来源仍是原始 file 字段。
+ */
+export const buildPendingMarkdownImageLine = (
+  source: string,
+  alt = '',
+  size?: { width: number; height: number }
+): string => {
+  const desc = alt.replace(/[[\]\r\n]/g, ' ').trim() || 'karin'
+  const explicit = size?.width && size?.height ? ` #${size.width}px #${size.height}px` : ''
+  return `![${desc}${explicit}](<${normalizeMediaSource(source)}>)`
+}
+
+/**
  * 将图片列表合并到一段 markdown 文本内（每张图占一行）
  *
  * @param urls 图片来源列表。
@@ -135,17 +159,4 @@ export const splitMarkdownImages = (markdown: string): MarkdownImagePart[] => {
   }
 
   return parts.length ? parts : [{ type: 'text', value: markdown }]
-}
-
-/**
- * 把一段 base64 / 本地图片转 url 后嵌入 markdown
- */
-export const base64ImageToMarkdown = async (src: string, extra?: FileToUrlExtra): Promise<string> => {
-  const { url, width, height } = await imageToUrl(src, extra)
-  return buildMarkdownImageLine(url, '', { width, height })
-}
-
-/** 构造 markdown element */
-export const composeMarkdown = (content: string): MarkdownElement => {
-  return segment.markdown(content)
 }

@@ -23,11 +23,6 @@ export interface QQBotConfig {
   guildMode: 0 | 1
   /** 收到消息后对文本进行表达式处理 */
   regex: { reg: string | RegExp; rep: string }[]
-  /** Markdown 通道 */
-  markdown: {
-    /** 是否启用 Markdown 通道发送消息 */
-    enable: boolean
-  }
   /** 消息缓存配置 */
   messageCache: {
     /** 是否启用数据库消息缓存，用于 bot.getMsg */

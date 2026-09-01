@@ -2,6 +2,7 @@ import { fileToUrl, karin } from 'node-karin'
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import { DEFAULT_FILENAME } from '@/core/constants'
 import type { AdapterQQBot } from './base'
+import type { FileToUrlExtra, UploadOrigin } from './media-source'
 
 type StaticElement = Extract<ElementTypes, { type: 'image' | 'video' | 'record' | 'file' }>
 
@@ -31,13 +32,15 @@ export const shouldCacheSelfMessage = (ctx: AdapterQQBot): boolean => {
  */
 export const prepareSelfMessageCache = async (
   ctx: AdapterQQBot,
+  contact: Contact,
   elements: ElementTypes[]
 ): Promise<PreparedSelfMessageCache> => {
   const sendElements: ElementTypes[] = []
   const cacheElements: ElementTypes[] = []
+  const origin = resolveUploadOrigin(contact)
 
   for (const element of elements) {
-    const prepared = await prepareSelfCacheElement(ctx, element)
+    const prepared = await prepareSelfCacheElement(ctx, element, origin)
     sendElements.push(prepared.send)
     if (prepared.cache) cacheElements.push(prepared.cache)
   }
@@ -98,7 +101,8 @@ export const cacheSelfMessage = (
  */
 const prepareSelfCacheElement = async (
   ctx: AdapterQQBot,
-  element: ElementTypes
+  element: ElementTypes,
+  origin?: UploadOrigin
 ): Promise<PreparedElement> => {
   switch (element.type) {
     case 'text':
@@ -113,7 +117,7 @@ const prepareSelfCacheElement = async (
     case 'video':
     case 'record':
     case 'file':
-      return prepareStaticElement(ctx, element)
+      return prepareStaticElement(ctx, element, origin)
     default:
       return { send: element, cache: null }
   }
@@ -124,7 +128,8 @@ const prepareSelfCacheElement = async (
  */
 const prepareStaticElement = async (
   ctx: AdapterQQBot,
-  element: StaticElement
+  element: StaticElement,
+  origin?: UploadOrigin
 ): Promise<PreparedElement> => {
   if (element.file.startsWith('http')) {
     const cached = { ...element } as ElementTypes
@@ -132,7 +137,13 @@ const prepareStaticElement = async (
   }
 
   try {
-    const res = await fileToUrl(element.type, element.file, element.name || DEFAULT_FILENAME[element.type])
+    /**
+     * 和发送链路传同一套附加信息：处理器需要知道是哪个 bot、哪个会话才能用对
+     * openid。用途是 media —— 缓存要的是能长期访问的地址，内置图床给的是会过期的
+     * 临时直链，按 purpose 主动放行正好。
+     */
+    const extra: FileToUrlExtra = { selfId: ctx.selfId, purpose: 'media', origin }
+    const res = await fileToUrl(element.type, element.file, element.name || DEFAULT_FILENAME[element.type], extra)
 
     /**
      * 链路上的处理器全部放行时 fileToUrl 实际返回 undefined（类型声明未涵盖
@@ -155,6 +166,21 @@ const prepareStaticElement = async (
     ctx.logger('debug', `[getMsg] 跳过自己消息资源缓存: ${element.type} ${message}`)
     return { send: element, cache: null }
   }
+}
+
+/**
+ * 解析缓存用 URL 转换的归属会话。
+ *
+ * QQ 的 openid 按 bot 隔离，上传接口只接受该 bot 可见的 group_openid / user_openid；
+ * 频道用 channel_id，没有可用 openid，返回 undefined。
+ *
+ * @param contact 本次发送目标。
+ * @returns 可交给 fileToUrl 处理器的上传会话。
+ */
+const resolveUploadOrigin = (contact: Contact): UploadOrigin | undefined => {
+  if (contact.scene === 'group') return { scene: 'group', peer: contact.peer }
+  if (contact.scene === 'friend') return { scene: 'user', peer: contact.peer }
+  return undefined
 }
 
 /**

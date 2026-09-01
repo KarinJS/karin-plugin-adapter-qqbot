@@ -87,6 +87,13 @@ export interface PreferredMediaSource {
   source: string
   /** 来源是原始 HTTP URL、fileToUrl 结果，还是 QQ 上传兜底。 */
   via: 'public-url' | 'file-to-url' | 'fallback'
+  /**
+   * fileToUrl 处理器顺带返回的图片宽高。
+   *
+   * markdown 图片语法必须写出宽高，处理器（含内置图床）上传时已经知道尺寸，
+   * 带出来就不必再按 URL 把图片下载回来量一次。
+   */
+  size?: { width: number; height: number }
 }
 
 /**
@@ -147,7 +154,13 @@ export const resolvePreferredMediaSource = async (
       return { source: normalized, via: 'fallback' }
     }
 
-    return { source: result.url, via: 'file-to-url' }
+    /** 只有 image 会带宽高，其余类型按声明就没有这两个字段。 */
+    const { width, height } = result as { width?: number; height?: number }
+    const size = typeof width === 'number' && typeof height === 'number'
+      ? { width, height }
+      : undefined
+
+    return { source: result.url, via: 'file-to-url', size }
   } catch (err) {
     ctx.logger('warn', `[sendQQ] ${type} 转 URL 失败，改用 QQ 上传兜底:`, err)
     return { source: normalized, via: 'fallback' }

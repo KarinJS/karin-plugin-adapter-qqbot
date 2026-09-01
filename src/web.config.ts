@@ -42,7 +42,6 @@ type WebQQBotInput = {
   guildEnable: unknown
   guildMode: unknown
   regex: unknown
-  'markdown:enable': unknown
   'messageCache:enable': unknown
   'messageCache:self': unknown
   'messageCache:level': unknown
@@ -88,7 +87,6 @@ export default defineConfig({
         guildEnable: item.guildEnable,
         guildMode: item.guildMode === 1,
         regex: item.regex.map((r: any) => `${r.reg} ${r.rep}`),
-        'markdown:enable': item.markdown?.enable !== false,
         'messageCache:enable': item.messageCache?.enable === true,
         'messageCache:self': item.messageCache?.self === true,
         'messageCache:level': item.messageCache?.level || 'standard',
@@ -107,7 +105,7 @@ export default defineConfig({
         data,
         {
           label: 'QQ 官方机器人列表',
-          description: '每一项对应一个 QQ 官方机器人账号。新增机器人时先填 AppID 和 Secret，再按需调整接收方式、场景能力和发送能力。',
+          description: '每一项对应一个 QQ 官方机器人账号。新增机器人时先填 AppID 和 Secret，再按需调整接收方式、场景能力和消息处理。',
           children: {
             key: 'qqbotConfig',
             children: [
@@ -167,7 +165,7 @@ export default defineConfig({
                 defaultSelected: false,
               }),
               components.divider.horizontal('bot-message-section', {
-                description: '消息发送',
+                description: '消息处理',
                 descPosition: 5,
               }),
               components.input.group('regex', {
@@ -178,11 +176,6 @@ export default defineConfig({
                   label: '一条替换规则',
                   placeholder: '^/ #',
                 }),
-              }),
-              components.switch.create('markdown:enable', {
-                label: '启用 Markdown 发送通道',
-                description: '开启后普通文本和图片优先合并为 QQ Markdown 消息，Markdown 里的图片会以内嵌图片形式发送；关闭后普通图片会按官方富媒体单独上传发送。插件显式传入的 segment.markdown 不受此开关影响。',
-                defaultSelected: true,
               }),
               components.divider.horizontal('bot-cache-section', {
                 description: '消息缓存',
@@ -248,7 +241,6 @@ export default defineConfig({
         const guildEnable = toBool(item.guildEnable, previous?.guildEnable ?? true)
         const guildMode = toBool(item.guildMode, previous?.guildMode === 1) ? 1 : 0
         const eventType = Number(toStringValue(item['event:type'], String(previous?.event?.type ?? 0))) as 0 | 1 | 2
-        const markdownEnable = toBool(item['markdown:enable'], previous?.markdown?.enable ?? true)
         const messageCacheEnable = toBool(item['messageCache:enable'], previous?.messageCache?.enable ?? false)
         const messageCacheSelf = toBool(item['messageCache:self'], previous?.messageCache?.self ?? false)
         /** 枚举与数值范围由 writeConfig 内的 formatConfig 统一校验回落。 */
@@ -279,7 +271,6 @@ export default defineConfig({
           guildEnable,
           guildMode,
           regex,
-          markdown: { enable: markdownEnable },
           messageCache: {
             enable: messageCacheEnable,
             self: messageCacheSelf,

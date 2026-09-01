@@ -21,10 +21,17 @@ import {
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
 import type { Grouping, PassiveInfo } from './grouping'
-import type { MediaType, SendQQMediaMessageRequest, SendQQMsg, SendQQMsgResponse } from '@/core/api/types'
+import type { SendQQMediaMessageRequest, SendQQMsg, SendQQMsgResponse } from '@/core/api/types'
 
 /**
  * 处理 QQ 场景（单聊 + 群聊）的发送
+ *
+ * QQ 单聊 / 群聊的自定义 Markdown 自 2026-04-23 起已开放给所有机器人，无需申请
+ * （见 `api-docs/server-inter/message/type/markdown.md`），所以这里只保留一条发送通道：
+ * text / at / 可转换为公网 URL 的图片通过 markdown content 渲染；无法转换的图片
+ * 与视频 / 语音 / 文件由 sendQQMarkdown 内部以 msg_type=7 紧随主消息补发。所有
+ * 富媒体都会优先通过 fileToUrl 取得公网地址，QQ 上传只做兜底。只有显式引用的
+ * 纯文本消息会降级为 msg_type=0，以保证 QQ 客户端能稳定显示引用气泡。
  */
 export const sendQQ = async (
   ctx: AdapterQQBot,
@@ -35,17 +42,7 @@ export const sendQQ = async (
   const target = contact.scene === 'friend' ? 'user' : 'group'
   const grouping = groupElements<'qq'>(contact.scene, elements)
   await resolveOutgoingReferenceQQ(ctx, contact, grouping)
-
-  /**
-   * 自动 Markdown 通道：
-   * text / at / 可转换为公网 URL 的图片通过 markdown content 渲染；无法转换的图片
-   * 与视频 / 语音 / 文件由 sendQQMarkdown 内部以 msg_type=7 单独补发。所有富媒体
-   * 都会优先通过 fileToUrl 取得公网地址，QQ 上传只做兜底。只有显式引用的
-   * 纯文本消息会降级为 msg_type=0，以保证 QQ 客户端能稳定显示引用气泡。
-   * 显式 segment.markdown 不受该自动通道开关影响。
-   */
-  if (ctx.cfg.markdown.enable) return sendQQMarkdown(ctx, contact, grouping, target)
-  return sendQQClassic(ctx, contact, grouping, target)
+  return sendQQMarkdown(ctx, contact, grouping, target)
 }
 
 /**
@@ -128,83 +125,6 @@ const sendQQMarkdown = async (
 }
 
 /**
- * 经典通道：文本走 msg_type=0，图片 / 富媒体走 msg_type=7。
- */
-const sendQQClassic = async (
-  ctx: AdapterQQBot,
-  contact: Contact<'friend' | 'group'>,
-  grouping: Grouping<'qq'>,
-  target: 'user' | 'group'
-): Promise<SendMsgResults> => {
-  const items: SendQQMsg[] = []
-  const lines: string[] = []
-  const images: string[] = [...grouping.qqImages]
-
-  if (grouping.text.length) lines.push(grouping.text.join(''))
-
-  if (!grouping.markdowns.length && (grouping.buttons.length || grouping.keyboards.length)) {
-    ctx.logger('warn', 'Markdown 通道已关闭，button / keyboard 无法随普通文本发送，已跳过')
-  }
-
-  const content = lines.join('\n').trim()
-  if (content) items.push(ctx.super.qq.text(content))
-
-  for (const image of images) {
-    items.push(await buildQQMediaItem(ctx, target, contact.peer, 'image', image))
-  }
-
-  for (const m of grouping.media) {
-    items.push(await buildQQMediaItem(ctx, target, contact.peer, m.kind, m.source, m.name))
-  }
-
-  await appendExplicitMarkdownItems(ctx, contact, grouping, target, items)
-
-  if (!items.length) {
-    items.push(ctx.super.qq.text('不支持发送的消息类型'))
-  }
-
-  return flushQQ(ctx, contact, grouping, items)
-}
-
-/**
- * 显式 `segment.markdown` 是调用方指定的发送类型，不受 Markdown 自动通道开关影响。
- */
-const appendExplicitMarkdownItems = async (
-  ctx: AdapterQQBot,
-  contact: Contact<'friend' | 'group'>,
-  grouping: Grouping<'qq'>,
-  target: 'user' | 'group',
-  items: SendQQMsg[]
-): Promise<void> => {
-  if (!grouping.markdowns.length) return
-
-  const lines: string[] = []
-  const fallbackImages = await appendExplicitMarkdown(ctx, lines, grouping, {
-    scene: target,
-    peer: contact.peer,
-  })
-
-  if (contact.scene === 'group') {
-    warnUnsupportedCommandEnterButtons(ctx, collectCommandEnterButtons(grouping.buttons, grouping.keyboards))
-    warnUnsupportedCommandEnterMarkdowns(ctx, grouping.markdowns.map(m => m.markdown))
-  }
-
-  const mediaItems: SendQQMediaMessageRequest[] = []
-  for (const file of fallbackImages) {
-    const res = await ctx.super.media.uploadFallback(target, contact.peer, 'image', file, false)
-    mediaItems.push(ctx.super.qq.media(res.file_info))
-  }
-
-  if (lines.length) {
-    items.push(ctx.super.qq.markdown({ content: lines.join('\n') }, buildKeyboard(grouping)))
-  } else {
-    attachKeyboardWithoutMarkdown(ctx, grouping, mediaItems, items)
-  }
-
-  items.push(...mediaItems)
-}
-
-/**
  * 处理「没有任何 markdown 正文，但存在按钮」的边缘情况。
  *
  * 典型触发路径：下游只发一张 markdown 语法图片 + 若干按钮，而这张图片没能通过
@@ -239,21 +159,6 @@ const attachKeyboardWithoutMarkdown = (
   ctx.logger('debug', '图片未能进入 markdown 通道，按钮已随富媒体一起发送，避免拆成两条消息')
 }
 
-const buildQQMediaItem = async (
-  ctx: AdapterQQBot,
-  target: 'user' | 'group',
-  peer: string,
-  type: MediaType,
-  source: string,
-  name?: string
-): Promise<SendQQMsg> => {
-  const resolved = await resolvePreferredMediaSource(ctx, type, source, name, { scene: target, peer })
-  const res = resolved.via === 'fallback'
-    ? await ctx.super.media.uploadFallback(target, peer, type, resolved.source, false, name)
-    : await ctx.super.media.upload(target, peer, type, resolved.source, false, name)
-  return ctx.super.qq.media(res.file_info)
-}
-
 /**
  * 将能转成公网 URL 的图片追加到 markdown 行，无法转换的图片返回给富媒体 fallback。
  *
@@ -278,7 +183,7 @@ const appendMarkdownImages = async (
       continue
     }
 
-    await appendImageUrlLine(lines, resolved.source)
+    lines.push(await buildMarkdownImageLine(resolved.source, '', resolved.size))
   }
 
   return fallback
@@ -316,22 +221,11 @@ const appendExplicitMarkdown = async (
       }
 
       /** 保留开发者写下的 alt 与显式尺寸，只替换图片来源 */
-      lines.push(await buildMarkdownImageLine(resolved.source, part.alt))
+      lines.push(await buildMarkdownImageLine(resolved.source, part.alt, resolved.size))
     }
   }
 
   return fallback
-}
-
-/**
- * 生成单张 markdown 图片行。
- * 尺寸获取失败时使用保守默认尺寸，保证 fileToUrl 成功的图片仍走 markdown。
- *
- * @param lines markdown 行数组。
- * @param url 图片 URL。
- */
-const appendImageUrlLine = async (lines: string[], url: string): Promise<void> => {
-  lines.push(await buildMarkdownImageLine(url))
 }
 
 /**
