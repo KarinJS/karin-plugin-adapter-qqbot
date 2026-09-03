@@ -24,7 +24,7 @@
 
 |名称|类型|必填|描述|
 |---|---|---|---|
-|members|\[\][SetMemberMuteState](#schema-setmembermutestate)|否|用户禁言列表；每项通过 op 控制增/改/删， 单次设置不能超过10个|
+|members|\[\][SetMemberMuteState](#schema-setmembermutestate)|否|用户禁言列表；每项通过 op 控制增/改/删， 单次设置不能超过 20 个|
 
 **SetMemberMuteState**
 

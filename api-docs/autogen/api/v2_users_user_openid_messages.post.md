@@ -35,7 +35,7 @@
 |msg\_id|string|否|被动回复的消息 ID。从 C2C\_MESSAGE\_CREATE 等事件的 d.id 获取，5 分钟内有效|
 |event\_id|string|否|被动回复的事件 ID。从事件最外层的id获取。与 msg\_id 二选一，支持事件："INTERACTION\_CREATE"、"C2C\_MSG\_RECEIVE"、"FRIEND\_ADD"|
 |msg\_seq|integer|否|回复消息的序号，与 msg\_id 联合使用，避免相同消息 id 回复重复发送，不填默认是 1。相同的 msg\_id + msg\_seq 重复发送会失败。|
-|media|[MediaInfo](#schema-mediainfo)|否|富媒体消息。msg\_type=7 时填写，file\_info 来自 /v2/groups/{group\_openid}/files|
+|media|[MediaInfo](#schema-mediainfo)|否|富媒体消息。msg\_type=7 时填写，file\_info 来自 /v2/users/{user\_openid}/files|
 |message\_reference|[MessageReference](#schema-messagereference)|否|引用回复。填写后以引用形式展示，关联上下文|
 |is\_wakeup|boolean|否|指明发送消息为互动召回消息，与 msg\_id，event\_id 互斥使用|
 |input\_notify|[InputNotify](#schema-inputnotify)|否|输入中状态，msg\_type=6时使用|
@@ -75,6 +75,7 @@
 |id|string|否|按钮 ID。同一键盘内唯一|
 |render\_data|[RenderData](#schema-renderdata)|否|按钮渲染|
 |action|[Action](#schema-action)|否|按钮点击行为|
+|group\_id|string|否|分组ID, 同一分组内有一个按钮操作后, 其它按钮则变灰不可点击 注意:只有当action.type = 1 时才有效|
 
 **RenderData**
 
@@ -82,7 +83,7 @@
 |---|---|---|---|
 |label|string|否|按钮文字，最多 10 字符|
 |visited\_label|string|否|点击后文字，不传则保持不变|
-|style|integer|否|0=灰线框, 1=蓝线框, 2=白字, 3=蓝底白字|
+|style|integer|否|0：灰色线框，1：蓝色线框 3: 白色背景+红色字体, 4:蓝色背景+白色字体|
 
 **Action**
 
@@ -96,6 +97,7 @@
 |enter|boolean|否|指令按钮可用，点击按钮后直接自动发送 data，仅单聊可用，默认 false。支持版本 8983|
 |reply|boolean|否|指令按钮可用，指令是否带引用回复本消息，默认 false。支持版本 8983|
 |anchor|integer|否|本字段仅在指令按钮下有效，设置后后会忽略 action.enter 配置。 设置为 1 时 ，点击按钮自动唤起启手Q选图器，其他值暂无效果。 （仅支持手机端版本 8983+ 的单聊场景，桌面端不支持）|
+|modal|[Modal](#schema-modal)|否|用户点击二次确认操作|
 
 **Permission**
 
@@ -104,6 +106,14 @@
 |type|integer|否|0=指定用户, 1=管理员, 2=所有人|
 |specify\_user\_ids|\[\]string|否|有权限的用户 id 的列表|
 |specify\_role\_ids|\[\]string|否|有权限的身份组 id 的列表（仅频道可用）|
+
+**Modal**
+
+|名称|类型|必填|描述|
+|---|---|---|---|
+|content|string|否|二次确认的提示文本,如果不为空则会进行二次确认. 注意:最多40个字符, 不能有URL|
+|confirm\_text|string|否|二次确认提示确认按钮中展示的文字,可以为空, 默认为"确认" 注意:最多4个字符|
+|cancel\_text|string|否|二次确认提示取消按钮中的文字,可以为空,默认为"取消" 注意:最多4个字符|
 
 **MediaInfo**
 

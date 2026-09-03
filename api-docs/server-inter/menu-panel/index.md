@@ -4,7 +4,7 @@
 
 |自定义菜单|指令面板|
 |---|---|
-|![自定义菜单](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.27.1/assets/img/custom-menu.674eb658.png)|![指令面板](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.27.1/assets/img/command-panel.4fde9574.png)|
+|![自定义菜单](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.28.0/assets/img/custom-menu.674eb658.png)|![指令面板](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.28.0/assets/img/command-panel.4fde9574.png)|
 
 ## [#](#自定义菜单) 自定义菜单
 

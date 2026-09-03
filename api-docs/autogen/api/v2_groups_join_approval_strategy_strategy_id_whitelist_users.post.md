@@ -65,7 +65,7 @@ POST /v2/groups/join_approval_strategy/st_d83eca11e9/whitelist_users
 4  
 5
 
-← [执行入群自动审批策略](/wiki/develop/api-v2/autogen/api/v2_groups_join_approval_strategy_strategy_id_execute.post.html) [机器人加入群聊](/wiki/develop/api-v2/autogen/event/group_add_robot.html) →
+← [执行入群自动审批策略](/wiki/develop/api-v2/autogen/api/v2_groups_join_approval_strategy_strategy_id_execute.post.html) [获取群成员列表](/wiki/develop/api-v2/autogen/api/v2_groups_group_openid_members.get.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)

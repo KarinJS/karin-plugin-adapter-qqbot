@@ -6,7 +6,7 @@
 |机器人发送|不支持|不支持|支持|支持|
 
 ## [#](#样式) 样式
-![embed](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.27.1/assets/img/message-embed.18d8bc6d.jpg)
+![embed](https://qq-ai.cdn-go.cn/web/bot-docs/-/v1.28.0/assets/img/message-embed.18d8bc6d.jpg)
 ## [#](#数据结构与协议) 数据结构与协议
 
 ### [#](#content-type) Content-Type
