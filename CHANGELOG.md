@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.2.0...adapter-qqbot-v3.2.1) (2026-09-03)
+
+
+### Bug Fixes
+
+* 添加 QQ openid 校验，确保发送目标有效性 ([9c61a69](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/9c61a69bd5eb728ccc23517376d0099f1cdc8a71))
+* 移除markdown通道的用户配置开关，全部消息都走markdown通道 ([12e787e](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/12e787ecc5dc6e14cbb21a5037afd1c9c1d740e2))
+
 ## [3.2.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.1.0...adapter-qqbot-v3.2.0) (2026-09-01)
 
 
