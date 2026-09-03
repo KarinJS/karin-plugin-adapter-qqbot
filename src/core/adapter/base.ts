@@ -6,7 +6,7 @@ import { cacheSelfMessage, prepareSelfMessageCache, shouldCacheSelfMessage } fro
 import { getJoinRequest, removeJoinRequest } from './join-request-cache'
 import { getAdapterConfig, setAdapterConfig } from './config-store'
 import { getMessageStore, type MessageStore } from '@/core/storage/message'
-import { HTTP_URL_RE, MAX_GROUP_MUTE_SECONDS } from '@/core/constants'
+import { GROUP_MEMBER_LIST_MAX_PAGES, HTTP_URL_RE, MAX_GROUP_MUTE_SECONDS } from '@/core/constants'
 import { normalizeMediaElements } from './media-source'
 import { buildPendingMarkdownImageLine } from './text-to-md'
 import type {
@@ -19,6 +19,32 @@ import type {
   AdapterType,
 } from 'node-karin'
 import type { QQBotConfig } from '@/types/config'
+
+/**
+ * 按 Karin 接口约定构造群成员信息。
+ *
+ * `sender` 用 getter 即时构建，避免整个适配器被系统接口序列化时带出多余引用。
+ *
+ * @param userId 成员 openid。
+ * @param role 群内角色。
+ * @param nick 成员昵称。
+ * @param joinTime 入群时间戳（毫秒）。
+ * @returns Karin 标准群成员信息。
+ */
+const buildGroupMemberInfo = (
+  userId: string,
+  role: GroupMemberInfo['role'],
+  nick?: string,
+  joinTime?: number
+): GroupMemberInfo => ({
+  userId,
+  role,
+  nick,
+  joinTime,
+  get sender () {
+    return senderGroup({ userId, nick: nick || '', name: nick || '', role })
+  },
+})
 
 /**
  * QQ Official Bot 适配器
@@ -396,10 +422,36 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
 
   /**
    * 群踢人
+   *
+   * 走官方 `POST /v2/groups/{group_openid}/batch_remove_members`，机器人需拥有群
+   * 管理员身份。Karin 的 `rejectAddRequest` 映射为官方的 `add_to_member_blacklist`：
+   * 移除的同时拉入群黑名单，该用户之后无法再次入群。官方接口没有踢人理由字段，
+   * `kickReason` 只会被记录到日志。
+   *
+   * 需要一次移除多人时用 `bot.super.groups.batchRemoveGroupMembers()`，单次最多 20 个。
+   *
+   * @param _groupId 群 openid
+   * @param _targetId 群成员 openid
+   * @param _rejectAddRequest 是否同时拉入群黑名单，默认 false
+   * @param _kickReason 官方不支持，仅在传入时输出提示
    */
   async groupKickMember (_groupId: string, _targetId: string, _rejectAddRequest?: boolean, _kickReason?: string): Promise<void> {
-    // TODO: QQ 官方 Bot API 暂不支持群踢人
-    this.logger('warn', '[groupKickMember] QQ Official Bot API 暂不支持群踢人')
+    if (_kickReason) {
+      this.logger('warn', `[groupKickMember] QQ Official Bot API 不支持踢人理由，已忽略: ${_kickReason}`)
+    }
+
+    try {
+      const result = await this.super.groups.batchRemoveGroupMembers(_groupId, {
+        member_openids: [_targetId],
+        ...(_rejectAddRequest ? { add_to_member_blacklist: true } : {}),
+      })
+      const failed = result.add_to_member_blacklist_fail_openids ?? []
+      if (failed.length) {
+        this.logger('warn', `[groupKickMember] 成员已移除，但加入群黑名单失败: ${failed.join('、')}`)
+      }
+    } catch (err) {
+      this.logger('error', '[groupKickMember] 移除群成员失败（该接口为白名单接口，未开通权限会返回 11253）:', err)
+    }
   }
 
   /**
@@ -564,27 +616,18 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
   /**
    * 获取群成员信息
    *
-   * - 查询机器人自身（targetId 为 selfId）走官方 `GET /v2/groups/{group_openid}/bot_state`（白名单）。
-   * - 查询其他成员走 `GET /v2/groups/{group_openid}/members/{member_openid}`，
-   *   该接口未公开文档，来自腾讯官方 openclaw 插件 v2.0.0，返回结构以平台实际为准。
-   * 接口不可用（如白名单未开通返回 11253）时降级为占位结构并告警。
+   * - 查询机器人自身（targetId 为 selfId）走官方 `GET /v2/groups/{group_openid}/bot_state`。
+   * - 查询其他成员走 `GET /v2/groups/{group_openid}/members/{member_openid}`，该接口在
+   *   接口文档 v1.28.0（2026-09-03）转为公开文档，昵称字段为 `username`，`nick` 是
+   *   转公开之前的字段名，仅作兼容回退。
+   *
+   * 两者都是白名单接口，未开通权限（11253）或查询失败时降级为占位结构并告警。
    */
   async getGroupMemberInfo (_groupId: string, _targetId: string, _refresh?: boolean): Promise<GroupMemberInfo> {
-    /** 按 karin 接口约定构造返回值，sender 由 getter 即时构建 */
-    const build = (userId: string, role: GroupMemberInfo['role'], nick?: string, joinTime?: number): GroupMemberInfo => ({
-      userId,
-      role,
-      nick,
-      joinTime,
-      get sender () {
-        return senderGroup({ userId, nick: nick || '', name: nick || '', role })
-      },
-    })
-
     if (_targetId === this.selfId) {
       try {
         const state = await this.super.groups.getBotState(_groupId)
-        return build(
+        return buildGroupMemberInfo(
           state.member_openid || _targetId,
           state.member_role || 'member',
           undefined,
@@ -592,32 +635,67 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
         )
       } catch (err) {
         this.logger('warn', `[getGroupMemberInfo] 获取机器人群内状态失败（该接口为白名单接口，未开通权限会返回 11253）: ${err instanceof Error ? err.message : err}`)
-        return build(_targetId, 'member')
+        return buildGroupMemberInfo(_targetId, 'member')
       }
     }
 
     try {
       const member = await this.super.groups.getGroupMember(_groupId, _targetId)
-      if (member.nick) this.nicknameCache.set(_targetId, member.nick)
-      return build(
+      const nick = member.username || member.nick
+      if (nick) this.nicknameCache.set(_targetId, nick)
+      return buildGroupMemberInfo(
         member.member_openid || _targetId,
         member.member_role || 'member',
-        member.nick,
+        nick,
         member.joined_at ? new Date(member.joined_at).getTime() : undefined
       )
     } catch (err) {
-      this.logger('warn', `[getGroupMemberInfo] 获取群成员详情失败（该接口未公开文档，可能不可用）: ${err instanceof Error ? err.message : err}`)
-      return build(_targetId, 'member')
+      this.logger('warn', `[getGroupMemberInfo] 获取群成员详情失败（该接口为白名单接口，未开通权限会返回 11253）: ${err instanceof Error ? err.message : err}`)
+      return buildGroupMemberInfo(_targetId, 'member')
     }
   }
 
   /**
    * 获取群成员列表
+   *
+   * 走官方 `GET /v2/groups/{group_openid}/members`（白名单接口），每页最多 30 条，
+   * 这里按 `next_cursor` 自动翻完所有页；顺便把昵称写入
+   * {@link AdapterQQBot.nicknameCache}，让后续消息事件能直接取到昵称。
+   *
+   * 为防止平台返回的游标不收敛，翻页数有安全上限（约 6000 人），触顶会告警并返回已取到的部分。
+   * 未开通权限（11253）或查询失败时返回已取到的部分并告警。
+   *
+   * @param _groupId 群 openid
    */
   async getGroupMemberList (_groupId: string, _refresh?: boolean): Promise<Array<GroupMemberInfo>> {
-    // TODO: QQ 官方 Bot API 暂不支持获取群成员列表
-    this.logger('warn', '[getGroupMemberList] QQ Official Bot API 暂不支持获取群成员列表')
-    return []
+    const result: GroupMemberInfo[] = []
+    let cursor = ''
+
+    try {
+      for (let page = 0; page < GROUP_MEMBER_LIST_MAX_PAGES; page++) {
+        const data = await this.super.groups.getGroupMemberList(_groupId, cursor ? { cursor } : {})
+        for (const member of data.members ?? []) {
+          if (member.username) this.nicknameCache.set(member.member_openid, member.username)
+          result.push(buildGroupMemberInfo(
+            member.member_openid,
+            member.member_role || 'member',
+            member.username,
+            member.joined_at ? new Date(member.joined_at).getTime() : undefined
+          ))
+        }
+
+        const next = data.next_cursor || ''
+        /** 空游标表示末页；游标不前进说明平台返回异常，直接停止避免死循环 */
+        if (!next || next === cursor) return result
+        cursor = next
+      }
+
+      this.logger('warn', `[getGroupMemberList] 翻页数已达上限 ${GROUP_MEMBER_LIST_MAX_PAGES} 页，仅返回前 ${result.length} 名成员`)
+    } catch (err) {
+      this.logger('warn', `[getGroupMemberList] 获取群成员列表失败（该接口为白名单接口，未开通权限会返回 11253）: ${err instanceof Error ? err.message : err}`)
+    }
+
+    return result
   }
 
   /**
