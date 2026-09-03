@@ -85,7 +85,7 @@ export const enum EventEnum {
   MESSAGE_AUDIT_PASS = 'MESSAGE_AUDIT_PASS',
   /** 消息审核不通过（MESSAGE_AUDIT 1<<27） */
   MESSAGE_AUDIT_REJECT = 'MESSAGE_AUDIT_REJECT',
-  /** 用户申请加群，仅机器人是群管理员时下发（GROUP_AND_C2C_EVENT 1<<25） */
+  /** 用户申请加群，仅机器人是群管理员时下发（GROUP_MEMBER_EVENT 1<<24，接口文档 v1.28.0 由 GROUP_AND_C2C_EVENT 调整而来） */
   GROUP_JOIN_REQUEST = 'GROUP_JOIN_REQUEST'
 }
 

@@ -1,4 +1,5 @@
-import type { ButtonElement, KarinButton, KeyboardElement, QQBotButton } from 'node-karin'
+import type { ButtonElement, KarinButton, KeyboardElement } from 'node-karin'
+import type { KeyboardButton } from '@/core/api/types'
 
 /** QQ 私聊直发文本链标签。 */
 const COMMAND_ENTER_TEXT_CHAIN_REGEXP = /<\s*qqbot-cmd-enter\b/i
@@ -61,11 +62,14 @@ export const collectCommandEnterButtons = (
 /**
  * 归一 QQ keyboard 按钮字段。
  *
+ * 只重写键盘内唯一的按钮序号，其余字段（含 v1.28.0 新增的 `group_id`、
+ * `action.modal`）原样透传。
+ *
  * @param button node-karin 转换后的 QQBot 按钮。
  * @param id 当前 keyboard 内唯一按钮序号。
  * @returns 可直接放入 QQ 官方 keyboard 的按钮对象。
  */
-export const normalizeQQBotButton = (button: QQBotButton, id: number): QQBotButton => {
+export const normalizeQQBotButton = (button: KeyboardButton, id: number): KeyboardButton => {
   return {
     ...button,
     id: String(id),

@@ -6,7 +6,7 @@ export const intentBitMap: Record<number, string> = {
   [1 << 1]: 'GUILD_MEMBERS        (频道成员变更)',
   [1 << 9]: 'GUILD_MESSAGES       (频道消息-私域)',
   [1 << 12]: 'DIRECT_MESSAGE       (频道私信)',
-  [1 << 24]: '群成员进退群事件',
+  [1 << 24]: 'GROUP_MEMBER_EVENT  (群成员进退群/入群申请)',
   [1 << 25]: 'GROUP_AND_C2C_EVENT (群聊/单聊消息)',
   [1 << 26]: 'INTERACTION          (按钮交互回调)',
   [1 << 30]: 'PUBLIC_GUILD_MESSAGES (频道消息-公域)',
@@ -18,7 +18,7 @@ export const priorityIntents: number[] = [
   1 << 9,   // GUILD_MESSAGES（私域）
   1 << 30,  // PUBLIC_GUILD_MESSAGES（公域）
   1 << 12,  // DIRECT_MESSAGE
-  1 << 24,  // 群成员进退群
+  1 << 24,  // GROUP_MEMBER_EVENT（群成员进退群/入群申请）
   1 << 26,  // INTERACTION（按钮回调）
   1 << 25,  // GROUP_AND_C2C_EVENT
   1 << 0,   // GUILDS
