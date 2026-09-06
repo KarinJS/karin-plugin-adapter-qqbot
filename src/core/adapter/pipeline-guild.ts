@@ -19,7 +19,7 @@ import { BUTTON_ONLY_MARKDOWN, KEYBOARD_MAX_BUTTONS_PER_ROW, KEYBOARD_MAX_ROWS }
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
 import type { Grouping } from './grouping'
-import type { SendGuildMsg, SendGuildResponse } from '@/core/api/types'
+import type { KeyboardRow, SendGuildMsg, SendGuildResponse } from '@/core/api/types'
 
 /**
  * 处理频道场景（子频道 + 私信）的发送
@@ -200,10 +200,10 @@ const resolveImageFilename = (source: string): string => {
 }
 
 const buildKeyboard = (grouping: Grouping<'guild'>) => {
-  const rows: ReturnType<typeof karinToQQBot> = []
+  const rows: KeyboardRow[] = []
   grouping.buttons.forEach(b => rows.push(...karinToQQBot(b)))
   grouping.keyboards.forEach(k => rows.push(...karinToQQBot(k)))
-  const normalizedRows: ReturnType<typeof karinToQQBot> = []
+  const normalizedRows: KeyboardRow[] = []
   let id = 0
 
   for (const row of rows.slice(0, KEYBOARD_MAX_ROWS)) {

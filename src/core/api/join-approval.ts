@@ -1,4 +1,5 @@
 import { Http } from './http'
+import { MAX_GROUP_CURSOR_LIMIT } from '@/core/constants'
 import type {
   GetJoinApprovalStrategyListParams, GetJoinApprovalStrategyListResponse,
   CreateJoinApprovalStrategyRequest, CreateJoinApprovalStrategyResponse,
@@ -17,14 +18,17 @@ export class JoinApprovalApi extends Http {
    * 查询入群自动审批策略列表
    *
    * 按创建时间倒序，支持分页。
-   * @param params 分页参数，`limit` 默认 20、最大 100
+   * @param params 分页参数，`limit` 默认 20、最大 50（接口文档 v1.28.0 由 100 下调），
+   * 传入更大的值会被收敛到 50，避免平台直接拒绝
    */
   getStrategyList (
     params: GetJoinApprovalStrategyListParams = {}
   ): Promise<GetJoinApprovalStrategyListResponse> {
     const query = new URLSearchParams()
     if (params.cursor) query.set('cursor', params.cursor)
-    if (params.limit !== undefined) query.set('limit', String(params.limit))
+    if (params.limit !== undefined) {
+      query.set('limit', String(Math.min(params.limit, MAX_GROUP_CURSOR_LIMIT)))
+    }
     const search = query.toString()
     return this.get(`/v2/groups/join_approval_strategy${search ? `?${search}` : ''}`)
   }

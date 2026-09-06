@@ -1,5 +1,3 @@
-import type { karinToQQBot } from 'node-karin'
-
 /** 上传富媒体文件场景 */
 export type Scene = 'user' | 'group'
 /** 上传富媒体文件类型 */
@@ -29,7 +27,12 @@ export interface QQMessageID {
   msg_id?: string
   /** 回复消息的序号，与 msg_id 联合使用，避免相同消息id回复重复发送，不填默认是1。相同的 msg_id + msg_seq 重复发送会失败。 */
   msg_seq?: number
-  /** 指明发送消息为互动召回消息，与 msg_id，event_id 互斥使用 */
+  /**
+   * 指明发送消息为互动召回消息，与 msg_id、event_id 互斥使用
+   *
+   * 接口文档 v1.28.0（2026-09-03）起该字段已从群消息发送接口移除，
+   * 目前仅单聊 `POST /v2/users/{user_openid}/messages` 可用。
+   */
   is_wakeup?: boolean
   /** 引用消息对象，QQ单聊和群聊场景均支持 */
   message_reference?: MessageReference
@@ -52,9 +55,106 @@ export interface Markdown {
   content: string
 }
 
+/** keyboard 按钮渲染（Button.render_data） */
+export interface KeyboardButtonRenderData {
+  /** 按钮文字，最多 10 字符 */
+  label?: string
+  /** 点击后文字，不传则保持不变 */
+  visited_label?: string
+  /**
+   * 按钮样式
+   * - `0` 灰色线框
+   * - `1` 蓝色线框
+   * - `3` 白色背景 + 红色字体
+   * - `4` 蓝色背景 + 白色字体
+   *
+   * 接口文档 v1.28.0（2026-09-03）重定义了取值，旧文档中的 `2`（白字）已被移除。
+   */
+  style?: number
+}
+
+/** keyboard 按钮点击权限（Button.action.permission） */
+export interface KeyboardButtonPermission {
+  /** 0 指定用户可操作，1 仅管理者可操作，2 所有人可操作，3 指定身份组可操作（仅频道可用） */
+  type?: number
+  /** 有权限的用户 id 的列表 */
+  specify_user_ids?: string[]
+  /** 有权限的身份组 id 的列表（仅频道可用） */
+  specify_role_ids?: string[]
+}
+
+/**
+ * 按钮二次确认（Button.action.modal）
+ *
+ * 接口文档 v1.28.0（2026-09-03）新增：点击按钮后先弹确认框，确认后才触发按钮行为。
+ */
+export interface KeyboardButtonModal {
+  /** 二次确认的提示文本，不为空则进行二次确认；最多 40 个字符，不能有 URL */
+  content?: string
+  /** 确认按钮上展示的文字，可为空，默认「确认」；最多 4 个字符 */
+  confirm_text?: string
+  /** 取消按钮上展示的文字，可为空，默认「取消」；最多 4 个字符 */
+  cancel_text?: string
+}
+
+/** keyboard 按钮点击行为（Button.action） */
+export interface KeyboardButtonAction {
+  /** 0 跳转按钮（http / 小程序 scheme），1 回调按钮（回调后台接口），2 指令按钮（在输入框插入 @bot data） */
+  type?: number
+  /** 权限设置 */
+  permission?: KeyboardButtonPermission
+  /** 操作相关的数据 */
+  data?: string
+  /** 客户端不支持本 action 的时候，弹出的 toast 文案 */
+  unsupport_tips?: string
+  /** 指令按钮可用，点击按钮后直接自动发送 data，仅单聊可用，默认 false（支持版本 8983） */
+  enter?: boolean
+  /** 指令按钮可用，指令是否带引用回复本消息，默认 false（支持版本 8983） */
+  reply?: boolean
+  /**
+   * 仅在指令按钮下有效，设置后会忽略 `enter` 配置。
+   * 设为 1 时点击按钮自动唤起手 Q 选图器（仅手机端 8983+ 的单聊场景）。
+   */
+  anchor?: number
+  /** 用户点击后的二次确认操作 */
+  modal?: KeyboardButtonModal
+  /** @deprecated 官方已弃用：可操作点击的次数 */
+  click_limit?: number
+  /** @deprecated 官方已弃用：指令按钮弹出子频道选择器 */
+  at_bot_show_channel_list?: boolean
+}
+
+/**
+ * keyboard 按钮（Button）
+ *
+ * 字段与官方文档一致，并且是 node-karin `QQBotButton` 的结构超集，
+ * 因此 `karinToQQBot()` 的输出可以直接放进 {@link Keyboard}。
+ */
+export interface KeyboardButton {
+  /** 按钮 ID，同一键盘内唯一 */
+  id?: string
+  /** 按钮渲染 */
+  render_data?: KeyboardButtonRenderData
+  /** 按钮点击行为 */
+  action?: KeyboardButtonAction
+  /**
+   * 分组 ID，同一分组内有一个按钮被操作后，其它按钮变灰不可点击
+   *
+   * 接口文档 v1.28.0（2026-09-03）新增，仅当 `action.type = 1` 时有效。
+   */
+  group_id?: string
+}
+
+/** keyboard 一行按钮 */
+export interface KeyboardRow {
+  /** 该行的按钮，官方限制每行最多 5 个 */
+  buttons: KeyboardButton[]
+}
+
 /** 按钮消息结构（官方已全量开放自定义 keyboard，2.0 不再支持模板按钮） */
 export interface Keyboard {
-  content: { rows: ReturnType<typeof karinToQQBot> }
+  /** 键盘内容，官方限制最多 5 行 */
+  content: { rows: KeyboardRow[] }
 }
 
 /** 发送QQ Markdown 消息请求参数 */
@@ -362,19 +462,29 @@ export interface GroupBotStateResponse {
 /**
  * 获取群成员详情接口响应（GET /v2/groups/{group_openid}/members/{member_openid}）
  *
- * 该接口未出现在公开文档中，仅在腾讯官方 openclaw 插件
- * （@tencent-connect/openclaw-qqbot v2.0.0）中被作为一等接口使用，返回结构未公开，
- * 字段全部按可选处理，实际以平台返回为准。
+ * 该接口在接口文档 v1.28.0（2026-09-03）转为公开文档，属「内邀接入」的白名单接口，
+ * 未获权限时平台返回错误码 11253。官方昵称字段为 `username`，`nick` 是转公开之前
+ * 腾讯官方 openclaw 插件（@tencent-connect/openclaw-qqbot v2.0.0）使用的字段名，
+ * 保留以兼容旧返回。
  */
 export interface QQGroupMemberResponse {
   /** 群成员 openid */
   member_openid?: string
-  /** 群成员昵称 */
+  /** 用户昵称 */
+  username?: string
+  /**
+   * 群成员昵称
+   * @deprecated 官方公开文档中的字段名是 {@link QQGroupMemberResponse.username}
+   */
   nick?: string
   /** 入群时间，RFC3339 格式 */
   joined_at?: string
   /** 群内角色：owner / admin / member */
   member_role?: 'owner' | 'admin' | 'member'
+  /** 是否机器人 */
+  bot?: boolean
+  /** 用户在应用/开放平台下的统一标识（如有） */
+  union_openid?: string
   /** 其余未公开字段原样保留 */
   [key: string]: unknown
 }
@@ -777,6 +887,20 @@ export interface MemberMuteState {
   union_openid?: string
 }
 
+/**
+ * 设置成员禁言项（POST /v2/groups/{group_openid}/restrict_chat_setting）
+ *
+ * 单次请求最多 20 项（接口文档 v1.28.0 由 10 提升至 20）。
+ */
+export interface SetMemberMuteState {
+  /** 操作类型：add 增加禁言，update 更新禁言到期时间，del 解除禁言 */
+  op: 'add' | 'update' | 'del'
+  /** 被禁言成员的 openid；增加 / 更新时只能操作普通成员，不能操作群主、管理员、机器人 */
+  member_openid: string
+  /** 禁言到期时间（RFC3339 格式）；op=del 时可传空串表示立即解除禁言 */
+  mute_expire_at?: string
+}
+
 /** 查询群禁言状态响应（GET /v2/groups/{group_openid}/restrict_chat_setting） */
 export interface GetGroupMuteSettingResponse {
   /** 群级禁言规则 */
@@ -828,7 +952,7 @@ export interface JoinRequest {
 export interface GetJoinRequestListParams {
   /** 分页游标，首次请求可不传或传空串 */
   cursor?: string
-  /** 单页数量，默认 20，最大 100 */
+  /** 单页数量，默认 20，最大 50 */
   limit?: number
 }
 
@@ -850,6 +974,98 @@ export interface ApprovalJoinRequestBody {
   reject_reason?: string
   /** 是否同时加入群黑名单，默认 false，op=decline 时可填 */
   add_to_member_blacklist?: boolean
+}
+
+// ==============以下是群成员管理相关的接口================
+
+/** 群成员（GET /v2/groups/{group_openid}/members 列表项） */
+export interface GroupMemberItem {
+  /** 成员 openid */
+  member_openid: string
+  /** 用户昵称 */
+  username?: string
+  /** 群成员角色：member 普通成员 / owner 群主 / admin 管理员 */
+  member_role?: 'owner' | 'admin' | 'member'
+  /** 是否机器人 */
+  bot?: boolean
+  /** 入群时间戳（RFC3339 格式） */
+  joined_at?: string
+  /** 用户在应用/开放平台下的统一标识（如有） */
+  union_openid?: string
+}
+
+/** 群成员列表查询参数（GET /v2/groups/{group_openid}/members） */
+export interface GetGroupMemberListParams {
+  /** 分页游标，首次请求可不传或传空串；后续传上一次响应的 next_cursor */
+  cursor?: string
+}
+
+/** 群成员列表响应（GET /v2/groups/{group_openid}/members） */
+export interface GetGroupMemberListResponse {
+  /** 成员列表，每次最多返回 30 条 */
+  members: GroupMemberItem[]
+  /** 下一页游标，空串表示已到末页 */
+  next_cursor: string
+}
+
+/** 群成员批量移除请求体（POST /v2/groups/{group_openid}/batch_remove_members） */
+export interface BatchRemoveGroupMembersBody {
+  /** 需要移除的成员 member_openid 列表，单次最多 20 个 */
+  member_openids: string[]
+  /** 是否同时加入群黑名单，默认 false */
+  add_to_member_blacklist?: boolean
+}
+
+/** 群成员批量移除响应 */
+export interface BatchRemoveGroupMembersResponse {
+  /** 成功时返回 success */
+  remove_members_result?: string
+  /** 拉黑失败的 openid */
+  add_to_member_blacklist_fail_openids?: string[]
+}
+
+/** 群黑名单用户（GET /v2/groups/{group_openid}/member_blacklist 列表项） */
+export interface GroupBlacklistUser {
+  /** 用户在应用/开放平台下的统一标识（如有） */
+  union_openid?: string
+  /** 用户 openid */
+  member_openid: string
+  /** 用户昵称 */
+  username?: string
+  /** 拉黑时间戳（RFC3339 格式） */
+  banned_at?: string
+  /** 是否为机器人账号 */
+  bot?: boolean
+}
+
+/** 群黑名单查询参数（GET /v2/groups/{group_openid}/member_blacklist） */
+export interface GetGroupMemberBlacklistParams {
+  /** 分页游标，首次请求可不传或传空串 */
+  cursor?: string
+  /** 单页数量，默认 20，最大 100 */
+  limit?: number
+}
+
+/** 群黑名单查询响应（GET /v2/groups/{group_openid}/member_blacklist） */
+export interface GetGroupMemberBlacklistResponse {
+  /** 黑名单用户列表 */
+  users: GroupBlacklistUser[]
+  /** 下一页游标，空串表示已到末页 */
+  next_cursor: string
+}
+
+/** 群黑名单操作请求体（POST /v2/groups/{group_openid}/member_blacklist） */
+export interface SetGroupMemberBlacklistBody {
+  /** 操作类型：add 加入黑名单（目标成员在群中时无法加入），del 移出黑名单 */
+  op: 'add' | 'del'
+  /** 目标成员 openid 列表，单次最多 20 个 */
+  member_openids: string[]
+}
+
+/** 群黑名单操作响应 */
+export interface SetGroupMemberBlacklistResponse {
+  /** 操作失败的 openid 列表，op=add / op=del 同义 */
+  fail_openids?: string[]
 }
 
 // ==============以下是入群自动审批策略相关的接口================
@@ -880,7 +1096,7 @@ export interface JoinApprovalStrategy {
 export interface GetJoinApprovalStrategyListParams {
   /** 分页游标，首次请求可不传或传空串 */
   cursor?: string
-  /** 单页数量，默认 20，最大 100 */
+  /** 单页数量，默认 20，最大 50 */
   limit?: number
 }
 

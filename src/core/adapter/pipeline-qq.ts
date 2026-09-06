@@ -21,7 +21,7 @@ import {
 import type { Contact, ElementTypes, SendMsgResults } from 'node-karin'
 import type { AdapterQQBot } from './base'
 import type { Grouping, PassiveInfo } from './grouping'
-import type { SendQQMediaMessageRequest, SendQQMsg, SendQQMsgResponse } from '@/core/api/types'
+import type { KeyboardRow, SendQQMediaMessageRequest, SendQQMsg, SendQQMsgResponse } from '@/core/api/types'
 
 /**
  * 处理 QQ 场景（单聊 + 群聊）的发送
@@ -285,10 +285,10 @@ const resolveOutgoingReferenceQQ = async (
  * 构造 keyboard 字段（buttons + keyboards 合并）
  */
 const buildKeyboard = (grouping: Grouping<'qq' | 'guild'>) => {
-  const rows: ReturnType<typeof karinToQQBot> = []
+  const rows: KeyboardRow[] = []
   grouping.buttons.forEach(b => rows.push(...karinToQQBot(b)))
   grouping.keyboards.forEach(k => rows.push(...karinToQQBot(k)))
-  const normalizedRows: ReturnType<typeof karinToQQBot> = []
+  const normalizedRows: KeyboardRow[] = []
   let id = 0
 
   for (const row of rows.slice(0, KEYBOARD_MAX_ROWS)) {
