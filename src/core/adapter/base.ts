@@ -5,6 +5,7 @@ import { sendGuild } from './pipeline-guild'
 import { cacheSelfMessage, prepareSelfMessageCache, shouldCacheSelfMessage } from './self-message-cache'
 import { getJoinRequest, removeJoinRequest } from './join-request-cache'
 import { getAdapterConfig, setAdapterConfig } from './config-store'
+import { selfAvatarUrl } from './self-avatar'
 import { getMessageStore, type MessageStore } from '@/core/storage/message'
 import { GROUP_MEMBER_LIST_MAX_PAGES, HTTP_URL_RE, MAX_GROUP_MUTE_SECONDS } from '@/core/constants'
 import { normalizeMediaElements } from './media-source'
@@ -296,8 +297,15 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
 
   /**
    * 获取头像 url
+   *
+   * 第三方头像 CDN 的模式是 `qqapp/{appId}/{openid}/{size}`，只有拼用户 openid 才有效；
+   * 机器人自身没有可用的 openid（selfId 就是 appId，拼出 appId/appid 只会得到默认头像），
+   * 因此目标是自己时改走官方 `GET /users/@me` 返回的 avatar 字段，取值与缓存见 self-avatar。
    */
   async getAvatarUrl (_userId: string, _size: 0 | 40 | 100 | 140 = 0): Promise<string> {
+    if (_userId && (_userId === this.selfId || _userId === this.selfSubId('id'))) {
+      return selfAvatarUrl(this)
+    }
     return `https://thirdqq.qlogo.cn/qqapp/${this.cfg.appId}/${_userId}/${_size}`
   }
 
