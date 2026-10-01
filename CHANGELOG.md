@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.3.0...adapter-qqbot-v3.3.1) (2026-10-01)
+
+
+### Bug Fixes
+
+* bot.getAvatarUrl获取bot自身头像的兜底逻辑 ([#70](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/70)) ([00eda1f](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/00eda1f734d04d1931fe9b8d873dc1fbeed70449))
+
 ## [3.3.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.2.0...adapter-qqbot-v3.3.0) (2026-09-06)
 
 
