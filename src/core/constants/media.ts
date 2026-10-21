@@ -8,14 +8,6 @@ export const FILE_TYPE: Record<MediaType, number> = {
   file: 4,
 }
 
-/** 各类资源的 QQ 上传上限。 */
-export const MAX_UPLOAD_SIZE: Record<MediaType, number> = {
-  image: 30 * 1024 * 1024,
-  video: 100 * 1024 * 1024,
-  record: 20 * 1024 * 1024,
-  file: 100 * 1024 * 1024,
-}
-
 /** 上传错误中展示的资源类型名称。 */
 export const MEDIA_TYPE_LABEL: Record<MediaType, string> = {
   image: '图片',
@@ -43,7 +35,7 @@ export const DEFAULT_MIME: Partial<Record<MediaType, string>> = {
   record: 'audio/mpeg',
 }
 
-/** fallback 上传超过该大小时走 QQ 分片上传。 */
+/** 二进制直传超过该大小时改用分片；这不是平台硬限制。 */
 export const LARGE_UPLOAD_THRESHOLD = 5 * 1024 * 1024
 
 /** COS 用于覆盖下载响应类型的 query 参数名。 */

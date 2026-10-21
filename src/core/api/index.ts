@@ -2,6 +2,7 @@ import type { AxiosInstance } from './http'
 import { RequestApi } from './request'
 import { MessagesApi } from './messages'
 import { MediaApi } from './media'
+import { MediaImagesApi } from './media-images'
 import { InteractionApi } from './interaction'
 import { MetaApi } from './meta'
 import { GroupsApi } from './groups'
@@ -17,6 +18,7 @@ import { buildQQMsg, buildGuildMsg } from './builders'
  * 子模块按职能拆分：
  * - messages：发送 / 撤回
  * - media：富媒体上传
+ * - mediaImages：Markdown 素材图片管理
  * - interaction：按钮回调 ack
  * - meta：@me / dms / gateway / 分享链接
  * - groups：群基础信息 / 机器人群内状态 / 群成员列表与详情 / 禁言 / 批量移除 / 群黑名单 / 入群申请（白名单接口）
@@ -45,6 +47,7 @@ export class QQBotApi {
   public readonly request: RequestApi
   public readonly messages: MessagesApi
   public readonly media: MediaApi
+  public readonly mediaImages: MediaImagesApi
   public readonly interaction: InteractionApi
   public readonly meta: MetaApi
   public readonly groups: GroupsApi
@@ -61,6 +64,7 @@ export class QQBotApi {
     this.request = new RequestApi(axios)
     this.messages = new MessagesApi(axios)
     this.media = new MediaApi(axios)
+    this.mediaImages = new MediaImagesApi(axios)
     this.interaction = new InteractionApi(axios)
     this.meta = new MetaApi(axios)
     this.groups = new GroupsApi(axios)
@@ -74,6 +78,7 @@ export class QQBotApi {
 export { buildQQMsg, buildGuildMsg } from './builders'
 export { Http } from './http'
 export { RequestApi } from './request'
+export { MediaImagesApi } from './media-images'
 export { GuildsApi } from './guilds'
 export { MenuApi } from './menu'
 export { PanelsApi } from './panels'

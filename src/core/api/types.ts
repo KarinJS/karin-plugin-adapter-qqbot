@@ -519,6 +519,73 @@ export interface UploadMediaResponse {
   raw_url?: string
 }
 
+/** 申请上传 Markdown 素材图片（POST /v2/media-images/prepare） */
+export interface MediaImagePrepareRequest {
+  /** 文件名（含扩展名） */
+  file_name: string
+  /** 文件大小（字节） */
+  file_size: number
+  /** 图片 MIME 类型：image/png / image/jpeg / image/gif / image/webp */
+  content_type: string
+  /** 文件内容 MD5（32 位十六进制） */
+  md5: string
+  /** 文件内容 SHA1（40 位十六进制） */
+  sha1: string
+}
+
+/** 申请上传 Markdown 素材图片的响应 */
+export interface MediaImagePrepareResponse {
+  /** 上传任务 ID，4 小时内有效 */
+  upload_id: string
+  /** 预签名上传 URL，使用 HTTP PUT 直传图片二进制 */
+  presigned_url: string
+  /** 预签名 URL 有效期（秒） */
+  expires_in: number
+}
+
+/** 完成 Markdown 素材图片上传（POST /v2/media-images/complete） */
+export interface MediaImageCompleteRequest {
+  /** prepare 返回的上传任务 ID */
+  upload_id: string
+  /** 文件 MD5（32 位十六进制），服务端会与 COS 对象实际 ETag 比对 */
+  md5: string
+}
+
+/** 完成 Markdown 素材图片上传的响应 */
+export interface MediaImageCompleteResponse {
+  /** 图片 ID，用于查询与删除 */
+  image_id: string
+  /** Markdown 引用链接：`qqbot-media://image/v1/<token>` */
+  url: string
+  /** 滑动有效期窗口（秒） */
+  ttl: number
+  /** 临时预览链接，短时效，请勿持久化存储 */
+  preview_url?: string
+}
+
+/** 查询 Markdown 素材图片列表的查询参数 */
+export interface MediaImageListParams {
+  /** 翻页游标；首页不传，末页返回空字符串 */
+  cursor?: string
+}
+
+/** Markdown 素材图片列表项 */
+export interface MediaImageItem {
+  image_id: string
+  url: string
+  file_name: string
+  preview_url?: string
+  created_at: number
+  expires_at: number
+}
+
+/** 查询 Markdown 素材图片列表的响应 */
+export interface MediaImageListResponse {
+  images: MediaImageItem[]
+  next_cursor: string
+  total: number
+}
+
 // ==============以下是自定义菜单相关的接口================
 
 /** 自定义菜单按钮类型 */
@@ -818,8 +885,6 @@ export interface UpdateChannelRequest {
 
 /** 生成分享链接请求体（POST /v2/generate_url_link） */
 export interface GenerateUrlLinkRequest {
-  /** 需要跳转的 URL */
-  url_link?: string
   /**
    * 开发者自定义回调数据，最长 32 字符
    *
@@ -830,8 +895,11 @@ export interface GenerateUrlLinkRequest {
 
 /** 生成分享链接响应（POST /v2/generate_url_link） */
 export interface GenerateUrlLinkResponse {
-  /** 生成的分享链接 */
-  url_link: string
+  /** 接口返回数据 */
+  data: {
+    /** 生成的分享链接 */
+    url: string
+  }
 }
 
 // ==============以下是群禁言状态 / 入群审批相关的接口================

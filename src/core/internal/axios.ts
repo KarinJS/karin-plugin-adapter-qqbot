@@ -17,8 +17,10 @@ const tokens = new Map<string, TokenState>()
 
 /** access_token 接口返回 */
 interface AccessTokenResponse {
-  access_token: string
-  expires_in: number | string
+  access_token?: string
+  expires_in?: number | string
+  code?: number
+  message?: string
 }
 /**
  * 拉取 access_token 并安排下一次刷新
@@ -51,6 +53,17 @@ export const getAccessToken = async (
       log('error', `[${appId}] 获取 access_token 失败:`, err)
     }
     throw err
+  }
+
+  /**
+   * access_token 接口的业务错误即使失败也会返回 HTTP 200，必须优先检查
+   * 响应体中的 code，不能只依赖 axios 的 HTTP 状态。
+   */
+  const code = res.data?.code
+  if (typeof code === 'number' && code !== 0) {
+    const detail = formatOpenAPIError(200, code, res.data?.message)
+    log('error', `[${appId}] 获取 access_token 失败 | ${detail}`)
+    throw new Error(`获取 access_token 失败 | ${detail}`)
   }
 
   const accessToken = res.data?.access_token

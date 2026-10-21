@@ -1,4 +1,5 @@
 import { fileToUrl } from 'node-karin'
+import { QQBOT_MEDIA_RE } from '@/core/constants'
 import { getImageSize } from '@/utils/common'
 import { normalizeMediaSource } from './media-source'
 import type { FileToUrlExtra } from './media-source'
@@ -14,6 +15,9 @@ const MARKDOWN_IMAGE_RE = /!\[([^\]]*)]\(\s*(<[^>]+>|[^\s)]+)(?:\s+["'][^"']*["'
  * 保留。
  */
 const EXPLICIT_IMAGE_SIZE_RE = /#(\d+)px\s+#(\d+)px/
+
+/** 已经是可直接写入 Markdown 的图片地址。 */
+const isDirectImageSource = (source: string): boolean => /^https?:\/\//i.test(source) || QQBOT_MEDIA_RE.test(source)
 
 /** Markdown 图片拆分结果 */
 export type MarkdownImagePart =
@@ -66,6 +70,7 @@ export const buildMarkdownImageLine = async (
   }
 
   const desc = alt.trim() || 'karin'
+  /** QQ 客户端对缺失尺寸的图片会使用很小的默认值，探测失败也必须写入兜底尺寸。 */
   const resolved = size ?? await getImageSize(url).catch(() => ({ width: 300, height: 300 }))
   return `![${desc} #${resolved.width}px #${resolved.height}px](${url})`
 }
@@ -107,7 +112,7 @@ export const imagesToMarkdown = async (
   extra?: FileToUrlExtra
 ): Promise<string[]> => {
   return Promise.all(urls.map(async (file) => {
-    if (file.startsWith('http')) {
+    if (isDirectImageSource(file)) {
       return buildMarkdownImageLine(file)
     }
     const { url, width, height } = await imageToUrl(file, extra)
@@ -126,7 +131,7 @@ export const markdownPartToLine = async (
   part: Extract<MarkdownImagePart, { type: 'image' }>,
   extra?: FileToUrlExtra
 ): Promise<string> => {
-  if (part.source.startsWith('http')) {
+  if (isDirectImageSource(part.source)) {
     return buildMarkdownImageLine(part.source, part.alt)
   }
   const { url, width, height } = await imageToUrl(part.source, extra)

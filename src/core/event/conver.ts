@@ -45,7 +45,7 @@ const pushMarkdownText = (text: string, elements: ElementTypes[]) => {
  * 图片和原生 Markdown；这里按原顺序恢复为 Karin `text`、`image`、`markdown`。
  */
 const pushQQMarkdown = (text: string, elements: ElementTypes[]): boolean => {
-  const imageReg = /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g
+  const imageReg = /!\[([^\]]*)\]\(((?:https?:\/\/|qqbot-media:\/\/)[^\s)]+)\)/g
   let lastIndex = 0
   let matched = false
   let match: RegExpExecArray | null
@@ -77,7 +77,7 @@ const pushQQMarkdown = (text: string, elements: ElementTypes[]): boolean => {
  */
 const tokenizeContent = (content = ''): string[] => {
   const tokens: string[] = []
-  const knownTag = /<faceType=\d+,faceId="[^"]*",ext="[^"]*">|<qqbot-at-user id="[^"]+"\s*\/?>|<qqbot-at-everyone\s*\/?>|<@!?[A-Za-z0-9]+>/g
+  const knownTag = /<faceType=\d+,faceId="[^"]*",ext="[^"]*">|<qqbot-at-user id="[^"]+"\s*\/?>|<qqbot-at-everyone\s*\/?>|<@!?[^>]+>/g
   let lastIndex = 0
   let match: RegExpExecArray | null
 

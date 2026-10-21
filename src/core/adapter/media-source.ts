@@ -1,5 +1,6 @@
 import { fileToUrl, fileToUrlHandlerKey, handler } from 'node-karin'
-import { DATA_URL_BASE64_RE, DEFAULT_FILENAME, HTTP_URL_RE } from '@/core/constants'
+import { DATA_URL_BASE64_RE, DEFAULT_FILENAME, HTTP_URL_RE, QQBOT_MEDIA_RE } from '@/core/constants'
+import { getImageSize } from '@/utils/common'
 import type { ElementTypes } from 'node-karin'
 import type { AdapterQQBot } from './base'
 import type { MediaType, Scene } from '@/core/api/types'
@@ -39,6 +40,13 @@ export interface FileToUrlExtra {
   purpose: UploadPurpose
   /** 本次发送归属的上传会话；频道场景没有可用 openid 时为 undefined。 */
   origin?: UploadOrigin
+  /**
+   * 是否允许适配器内置的 fileToUrl 处理器接手。
+   *
+   * 发送链路会先传 false，让用户处理器和 QQ 素材管理依次尝试；两者都失败后
+   * 再传 true 调用内置图床。用户处理器可以忽略该字段。
+   */
+  allowBuiltinFileToUrl?: boolean
 }
 
 /** HTTP(S) 资源已经是可直接传给 QQ 平台的公网地址。 */
@@ -86,7 +94,7 @@ export interface PreferredMediaSource {
   /** 交给后续 markdown 或富媒体上传的来源。 */
   source: string
   /** 来源是原始 HTTP URL、fileToUrl 结果，还是 QQ 上传兜底。 */
-  via: 'public-url' | 'file-to-url' | 'fallback'
+  via: 'public-url' | 'file-to-url' | 'qqbot-media' | 'fallback'
   /**
    * fileToUrl 处理器顺带返回的图片宽高。
    *
@@ -110,10 +118,11 @@ export const hasFileToUrlHandler = (): boolean => handler.has(fileToUrlHandlerKe
 export const isHttpMediaSource = (source: string): boolean => HTTP_URL_RE.test(source)
 
 /**
- * 优先把本地/base64 富媒体转换为公网 URL；没有处理器或转换失败时返回原始来源。
+ * 解析本地 / Base64 富媒体来源。
  *
- * QQ 官方的普通 file_data 上传对视频等资源更容易失败，因此 adapter 层始终把
- * fileToUrl 作为主路径，QQ 上传只做兜底。
+ * 优先级为：用户自己的 `fileToUrl` 处理器 -> Markdown 图片素材管理 ->
+ * 适配器内置 fileToUrl 图床 -> QQ 富媒体上传兜底。内置图床只在前两步都失败后
+ * 才被允许接手，避免临时直链抢占 `qqbot-media://`；视频 / 语音仍可由内置图床取直链。
  *
  * @param ctx 适配器实例，用于记录降级日志并标明执行发送的 bot。
  * @param type 富媒体类型。
@@ -132,37 +141,76 @@ export const resolvePreferredMediaSource = async (
   purpose: UploadPurpose = 'media'
 ): Promise<PreferredMediaSource> => {
   const normalized = normalizeMediaSource(source)
-  if (isHttpMediaSource(normalized)) {
+  if (isHttpMediaSource(normalized) || QQBOT_MEDIA_RE.test(normalized)) {
     return { source: normalized, via: 'public-url' }
   }
 
-  if (!hasFileToUrlHandler()) {
-    return { source: normalized, via: 'fallback' }
-  }
-
-  try {
-    const extra: FileToUrlExtra = { selfId: ctx.selfId, purpose, origin }
-    const result = await fileToUrl(type, normalized, filename || DEFAULT_FILENAME[type], extra)
-
-    /**
-     * `handler.has` 只判断该 key 下是否注册过处理器，不代表真的有处理器接手：
-     * 所有处理器都调用 next() 放行时，fileToUrl 会返回 undefined。此时不属于
-     * 异常，安静地走 QQ 上传兜底即可，不必输出 warn 噪音。
-     */
-    if (!result?.url) {
-      ctx.logger('debug', `[sendQQ] 没有 fileToUrl 处理器接手 ${type}，改用 QQ 上传兜底`)
-      return { source: normalized, via: 'fallback' }
-    }
-
-    /** 只有 image 会带宽高，其余类型按声明就没有这两个字段。 */
-    const { width, height } = result as { width?: number; height?: number }
-    const size = typeof width === 'number' && typeof height === 'number'
-      ? { width, height }
+  /** 将 fileToUrl 结果归一为发送链路需要的来源结构。 */
+  const toPreferred = (result: { url: string; width?: number; height?: number }): PreferredMediaSource => {
+    const size = typeof result.width === 'number' && typeof result.height === 'number'
+      ? { width: result.width, height: result.height }
       : undefined
-
     return { source: result.url, via: 'file-to-url', size }
-  } catch (err) {
-    ctx.logger('warn', `[sendQQ] ${type} 转 URL 失败，改用 QQ 上传兜底:`, err)
-    return { source: normalized, via: 'fallback' }
   }
+
+  /**
+   * 调用 fileToUrl 链。
+   *
+   * 第一次传 `allowBuiltinFileToUrl: false`，内置处理器会主动放行；素材管理
+   * 失败后再传 true，允许内置图床接手。用户自己的处理器在两轮中都可以响应。
+   */
+  const tryFileToUrl = async (
+    allowBuiltinFileToUrl: boolean
+  ): Promise<{ result?: { url: string; width?: number; height?: number }; error?: unknown }> => {
+    if (!hasFileToUrlHandler()) return {}
+
+    try {
+      const extra: FileToUrlExtra = {
+        selfId: ctx.selfId,
+        purpose,
+        origin,
+        allowBuiltinFileToUrl,
+      }
+      const result = await fileToUrl(type, normalized, filename || DEFAULT_FILENAME[type], extra)
+      return { result: result?.url ? result : undefined }
+    } catch (err) {
+      return { error: err }
+    }
+  }
+
+  /**
+   * 图片要进入 Markdown 时，如果用户图床不可用，优先使用官方素材管理。
+   * 该接口返回的 `qqbot-media://` 可以直接写进 Markdown，且不依赖公网 URL。
+   */
+  const tryQQBotMedia = async (): Promise<PreferredMediaSource | undefined> => {
+    if (type !== 'image' || purpose !== 'markdown') return undefined
+
+    try {
+      const size = await getImageSize(normalized).catch(() => undefined)
+      const uploaded = await ctx.super.mediaImages.upload(normalized, filename)
+      ctx.logger('debug', `[sendQQ] 素材管理上传成功，ttl=${uploaded.ttl}s: ${uploaded.url}`)
+      return { source: uploaded.url, via: 'qqbot-media', size }
+    } catch (err) {
+      ctx.logger('debug', `[sendQQ] ${type} 素材管理上传失败，继续尝试内置图床:`, err)
+      return undefined
+    }
+  }
+
+  const userStage = await tryFileToUrl(false)
+  if (userStage.result) return toPreferred(userStage.result)
+
+  const material = await tryQQBotMedia()
+  if (material) return material
+
+  const builtinStage = await tryFileToUrl(true)
+  if (builtinStage.result) return toPreferred(builtinStage.result)
+
+  const failure = builtinStage.error || userStage.error
+  if (failure) {
+    ctx.logger('warn', `[sendQQ] ${type} 转 URL 失败，改用 QQ 上传兜底:`, failure)
+  } else {
+    ctx.logger('debug', `[sendQQ] 没有 fileToUrl 处理器接手 ${type}，改用 QQ 上传兜底`)
+  }
+
+  return { source: normalized, via: 'fallback' }
 }

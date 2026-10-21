@@ -92,7 +92,8 @@ const sendQQMarkdown = async (
   const mediaItems: SendQQMediaMessageRequest[] = []
 
   for (const file of fallbackImages) {
-    const res = await ctx.super.media.uploadFallback(target, contact.peer, 'image', file, false)
+    /** 图片兜底固定走分片上传，避免普通二进制直传在本地/Base64 场景下不稳定。 */
+    const res = await ctx.super.media.uploadFallback(target, contact.peer, 'image', file, false, undefined, true)
     mediaItems.push(ctx.super.qq.media(res.file_info))
   }
 

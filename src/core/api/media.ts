@@ -19,7 +19,6 @@ import {
   HTTP_URL_RE,
   LARGE_UPLOAD_THRESHOLD,
   MAX_PART_CONCURRENCY,
-  MAX_UPLOAD_SIZE,
   MD5_10M_SIZE,
   MEDIA_DOWNLOAD_TIMEOUT,
   MEDIA_TYPE_LABEL,
@@ -199,27 +198,6 @@ const normalizeUploadFileName = (type: MediaType, name?: string): string => {
 }
 
 /**
- * 检查 fallback 资源大小是否超过 QQ 对应类型上限。
- * @param type 富媒体类型。
- * @param size 文件大小。
- */
-const assertUploadSize = (type: MediaType, size: number): void => {
-  const limit = MAX_UPLOAD_SIZE[type]
-  if (size <= limit) return
-  throw new Error(`${MEDIA_TYPE_LABEL[type]}过大：${formatBytes(size)}，QQ 上传上限为 ${formatBytes(limit)}`)
-}
-
-/**
- * 读取本地媒体文件并转为 QQ 上传接口需要的 base64。
- * @param source 本地路径或 file:// URL。
- * @returns 文件内容的 base64 字符串。
- */
-const readLocalFileAsBase64 = async (source: string): Promise<string> => {
-  const file = normalizeLocalPath(source)
-  return readFile(file, 'base64')
-}
-
-/**
  * 下载远程媒体并返回 Buffer。
  * @param url 远程媒体 URL。
  * @returns 文件内容。
@@ -241,23 +219,6 @@ const downloadRemoteAsBuffer = async (url: string): Promise<Buffer> => {
  */
 const downloadRemoteAsBase64 = async (url: string): Promise<string> => {
   return (await downloadRemoteAsBuffer(url)).toString('base64')
-}
-
-/**
- * 将 Karin 的 file 字段归一为 QQ 上传接口支持的 url / file_data。
- * @param source HTTP URL、本地路径、data URL、base64:// 或裸 base64。
- * @returns 可合并进上传请求体的来源字段。
- */
-const buildUploadSource = async (source: string): Promise<{ url?: string; file_data?: string }> => {
-  const value = source.trim()
-  if (HTTP_URL_RE.test(value)) return { url: value }
-  if (DATA_URL_BASE64_RE.test(value) || BASE64_PREFIX_RE.test(value)) {
-    return { file_data: stripBase64Prefix(value) }
-  }
-  if (isLocalPathSource(value)) {
-    return { file_data: await readLocalFileAsBase64(value) }
-  }
-  return { file_data: value }
 }
 
 /**
@@ -506,28 +467,29 @@ export class MediaApi extends Http {
     srvSendMsg = false,
     fileName?: string
   ): Promise<UploadMediaResponse> {
-    const sourceBody = await buildUploadSource(source)
+    const value = source.trim()
+    /** 本地 / Base64 属于二进制直传路径，统一交给按体积选择直传或分片的实现。 */
+    if (!HTTP_URL_RE.test(value)) {
+      return this.uploadFallback(scene, peer, type, value, srvSendMsg, fileName)
+    }
+
     const body: Record<string, unknown> = {
       file_type: FILE_TYPE[type],
       srv_send_msg: srvSendMsg,
+      url: value,
     }
-    Object.assign(body, sourceBody)
-    if (type === 'file' && fileName) {
-      body.file_name = fileName
-    }
+    if (fileName) body.file_name = fileName
 
-    const path = `/v2/${scene}s/${peer}/files`
+    const requestPath = `/v2/${scene}s/${peer}/files`
     try {
-      return await this.post(path, body, { timeout: MEDIA_UPLOAD_TIMEOUT })
+      return await this.post(requestPath, body, { timeout: MEDIA_UPLOAD_TIMEOUT })
     } catch (err) {
-      if (!sourceBody.url) throw err
-
-      const fallbackBody: Record<string, unknown> = {
-        ...body,
-        file_data: await downloadRemoteAsBase64(sourceBody.url),
-      }
-      delete fallbackBody.url
-      return this.post(path, fallbackBody, { timeout: MEDIA_UPLOAD_TIMEOUT })
+      /**
+       * 文档明确提示 URL 上传可能因服务端网络失败；下载后走同一套
+       * 二进制直传 / 分片兜底，避免再次把公网 URL 交给平台。
+       */
+      const base64 = await downloadRemoteAsBase64(value)
+      return this.uploadFallback(scene, peer, type, `base64://${base64}`, srvSendMsg, fileName)
     }
   }
 
@@ -543,6 +505,7 @@ export class MediaApi extends Http {
    * @param source 本地路径、http url、data URL、base64:// 或裸 base64
    * @param srvSendMsg 上传后是否由服务端直接发送
    * @param fileName 文件消息的展示文件名
+   * @param forceChunk 是否强制走分片上传，不按 5MB 阈值判断
    * @returns 上传结果，包含后续发送消息所需的 file_info
    */
   async uploadFallback (
@@ -551,29 +514,43 @@ export class MediaApi extends Http {
     type: MediaType,
     source: string,
     srvSendMsg = false,
-    fileName?: string
+    fileName?: string,
+    forceChunk = false
   ): Promise<UploadMediaResponse> {
+    /**
+     * 不在适配器侧按固定体积拦截；平台硬限制可能调整，由上传接口返回错误。
+     * 这里的 5MB 只用于选择二进制直传还是分片传输。
+     */
     const fallbackSource = await buildFallbackSource(type, source, fileName)
-    assertUploadSize(type, fallbackSource.size)
-    const hashes = !srvSendMsg ? await computeUploadHashes(fallbackSource) : undefined
+    const needsChunk = forceChunk || fallbackSource.size > LARGE_UPLOAD_THRESHOLD
+    const hashes = (!srvSendMsg || needsChunk)
+      ? await computeUploadHashes(fallbackSource)
+      : undefined
 
-    if (hashes) {
+    if (!srvSendMsg && hashes) {
       const cached = await getCachedUpload(scene, peer, type, hashes.md5)
       if (cached) return cached
     }
 
-    if (!srvSendMsg && fallbackSource.size >= LARGE_UPLOAD_THRESHOLD) {
-      const response = await this.uploadChunked(scene, peer, type, fallbackSource, hashes)
-      if (hashes) await setCachedUpload(scene, peer, type, hashes.md5, response)
+    if (needsChunk) {
+      const response = await this.uploadChunked(
+        scene,
+        peer,
+        type,
+        fallbackSource,
+        hashes,
+        srvSendMsg
+      )
+      if (!srvSendMsg && hashes) await setCachedUpload(scene, peer, type, hashes.md5, response)
       return response
     }
 
     const body: Record<string, unknown> = {
       file_type: FILE_TYPE[type],
       srv_send_msg: srvSendMsg,
+      file_name: fallbackSource.fileName,
       file_data: await readFallbackSourceAsBase64(fallbackSource),
     }
-    if (type === 'file') body.file_name = fallbackSource.fileName
 
     const response = await this.post<UploadMediaResponse>(`/v2/${scene}s/${peer}/files`, body, { timeout: MEDIA_UPLOAD_TIMEOUT })
     if (hashes) await setCachedUpload(scene, peer, type, hashes.md5, response)
@@ -610,8 +587,8 @@ export class MediaApi extends Http {
       throw new Error(`QQ 不为${MEDIA_TYPE_LABEL.file}类型返回下载直链，无法当图床使用`)
     }
 
+    /** 同样不在本地拦截体积；平台限制由 upload_prepare / files 接口返回。 */
     const prepared = await buildFallbackSource(type, source, fileName)
-    assertUploadSize(type, prepared.size)
     const hashes = await computeUploadHashes(prepared)
 
     const reused = await getCachedUpload(scene, peer, type, hashes.md5)
@@ -716,10 +693,12 @@ export class MediaApi extends Http {
   private async completeChunkedUpload (
     scene: Scene,
     peer: string,
-    uploadId: string
+    uploadId: string,
+    srvSendMsg = false
   ): Promise<UploadMediaResponse> {
     let lastError: unknown
-    const body = { upload_id: uploadId }
+    const body: Record<string, unknown> = { upload_id: uploadId }
+    if (srvSendMsg) body.srv_send_msg = true
 
     for (let attempt = 0; attempt <= COMPLETE_UPLOAD_RETRIES; attempt++) {
       try {
@@ -752,7 +731,8 @@ export class MediaApi extends Http {
     peer: string,
     type: MediaType,
     source: ChunkableSource,
-    preparedHashes?: UploadPrepareHashes
+    preparedHashes?: UploadPrepareHashes,
+    srvSendMsg = false
   ): Promise<UploadMediaResponse> {
     const hashes = preparedHashes || await computeUploadHashes(source)
     const prepareBody: Record<string, unknown> = {
@@ -812,6 +792,6 @@ export class MediaApi extends Http {
       await handle?.close().catch(() => undefined)
     }
 
-    return this.completeChunkedUpload(scene, peer, prepare.upload_id)
+    return this.completeChunkedUpload(scene, peer, prepare.upload_id, srvSendMsg)
   }
 }

@@ -7,19 +7,43 @@ import type { MediaType } from '@/core/api/types'
 /**
  * 内置 `fileToUrl` 处理器：用 QQ 官方分片上传充当临时图床。
  *
- * 分片上传完成后，合并响应会带上资源的下载直链。有了这个地址，本地图片、截图、
- * base64 图片就能以 markdown 图片语法进入消息正文，和文本、按钮合并成一条消息，
- * 而不是退化成一条独立的富媒体消息。
- *
- * 无需任何配置：适配器发送消息时会把执行发送的 bot 和真实发送目标一并交给本
- * 处理器，上传因此总是发生在同一个 bot、同一个会话下。QQ 的 openid 按 bot
- * 隔离，这一点不能靠猜。上传只借用会话的上传通道，不会往会话里发任何消息。
+ * 发送链路会先尝试用户自己的 `fileToUrl` 和 QQ 素材管理；两者都失败后才把
+ * `allowBuiltinFileToUrl` 设为 true，允许本处理器接手。这样图片优先得到
+ * `qqbot-media://`，临时直链只作为 Markdown 内嵌的最后手段，再失败才降级为
+ * 独立的 `msg_type=7` 富媒体消息。
  *
  * 只在以下条件全部满足时接手，其余情况一律放行给链路上的其他处理器：
  * - 资源要被写进 markdown 正文（富媒体上传不需要先换成 URL）；
  * - 类型是图片 / 视频 / 语音（QQ 不为文件类型返回直链）；
+ * - 允许内置图床接手；
  * - 能确定执行上传的 bot 与归属会话（频道场景没有可用 openid）。
  */
+
+/** 内置 fileToUrl 处理器的接手条件。 */
+export interface BuiltinFileToUrlInput {
+  type: MediaType
+  purpose?: FileToUrlExtra['purpose']
+  selfId?: string
+  origin?: FileToUrlExtra['origin']
+  allowBuiltinFileToUrl?: boolean
+}
+
+/**
+ * 判断内置处理器是否应接手本次 fileToUrl 请求。
+ *
+ * 发送链路在用户处理器和素材管理阶段会传 `allowBuiltinFileToUrl: false`，
+ * 此时内置图床必须放行；只有最后兜底阶段才允许接手图片。
+ *
+ * @param input 当前 fileToUrl 请求的媒体类型与上下文。
+ * @returns 是否由内置处理器处理。
+ */
+export const shouldHandleBuiltinFileToUrl = (input: BuiltinFileToUrlInput): boolean => {
+  return input.purpose === 'markdown' &&
+    input.type !== 'file' &&
+    input.allowBuiltinFileToUrl !== false &&
+    !!input.selfId &&
+    !!input.origin
+}
 
 /**
  * 判断已注册的 bot 是否由本插件提供。
@@ -65,20 +89,18 @@ export const qqbotFileToUrl = karin.handler('fileToUrl', async (payload, next) =
     args?: Partial<FileToUrlExtra>
   }
 
-  /**
-   * 富媒体上传接受本地文件与 base64，先换成 URL 再交给 QQ 反而多一次往返，
-   * 而且那次往返仍然是 QQ 自己下载转存，没有收益。
-   */
-  if (extra?.purpose !== 'markdown') return next()
+  const selfId = extra?.selfId
+  const origin = extra?.origin
+  if (!selfId || !origin) return next()
+  if (!shouldHandleBuiltinFileToUrl({
+    type,
+    purpose: extra?.purpose,
+    selfId,
+    origin,
+    allowBuiltinFileToUrl: extra?.allowBuiltinFileToUrl,
+  })) return next()
 
-  /** QQ 只对图片 / 视频 / 语音返回下载直链。 */
-  if (type === 'file') return next()
-
-  /** 频道场景用 channel_id，没有上传接口要求的 openid。 */
-  const origin = extra.origin
-  if (!extra.selfId || !origin) return next()
-
-  const bot = findBot(extra.selfId)
+  const bot = findBot(selfId)
   if (!bot) return next()
 
   try {
@@ -91,10 +113,9 @@ export const qqbotFileToUrl = karin.handler('fileToUrl', async (payload, next) =
     )
 
     bot.logger('debug', `[内置图床] 已取得直链，有效期 ${response.ttl}s: ${url}`)
-
     if (type !== 'image') return { url }
 
-    /** markdown 图片语法需要宽高；解析不出来时 getImageSize 会给出保守默认值。 */
+    /** Markdown 图片必须携带宽高，否则 QQ 客户端会使用极小的默认尺寸。 */
     const { width, height } = await getImageSize(file)
     return { url, width, height }
   } catch (err) {

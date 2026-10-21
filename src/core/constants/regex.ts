@@ -1,6 +1,9 @@
 /** HTTP(S) 资源已经是可直接传给 QQ 平台的公网地址。 */
 export const HTTP_URL_RE = /^https?:\/\//i
 
+/** QQ 素材管理返回的 Markdown 图片引用。 */
+export const QQBOT_MEDIA_RE = /^qqbot-media:\/\//i
+
 /** Karin 常见 base64 图片/媒体前缀。 */
 export const BASE64_PREFIX_RE = /^base64:\/\//i
 

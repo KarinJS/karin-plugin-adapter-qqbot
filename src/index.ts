@@ -22,5 +22,4 @@ const bootstrap = async () => {
 bootstrap()
 
 export type { AdapterQQBot }
-export { QQBotApi, RequestApi, Http } from '@/core/api'
-export type { RequestOptions, AxiosInstance } from '@/core/api'
+export { QQBotApi } from '@/core/api'

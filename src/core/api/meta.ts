@@ -30,7 +30,17 @@ export class MetaApi extends Http {
    *
    * @param body 分享链接参数，均为可选
    */
-  generateUrlLink (body: GenerateUrlLinkRequest = {}): Promise<GenerateUrlLinkResponse> {
-    return this.post('/v2/generate_url_link', body)
+  async generateUrlLink (body: GenerateUrlLinkRequest = {}): Promise<GenerateUrlLinkResponse> {
+    const response = await this.post<GenerateUrlLinkResponse | { url_link?: string }>(
+      '/v2/generate_url_link',
+      body
+    )
+
+    /** 兼容旧版接口返回；新文档的正式结构是 `{ data: { url } }`。 */
+    if (!('data' in response) && response.url_link) {
+      return { data: { url: response.url_link } }
+    }
+
+    return response as GenerateUrlLinkResponse
   }
 }

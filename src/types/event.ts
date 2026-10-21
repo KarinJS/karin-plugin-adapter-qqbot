@@ -172,6 +172,7 @@ export interface ARKData {
    * - `contact_card`：好友名片
    * - `video_share`：视频分享
    * - `music_together`：一起听歌
+   * - `picture`：图片
    */
   ark_type?: string
   /** 卡片消息类型的中文名称，如「图文 H5」「小程序」「图文卡片」 */
@@ -319,7 +320,12 @@ export interface GroupMsgEvent extends BaseEvent {
   d: {
     /** 发送者，群聊场景 `member_openid` 有值 */
     author: QQAuthor
-    /** 消息文本内容（已去除 @机器人的前缀） */
+    /**
+     * 消息文本内容。
+     *
+     * 消息中 @ 某成员时会替换为 `<@member_openid>`，@全体成员时为 `<@all>`；
+     * 被 @ 的成员列表见 `mentions` 字段。
+     */
     content: string
     /** 与 group_openid 一致 */
     group_id: string
@@ -504,8 +510,6 @@ export interface GroupMemberAddEvent extends BaseEvent {
     group_openid: string
     /** 新加入成员的 OpenID */
     member_openid: string
-    /** 新成员的用户 OpenID（跨应用统一标识，可能为空） */
-    user_openid?: string
   }
 }
 
