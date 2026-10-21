@@ -43,7 +43,7 @@
 > * 富媒体上传流程见 [富媒体使用说明](/wiki/develop/api-v2/server-inter/message/rich-media.html)
 > * 表情表态仅频道支持，详见 [表情表态](/wiki/develop/api-v2/server-inter/message/trans/emoji.html)
 
-← [频道消息事件](/wiki/develop/api-v2/server-inter/channel/message/event.html) [Markdown 消息](/wiki/develop/api-v2/server-inter/message/type/markdown.html) →
+← [频道消息事件](/wiki/develop/api-v2/server-inter/channel/message/event.html) [素材管理](/wiki/develop/api-v2/server-inter/message/material-management.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)

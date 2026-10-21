@@ -58,6 +58,10 @@ _斜体_
 
 1
 
+图片上传
+
+若图片没有可公网访问的 URL，可以先将图片上传到平台，获取 `qqbot-media://` 引用后在 Markdown 中直接引用，无需依赖网络资源，详见 [素材管理](/wiki/develop/api-v2/server-inter/message/material-management.html)（消息类型 > 素材管理）。
+
 ### [#](#有序列表) 有序列表
 
 ```text
@@ -294,7 +298,7 @@ markdown 模版消息的使用示例：
 |custom\_template\_id|string|否|markdown 模版id，申请模版后获得|
 |params|Array|否|{key: xxx, values: xxx}，模版内变量与填充值的kv映射|
 
-← [消息类型](/wiki/develop/api-v2/server-inter/message/type/overview.html) [富媒体消息概述](/wiki/develop/api-v2/server-inter/message/rich-media.html) →
+← [素材管理](/wiki/develop/api-v2/server-inter/message/material-management.html) [富媒体消息概述](/wiki/develop/api-v2/server-inter/message/rich-media.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)

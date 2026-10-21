@@ -16,7 +16,6 @@
 |timestamp|integer|事件时间戳（Unix 秒）|
 |group\_openid|string|群 OpenID|
 |member\_openid|string|新加入成员的 OpenID|
-|user\_openid|string|新成员的用户 OpenID（跨应用统一标识，可能为空）|
 
 ### [#](#事件示例) 事件示例
 
@@ -26,8 +25,7 @@
 {
   "timestamp": 1784276757,
   "group_openid": "B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5",
-  "member_openid": "C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6",
-  "user_openid": "C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6"
+  "member_openid": "C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6"
 }
 ```
 
@@ -35,8 +33,7 @@
 2  
 3  
 4  
-5  
-6
+5
 
 ← [群聊消息接收关闭](/wiki/develop/api-v2/autogen/event/group_msg_reject.html) [群成员退出](/wiki/develop/api-v2/autogen/event/group_member_remove.html) →
 

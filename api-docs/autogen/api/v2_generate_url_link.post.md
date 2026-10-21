@@ -18,7 +18,7 @@
 
 |名称|类型|必填|描述|
 |---|---|---|---|
-|url\_link|string|否|需要跳转的 URL|
+|callback\_data|string|否|回传给机器人后台的数据|
 
 ### [#](#请求示例) 请求示例
 
@@ -42,7 +42,13 @@ POST /v2/generate_url_link
 
 |名称|类型|描述|
 |---|---|---|
-|url\_link|string|生成的分享链接|
+|data|[Data](#schema-data)||
+
+**Data**
+
+|名称|类型|描述|
+|---|---|---|
+|url|string|生成的分享链接|
 
 ## [#](#响应示例) 响应示例
 
@@ -50,13 +56,17 @@ POST /v2/generate_url_link
 
 ```json
 {
-  "url_link": "https://qun.qq.com/qunpro/robot/qunshare?robot_appid=1234567890&robot_uin=12345678&data=xxx"
+  "data": {
+    "url": "https://qun.qq.com/qunpro/robot/qunshare?robot_appid=1234567890&robot_uin=12345678&data=xxx"
+  }
 }
 ```
 
 1  
 2  
-3
+3  
+4  
+5
 
 ### [#](#错误码) 错误码
 
@@ -68,7 +78,7 @@ POST /v2/generate_url_link
 |10044|从协议头获取uin失败|请检查 Authorization Header 是否正确|
 |11004|生成分享ARK失败|请稍后重试|
 
-← [获取机器人加入的频道列表](/wiki/develop/api-v2/autogen/api/users_me_guilds.get.html) [查询全局自定义菜单](/wiki/develop/api-v2/autogen/api/v2_menu.get.html) →
+← [获取机器人频道列表](/wiki/develop/api-v2/autogen/api/users_me_guilds.get.html) [查询全局自定义菜单](/wiki/develop/api-v2/autogen/api/v2_menu.get.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)

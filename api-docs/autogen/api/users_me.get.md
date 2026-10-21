@@ -66,7 +66,7 @@ GET /users/@me
 9  
 10
 
-← [文本交互](/wiki/develop/api-v2/server-inter/message/trans/text-chain.html) [获取机器人加入的频道列表](/wiki/develop/api-v2/autogen/api/users_me_guilds.get.html) →
+← [文本交互](/wiki/develop/api-v2/server-inter/message/trans/text-chain.html) [获取机器人频道列表](/wiki/develop/api-v2/autogen/api/users_me_guilds.get.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)
