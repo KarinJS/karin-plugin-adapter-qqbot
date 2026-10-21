@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.4.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.3.1...adapter-qqbot-v3.4.0) (2026-10-21)
+
+
+### Features
+
+* 同步官方文档 v1.42.0，支持素材管理 API ([835e008](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/835e00887839d2a7c90af7f5b79cd0172ab253a4))
+
 ## [3.3.1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.3.0...adapter-qqbot-v3.3.1) (2026-10-01)
 
 
