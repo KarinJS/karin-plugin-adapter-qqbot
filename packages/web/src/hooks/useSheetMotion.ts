@@ -43,20 +43,36 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }
     const dialog = backdrop?.querySelector<HTMLElement>('[data-slot="drawer-dialog"]')
     if (!backdrop || !dialog) return
 
+    // 外壳和抽屉用同一组 GSAP 参数、同一帧开始，缩放不会比抽屉慢半拍。
+    const frame = document.querySelector<HTMLElement>('.mobile-frame')
+
     gsap.killTweensOf([backdrop, dialog])
+    if (frame) gsap.killTweensOf(frame)
     gsap.set(backdrop, { opacity: 1 })
     // 先确定本次打开的高度，再读取 offsetHeight 作为滑入距离。
     beforeEnterRef.current?.(dialog)
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       gsap.set(dialog, { y: 0 })
+      if (frame) gsap.set(frame, { scale: 0.94, y: 10, borderRadius: 24 })
       return
     }
 
     gsap.fromTo(dialog, { y: dialog.offsetHeight }, { y: 0, duration: SHEET_ENTER_DURATION, ease: SHEET_ENTER_EASE })
+    if (frame) {
+      gsap.to(frame, {
+        scale: 0.94,
+        y: 10,
+        borderRadius: 24,
+        duration: SHEET_ENTER_DURATION,
+        ease: SHEET_ENTER_EASE,
+        overwrite: 'auto',
+      })
+    }
 
     return () => {
       gsap.killTweensOf([backdrop, dialog])
+      if (frame) gsap.killTweensOf(frame)
     }
   }, [isOpen, mounted])
 
@@ -73,9 +89,13 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }
       return
     }
 
+    const frame = document.querySelector<HTMLElement>('.mobile-frame')
+
     gsap.killTweensOf([backdrop, dialog])
+    if (frame) gsap.killTweensOf(frame)
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      if (frame) gsap.set(frame, { scale: 1, y: 0, borderRadius: 0 })
       setMounted(false)
       closingRef.current = false
       onExitedRef.current?.()
@@ -92,9 +112,20 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }
         onExitedRef.current?.()
       },
     })
+    if (frame) {
+      gsap.to(frame, {
+        scale: 1,
+        y: 0,
+        borderRadius: 0,
+        duration: SHEET_EXIT_DURATION,
+        ease: SHEET_EXIT_EASE,
+        overwrite: 'auto',
+      })
+    }
 
     return () => {
       gsap.killTweensOf([backdrop, dialog])
+      if (frame) gsap.killTweensOf(frame)
     }
   }, [isOpen, mounted])
 

@@ -59,13 +59,7 @@ const MobileShellContent = () => {
 
   return (
     <>
-      <div
-        className={cn(
-          'mobile-frame flex h-dvh flex-col overflow-hidden bg-background',
-          sheetOpen && 'mobile-frame--sheet'
-        )}
-        inert={isDetail}
-      >
+      <div className='mobile-frame flex h-dvh flex-col overflow-hidden bg-background' inert={isDetail}>
         <div className='min-h-0 flex-1'>
           <MobilePager items={items} activeKey={activeKey} onChange={handlePagerChange} disabled={sheetOpen} />
         </div>

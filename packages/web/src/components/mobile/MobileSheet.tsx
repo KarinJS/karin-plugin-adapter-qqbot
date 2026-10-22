@@ -19,7 +19,8 @@ interface MobileSheetProps {
  * 手机端底部抽屉的共用外壳。
  *
  * 打开时默认只占可用高度的 50%，向上拖动带出剩余高度；
- * 超过 75% 吸附到全屏，否则回到半屏。全屏且内容在顶部时可以向下拖回去。
+ * 超过 75% 吸附到全屏，低于 25% 松手直接退场，其余回到半屏。
+ * 全屏后继续向上拖会接着滚动表单，内容到顶后向下拖会收起抽屉。
  * 抽屉高度在整个打开周期内用打开瞬间测量的像素值，不跟随 dvh / 地址栏变化。
  */
 export const MobileSheet = ({ isOpen, onRequestClose, onExited, header, footer, children }: MobileSheetProps) => {
@@ -53,6 +54,7 @@ export const MobileSheet = ({ isOpen, onRequestClose, onExited, header, footer, 
   useSheetDrag({
     isOpen,
     mounted,
+    onRequestClose,
     backdropRef,
     scrollerRef,
     baseHeightRef,

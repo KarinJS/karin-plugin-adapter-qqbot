@@ -57,7 +57,9 @@ export const SheetScaffold = ({ header, footer, children, contentClassName, scro
       <div
         ref={scrollerRef}
         className={cn('mobile-scroll h-full overflow-y-auto overscroll-contain px-4', contentClassName)}
-        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+        // 纵向滚动由 useSheetDrag 通过 scrollTop 驱动，关掉原生手势，
+        // 避免 iOS / 安卓在滚动开始后抢走 touch 事件。
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom, touchAction: 'none' }}
       >
         {children}
       </div>

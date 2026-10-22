@@ -2,6 +2,7 @@ import { gsap } from 'gsap'
 import { useEffect, type RefObject } from 'react'
 import {
   SHEET_COLLAPSED_RATIO,
+  SHEET_DISMISS_THRESHOLD,
   SHEET_ENTER_EASE,
   SHEET_EXIT_EASE,
   SHEET_EXPAND_THRESHOLD,
@@ -11,6 +12,7 @@ import {
 interface SheetDragOptions {
   isOpen: boolean
   mounted: boolean
+  onRequestClose: () => void
   backdropRef: RefObject<HTMLDivElement | null>
   scrollerRef: RefObject<HTMLDivElement | null>
   /** 打开时测量的可用高度；整个打开周期内保持不变，避免滚动时抽屉忽高忽低。 */
@@ -23,6 +25,7 @@ const DRAG_START = 6
 const CLICK_SUPPRESS = 200
 const SCROLL_SAMPLE_LIMIT = 6
 const MOMENTUM_DURATION = 0.45
+const MIN_MOMENTUM_ELAPSED = 8
 const INTERACTIVE_SELECTOR = [
   'input',
   'textarea',
@@ -42,14 +45,23 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 /**
  * 底部抽屉的拖动高度与内容滚动。
  *
- * 50% 时向上拖会把剩下的高度带出来；全屏时纵向手势由这里自己接管：
- * 内容先按 1:1 滚动，滚到顶部后继续向下就无缝转成收起抽屉。
+ * 50% 时向上拖会把剩下的高度带出来；到顶后继续向上拖直接转成内容滚动。
+ * 全屏时纵向手势由这里自己接管：内容先按 1:1 滚动，
+ * 滚到顶部后继续向下就无缝转成收起抽屉；收起时松手低于 25% 直接退场。
  * 不依赖浏览器原生滚动，避免 iOS / 安卓在滚动过程中取消 touch 事件、
  * 或者滚动到顶部后无法把抽屉接回手势的问题。
  *
  * 抽屉本身用 height 跟手；内容滚动用 scrollTop 跟手，松手后补一段惯性。
+ * 滚动容器的 touch-action 在 SheetScaffold 里设为 none，浏览器不会抢走纵向手势。
  */
-export const useSheetDrag = ({ isOpen, mounted, backdropRef, scrollerRef, baseHeightRef }: SheetDragOptions) => {
+export const useSheetDrag = ({
+  isOpen,
+  mounted,
+  onRequestClose,
+  backdropRef,
+  scrollerRef,
+  baseHeightRef,
+}: SheetDragOptions) => {
   useEffect(() => {
     if (!isOpen || !mounted) return
 
@@ -90,20 +102,16 @@ export const useSheetDrag = ({ isOpen, mounted, backdropRef, scrollerRef, baseHe
     /**
      * 手指移动方向决定这次手势做什么：
      * 没到全屏时向上拖展开，到全屏后向上拖滚内容；
-     * 全屏且内容在顶部时向下拖收起，否则先滚内容。
+     * 内容没到顶时向下拖先滚内容，到顶后继续向下拖收起抽屉。
+     * 收起没有 50% 下限，低于 25% 松手会直接退场。
      */
     const resolveTouchMode = (dy: number, inScroller: boolean): DragMode => {
-      const current = ratio()
-      const fullyExpanded = current >= 0.999
-
       if (dy < 0) {
-        if (!fullyExpanded) return 'expand'
-        return inScroller ? 'scroll' : 'none'
+        return ratio() >= 0.999 ? 'scroll' : 'expand'
       }
 
       if (dy > 0) {
-        if (current <= SHEET_COLLAPSED_RATIO + 0.001) return 'none'
-        if (fullyExpanded && inScroller && scroller.scrollTop > 1) return 'scroll'
+        if (inScroller && scroller.scrollTop > 1) return 'scroll'
         return 'collapse'
       }
 
@@ -111,9 +119,8 @@ export const useSheetDrag = ({ isOpen, mounted, backdropRef, scrollerRef, baseHe
     }
 
     const resolvePointerMode = (dy: number): DragMode => {
-      const current = ratio()
-      if (dy < 0 && current < 0.999) return 'expand'
-      if (dy > 0 && current > SHEET_COLLAPSED_RATIO + 0.001) return 'collapse'
+      if (dy < 0 && ratio() < 0.999) return 'expand'
+      if (dy > 0) return 'collapse'
       return 'none'
     }
 
@@ -142,10 +149,25 @@ export const useSheetDrag = ({ isOpen, mounted, backdropRef, scrollerRef, baseHe
       if (!height) return
 
       // 高度始终跟随手指：向上拖（clientY 变小）变高，向下拖（clientY 变大）变矮。
-      const delta = dragStartY - clientY
-      const min = height * SHEET_COLLAPSED_RATIO
-      const next = clamp(dragStartHeight + delta, min, height)
-      dialog.style.height = `${next}px`
+      const raw = dragStartHeight + (dragStartY - clientY)
+
+      if (raw > height) {
+        // 抽屉已经到顶，继续向上拖直接转成内容滚动，手势不中断。
+        dialog.style.height = `${height}px`
+        const excess = raw - height
+        mode = 'scroll'
+        delete dialog.dataset.resizing
+        scrollStartTop = scroller.scrollTop
+        scrollStartY = clientY + excess
+        samples = []
+        applyScrollDrag(clientY)
+        // 从交接后的位置重新计时，避免把展开阶段的速度算进内容惯性。
+        samples = [{ t: performance.now(), top: scroller.scrollTop }]
+        return
+      }
+
+      // 允许拖到 0：低于 25% 松手时直接退场。
+      dialog.style.height = `${clamp(raw, 0, height)}px`
     }
 
     const applyScrollDrag = (clientY: number) => {
@@ -185,7 +207,9 @@ export const useSheetDrag = ({ isOpen, mounted, backdropRef, scrollerRef, baseHe
       if (!first || !last || samples.length < 2) return
 
       const elapsed = last.t - first.t
-      const velocity = elapsed > 0 ? (last.top - first.top) / elapsed : 0
+      if (elapsed < MIN_MOMENTUM_ELAPSED) return
+
+      const velocity = (last.top - first.top) / elapsed
       if (Math.abs(velocity) < 0.05) return
 
       const target = clamp(scroller.scrollTop + velocity * 180, 0, maxScroll())
@@ -214,6 +238,8 @@ export const useSheetDrag = ({ isOpen, mounted, backdropRef, scrollerRef, baseHe
       if (finishedMode !== 'none') suppressClickUntil = performance.now() + CLICK_SUPPRESS
 
       if (finishedMode === 'scroll') {
+        // 滚动结束时再补安全区，避免滚动过程中顶栏高度变化。
+        if (ratio() >= 0.999) setExpanded(true)
         finishScroll()
         return
       }
@@ -224,8 +250,22 @@ export const useSheetDrag = ({ isOpen, mounted, backdropRef, scrollerRef, baseHe
       if (!height) return
 
       const current = dialog.offsetHeight / height
+
+      if (current < SHEET_DISMISS_THRESHOLD) {
+        // 低于 25%：不吸附回半屏，直接从当前位置走退场动画。
+        onRequestClose()
+        return
+      }
+
       const expand = current > SHEET_EXPAND_THRESHOLD
       const target = expand ? height : height * SHEET_COLLAPSED_RATIO
+
+      // 已经在目标高度上（例如正好拖到 100%），不需要再空跑一段动画。
+      if (Math.abs(dialog.offsetHeight - target) < 0.5) {
+        dialog.style.height = `${target}px`
+        setExpanded(expand)
+        return
+      }
 
       if (reduceMotion()) {
         dialog.style.height = `${target}px`
@@ -304,7 +344,11 @@ export const useSheetDrag = ({ isOpen, mounted, backdropRef, scrollerRef, baseHe
     const onTouchEnd = (event: TouchEvent) => {
       if (touchId === null) return
       const touch = event.changedTouches[0]
-      if (active && touch) applyDrag(touch.clientY)
+      if (active) {
+        // 拖动结束后不要补发 click，避免误触按钮或提交表单。
+        event.preventDefault()
+        if (touch) applyDrag(touch.clientY)
+      }
       touchId = null
       finish()
     }
@@ -391,12 +435,9 @@ export const useSheetDrag = ({ isOpen, mounted, backdropRef, scrollerRef, baseHe
       }
     }
 
-    // 纵向滚动完全由这里接管，横向和双指缩放仍交给浏览器。
-    scroller.style.touchAction = 'pan-x pinch-zoom'
-
     dialog.addEventListener('touchstart', onTouchStart, { passive: true })
     dialog.addEventListener('touchmove', onTouchMove, { passive: false })
-    dialog.addEventListener('touchend', onTouchEnd)
+    dialog.addEventListener('touchend', onTouchEnd, { passive: false })
     dialog.addEventListener('touchcancel', onTouchCancel)
     dialog.addEventListener('pointerdown', onPointerDown)
     dialog.addEventListener('pointermove', onPointerMove, { passive: false })
@@ -417,7 +458,6 @@ export const useSheetDrag = ({ isOpen, mounted, backdropRef, scrollerRef, baseHe
       delete dialog.dataset.resizing
       gsap.killTweensOf(dialog, 'height')
       gsap.killTweensOf(scroller)
-      scroller.style.touchAction = ''
     }
-  }, [isOpen, mounted, backdropRef, scrollerRef, baseHeightRef])
+  }, [isOpen, mounted, onRequestClose, backdropRef, scrollerRef, baseHeightRef])
 }
