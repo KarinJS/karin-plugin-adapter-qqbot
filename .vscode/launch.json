@@ -7,6 +7,13 @@
     {
       "type": "chrome",
       "request": "launch",
+      "name": "web",
+      "url": "http://localhost:5173/qqbot/web/",
+      "webRoot": "${workspaceFolder}"
+    },
+    {
+      "type": "chrome",
+      "request": "launch",
       "name": "docs",
       "url": "http://localhost:3000",
       "webRoot": "${workspaceFolder}"

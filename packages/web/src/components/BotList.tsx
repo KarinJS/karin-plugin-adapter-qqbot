@@ -1,6 +1,7 @@
 import { Button, Skeleton, cn } from '@heroui/react'
 import { ChevronRight, Plus, RadioTower } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { BotAvatar } from '@/components/BotAvatar'
 import { StatusPill } from '@/components/StatusPill'
 import { useConfigStore } from '@/hooks/useConfigStore'
 
@@ -54,7 +55,6 @@ export const BotList = ({ selectedAppId, className, showAdd = true }: BotListPro
           const status = statuses[bot.appId]
           const selected = selectedAppId === bot.appId
           const title = status?.name || bot.appId
-          const initial = title.slice(0, 1).toUpperCase()
 
           return (
             <Button
@@ -62,18 +62,20 @@ export const BotList = ({ selectedAppId, className, showAdd = true }: BotListPro
               fullWidth
               variant={selected ? 'secondary' : 'ghost'}
               className={cn(
-                'h-auto justify-start gap-3 rounded-none border-b border-border/60 p-3.5 text-left last:border-b-0',
-                selected && 'bg-surface-secondary'
+                'relative h-auto justify-start gap-3 overflow-hidden rounded-none border-b border-border/60 p-3.5 text-left last:border-b-0',
+                selected ? 'bg-default' : 'hover:bg-default/50'
               )}
               aria-current={selected ? 'page' : undefined}
               onPress={() => navigate(`/bots/${encodeURIComponent(bot.appId)}`)}
             >
               <span
-                className='flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold'
+                className={cn(
+                  'absolute inset-y-2 left-0 w-[3px] rounded-full bg-foreground transition-opacity duration-150',
+                  selected ? 'opacity-100' : 'opacity-0'
+                )}
                 aria-hidden='true'
-              >
-                {initial}
-              </span>
+              />
+              <BotAvatar name={title} avatar={status?.avatar} />
               <span className='flex min-w-0 flex-1 flex-col gap-1'>
                 <span className='truncate text-sm font-medium'>{title}</span>
                 <span className='truncate text-xs text-muted'>{bot.appId}</span>

@@ -2,8 +2,11 @@ import { Toast } from '@heroui/react'
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ConfigProvider } from '@/hooks/useConfigStore'
+import { useEmbedded } from '@/hooks/useEmbedded'
+import { useTheme } from '@/hooks/useTheme'
 import { useViewport } from '@/hooks/useViewport'
 import { DesktopShell } from '@/layouts/DesktopShell'
+import { EmbeddedDesktopShell } from '@/layouts/EmbeddedDesktopShell'
 import { MobileShell } from '@/layouts/MobileShell'
 import { authChangedEvent, hasAuth } from '@/lib/auth'
 import { AddBotPage } from '@/pages/AddBotPage'
@@ -15,12 +18,19 @@ import { SettingsPage } from '@/pages/SettingsPage'
 
 const AppShell = () => {
   const { isMobile } = useViewport()
-  return isMobile ? <MobileShell /> : <DesktopShell />
+  const embedded = useEmbedded()
+
+  if (isMobile) return <MobileShell />
+  return embedded ? <EmbeddedDesktopShell /> : <DesktopShell />
 }
 
 const App = () => {
   const [authenticated, setAuthenticated] = useState(hasAuth)
   const { isMobile } = useViewport()
+  const embedded = useEmbedded()
+
+  // 主题只在 App 里初始化一次，嵌入模式没有主题切换入口时也能跟随 Karin。
+  useTheme()
 
   useEffect(() => {
     const syncAuth = () => setAuthenticated(hasAuth())
@@ -48,7 +58,7 @@ const App = () => {
             <Route path='bots' element={<BotsPage />} />
             <Route path='bots/new' element={<AddBotPage />} />
             <Route path='bots/:appId' element={<BotDetailPage />} />
-            <Route path='settings' element={<SettingsPage />} />
+            <Route path='settings' element={embedded ? <Navigate to='/' replace /> : <SettingsPage />} />
             <Route path='*' element={<Navigate to='/' replace />} />
           </Route>
         </Routes>

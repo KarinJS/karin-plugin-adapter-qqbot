@@ -33,6 +33,7 @@ export const DesktopShell = () => {
   const { config, statuses, version } = useConfigStore()
   const activeKey = getActiveKey(pathname)
   const onlineCount = config.filter((bot) => statuses[bot.appId]?.online).length
+  const allOnline = config.length > 0 && onlineCount === config.length
 
   return (
     <div className='flex h-dvh overflow-hidden bg-background'>
@@ -71,7 +72,12 @@ export const DesktopShell = () => {
         <div className='flex flex-col gap-4 border-t border-border/60 px-5 py-5'>
           <div className='flex items-center justify-between text-xs text-muted'>
             <span>运行状态</span>
-            <span className='tabular inline-flex items-center gap-2'>
+            <span
+              className={cn(
+                'tabular inline-flex items-center gap-2',
+                allOnline ? 'text-success' : config.length > 0 ? 'text-warning' : 'text-muted'
+              )}
+            >
               <span className='status-dot' data-online={onlineCount > 0} aria-hidden='true' />
               {onlineCount} / {config.length} 在线
             </span>
@@ -98,7 +104,7 @@ export const DesktopShell = () => {
 
         <main className='flex-1 overflow-y-auto'>
           <div className='mx-auto w-full max-w-[78rem] px-8 py-7'>
-            <PageTransition>
+            <PageTransition sectionKey={activeKey}>
               <Outlet />
             </PageTransition>
           </div>

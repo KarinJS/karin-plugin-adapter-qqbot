@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { EmptyState } from '@/components/EmptyState'
 import { SectionCard } from '@/components/SectionCard'
 import { useConfigStore } from '@/hooks/useConfigStore'
+import { useEmbedded } from '@/hooks/useEmbedded'
 import { useViewport } from '@/hooks/useViewport'
 
 const decodeAppId = (value: string | undefined) => {
@@ -24,6 +25,7 @@ export const BotDetailPage = () => {
   const appId = decodeAppId(rawAppId)
   const { config, loading, remove, saving } = useConfigStore()
   const { isMobile } = useViewport()
+  const embedded = useEmbedded()
   const navigate = useNavigate()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [removing, setRemoving] = useState(false)
@@ -74,7 +76,7 @@ export const BotDetailPage = () => {
 
   const dangerZone = (
     <SectionCard title='移除机器人' description='从 config.json 中删除该机器人，并断开当前连接。'>
-      <Button variant='secondary' onPress={() => setConfirmOpen(true)}>
+      <Button variant='danger' onPress={() => setConfirmOpen(true)}>
         <Trash2 className='size-4' aria-hidden='true' />
         移除 {bot.appId}
       </Button>
@@ -87,6 +89,12 @@ export const BotDetailPage = () => {
         {isMobile ? null : <BotList selectedAppId={bot.appId} showAdd={false} className='xl:sticky xl:top-0' />}
 
         <div className='flex min-w-0 flex-col gap-5'>
+          {embedded && isMobile ? (
+            <Button variant='ghost' size='sm' className='self-start' onPress={() => navigate('/bots')}>
+              <ArrowLeft className='size-4' aria-hidden='true' />
+              机器人列表
+            </Button>
+          ) : null}
           <BotForm bot={bot} />
           {dangerZone}
         </div>

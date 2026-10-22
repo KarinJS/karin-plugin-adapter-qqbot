@@ -1,4 +1,6 @@
 import { BindStatus, checkBindResult, createBindTask, decryptSecret } from '@/core/qrcode'
+import { QQBotApi } from '@/core/api'
+import { createAxiosInstance, getAccessToken } from '@/core/internal/axios'
 import { getDefaultConfig, readConfigFile, writeConfig } from '@/utils/config'
 
 export type WebLoginStatus = 'pending' | 'completed' | 'expired' | 'cancelled' | 'failed'
@@ -9,6 +11,8 @@ export interface WebLoginSnapshot {
   createdAt: number
   expiresAt: number
   appId?: string
+  name?: string
+  avatar?: string
   /** 完成时表示更新了已有机器人，而不是新增。 */
   updated?: boolean
   message?: string
@@ -35,6 +39,8 @@ const snapshot = (session: WebLoginSession): WebLoginSnapshot => ({
   createdAt: session.createdAt,
   expiresAt: session.expiresAt,
   appId: session.appId,
+  name: session.name,
+  avatar: session.avatar,
   updated: session.updated,
   message: session.message,
 })
@@ -71,6 +77,30 @@ const persistBot = (appId: string, secret: string): boolean => {
   return index >= 0
 }
 
+const PROFILE_TIMEOUT = 3000
+
+/**
+ * 授权完成后立刻拉一次机器人资料。
+ *
+ * 新建的机器人要等适配器重连后才有 `account`，这里直接用刚写入的凭据请求
+ * `/users/@me`，让前端在成功页就能显示头像和昵称。
+ */
+const fetchBotProfile = async (appId: string, secret: string) => {
+  const request = (async () => {
+    await getAccessToken(appId, secret)
+    const api = new QQBotApi(createAxiosInstance(appId))
+    const me = await api.meta.getMe()
+    return { name: me.username, avatar: me.avatar }
+  })().catch(() => null)
+
+  /** 资料只用于成功页展示，超时就不要拖住授权完成。 */
+  const timeout = new Promise<null>((resolve) => {
+    setTimeout(() => resolve(null), PROFILE_TIMEOUT).unref?.()
+  })
+
+  return Promise.race([request, timeout])
+}
+
 const poll = async (session: WebLoginSession) => {
   if (session.status !== 'pending' || session.polling) return
 
@@ -86,7 +116,10 @@ const poll = async (session: WebLoginSession) => {
     if (result.status === BindStatus.COMPLETED) {
       const secret = decryptSecret(result.encryptedSecret, session.key)
       const updated = persistBot(result.appId, secret)
+      const profile = await fetchBotProfile(result.appId, secret)
       session.appId = result.appId
+      session.name = profile?.name
+      session.avatar = profile?.avatar
       session.updated = updated
       finish(session, 'completed', updated ? '已更新现有机器人的 AppSecret' : '已添加新的机器人')
       return

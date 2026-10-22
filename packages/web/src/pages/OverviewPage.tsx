@@ -9,28 +9,47 @@ import { EmptyState } from '@/components/EmptyState'
 import { PageHeader } from '@/components/PageHeader'
 import { SectionCard } from '@/components/SectionCard'
 import { useConfigStore } from '@/hooks/useConfigStore'
+import { useEmbedded } from '@/hooks/useEmbedded'
 import { useViewport } from '@/hooks/useViewport'
 
 const DOCS_URL = 'https://karinjs.github.io/karin-plugin-adapter-qqbot/'
 const GITHUB_URL = 'https://github.com/KarinJS/karin-plugin-adapter-qqbot'
+
+type StatTone = 'default' | 'success' | 'warning'
 
 const StatCard = ({
   label,
   value,
   hint,
   icon: Icon,
+  tone = 'default',
 }: {
   label: string
   value: string
   hint: string
   icon: typeof Bot
+  tone?: StatTone
 }) => (
   <div data-stat className='rounded-2xl border border-border/80 bg-surface p-5'>
     <div className='flex items-center justify-between'>
       <span className='text-xs text-muted'>{label}</span>
-      <Icon className='size-4 text-muted' aria-hidden='true' />
+      <Icon
+        className={cn(
+          'size-4',
+          tone === 'success' ? 'text-success' : tone === 'warning' ? 'text-warning' : 'text-muted'
+        )}
+        aria-hidden='true'
+      />
     </div>
-    <p className='tabular mt-4 text-3xl font-semibold tracking-tight'>{value}</p>
+    <p
+      className={cn(
+        'tabular mt-4 text-3xl font-semibold tracking-tight',
+        tone === 'success' && 'text-success',
+        tone === 'warning' && 'text-warning'
+      )}
+    >
+      {value}
+    </p>
     <p className='mt-1 text-xs text-muted'>{hint}</p>
   </div>
 )
@@ -38,6 +57,7 @@ const StatCard = ({
 export const OverviewPage = () => {
   const { config, statuses, loading } = useConfigStore()
   const { isMobile, isLandscape } = useViewport()
+  const embedded = useEmbedded()
   const navigate = useNavigate()
   const statsRef = useRef<HTMLDivElement>(null)
 
@@ -69,6 +89,7 @@ export const OverviewPage = () => {
   const webhookCount = config.filter((bot) => bot.event.type === 1).length
   const disabledCount = config.filter((bot) => bot.event.type === 0).length
   const cacheCount = config.filter((bot) => bot.messageCache.enable).length
+  const onlineTone: StatTone = config.length === 0 ? 'default' : onlineCount === config.length ? 'success' : 'warning'
 
   return (
     <div className='flex flex-col gap-6'>
@@ -101,6 +122,7 @@ export const OverviewPage = () => {
           value={String(onlineCount)}
           hint={config.length === 0 ? '等待添加' : `共 ${config.length} 个机器人`}
           icon={RadioTower}
+          tone={onlineTone}
         />
         <StatCard
           label='事件通道'
@@ -203,9 +225,11 @@ export const OverviewPage = () => {
       <Card className='border border-dashed border-border bg-transparent shadow-none'>
         <Card.Content className='flex flex-col gap-2 p-5 text-sm text-muted sm:flex-row sm:items-center sm:justify-between'>
           <span>配置保存后会写入 config.json，适配器自动重连受影响的机器人。</span>
-          <Button size='sm' variant='ghost' onPress={() => navigate('/settings')}>
-            查看设置
-          </Button>
+          {embedded ? null : (
+            <Button size='sm' variant='ghost' onPress={() => navigate('/settings')}>
+              查看设置
+            </Button>
+          )}
         </Card.Content>
       </Card>
     </div>

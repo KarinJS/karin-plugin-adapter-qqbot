@@ -1,22 +1,12 @@
-import {
-  Alert,
-  Button,
-  Description,
-  FieldError,
-  Input,
-  Label,
-  ListBox,
-  Select,
-  Switch,
-  TextField,
-  toast,
-} from '@heroui/react'
-import { Eye, EyeOff, RotateCcw, Save } from 'lucide-react'
-import { useEffect, useId, useState, type FormEvent } from 'react'
+import { Alert, Button, Description, FieldError, Input, Label, ListBox, Select, Switch, TextField } from '@heroui/react'
+import { RotateCcw, Save } from 'lucide-react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { EventTypePicker } from '@/components/EventTypePicker'
 import { MessageCacheFields } from '@/components/MessageCacheFields'
 import { RegexEditor } from '@/components/RegexEditor'
+import { SaveStatus, type SaveState } from '@/components/SaveStatus'
+import { SecretField } from '@/components/SecretField'
 import { SectionCard } from '@/components/SectionCard'
 import { StatusPill } from '@/components/StatusPill'
 import { useConfigStore } from '@/hooks/useConfigStore'
@@ -53,13 +43,23 @@ export const BotForm = ({ bot, onSaved }: BotFormProps) => {
 
   const [draft, setDraft] = useState<BotConfig>(() => cloneBot(bot))
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [showSecret, setShowSecret] = useState(false)
+  const [saveState, setSaveState] = useState<SaveState>('idle')
+  const timerRef = useRef<number | undefined>(undefined)
 
   useEffect(() => {
     setDraft(cloneBot(bot))
     setErrors({})
-    setShowSecret(false)
   }, [bot])
+
+  useEffect(() => () => window.clearTimeout(timerRef.current), [])
+
+  const showSaveState = (next: SaveState, hideAfter?: number) => {
+    window.clearTimeout(timerRef.current)
+    setSaveState(next)
+    if (hideAfter) {
+      timerRef.current = window.setTimeout(() => setSaveState('idle'), hideAfter)
+    }
+  }
 
   const status = statuses[bot.appId]
   const otherAppIds = config.filter((item) => item.appId !== bot.appId).map((item) => item.appId)
@@ -74,6 +74,8 @@ export const BotForm = ({ bot, onSaved }: BotFormProps) => {
     setDraft(cloneBot(bot))
     setErrors({})
     clearError()
+    window.clearTimeout(timerRef.current)
+    setSaveState('idle')
   }
 
   const validate = (value: BotConfig) => {
@@ -107,18 +109,19 @@ export const BotForm = ({ bot, onSaved }: BotFormProps) => {
 
     const nextConfig = config.map((item) => (item.appId === bot.appId ? normalized : item))
 
+    showSaveState('saving')
+
     try {
       await save(nextConfig)
       setDraft(cloneBot(normalized))
-      toast.success('配置已保存', {
-        description: '适配器会自动重连受影响的机器人',
-      })
+      showSaveState('saved', 1600)
       onSaved?.(normalized.appId)
 
       if (normalized.appId !== bot.appId) {
         navigate(`/bots/${encodeURIComponent(normalized.appId)}`, { replace: true })
       }
     } catch {
+      showSaveState('error', 3200)
       // 错误已经由 ConfigProvider 统一记录并展示。
     }
   }
@@ -143,16 +146,21 @@ export const BotForm = ({ bot, onSaved }: BotFormProps) => {
   return (
     <form
       id={formId}
+      autoComplete='off'
       className={isMobile ? 'flex flex-col gap-5 pb-28' : 'flex flex-col gap-5'}
       onSubmit={handleSubmit}
     >
+      <SaveStatus state={saveState} />
+
       <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
         <div className='min-w-0'>
           <div className='flex flex-wrap items-center gap-x-3 gap-y-1'>
             <h2 className='text-heading truncate text-xl font-semibold'>{status?.name || bot.appId}</h2>
             <StatusPill online={status?.online ?? false} eventType={bot.event.type} />
             {dirty ? (
-              <span className='rounded-full border border-border px-2 py-0.5 text-[0.6875rem] text-muted'>未保存</span>
+              <span className='rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[0.6875rem] text-warning'>
+                未保存
+              </span>
             ) : null}
           </div>
           <p className='mt-1 text-xs text-muted'>{bot.appId} · 保存后适配器会销毁旧连接并重新初始化</p>
@@ -181,43 +189,26 @@ export const BotForm = ({ bot, onSaved }: BotFormProps) => {
                 onChange={(appId) => patch({ appId })}
               >
                 <Label>AppID</Label>
-                <Input autoComplete='off' spellCheck={false} placeholder='例如 102012345' />
+                <Input
+                  autoComplete='off'
+                  spellCheck={false}
+                  placeholder='例如 102012345'
+                  data-1p-ignore
+                  data-bwignore
+                  data-lpignore='true'
+                />
                 <Description>机器人唯一标识，保存后用于注册适配器。</Description>
                 <FieldError>{errors.appId}</FieldError>
               </TextField>
 
-              <TextField
-                fullWidth
+              <SecretField
                 value={draft.secret}
                 isInvalid={Boolean(errors.secret)}
+                error={errors.secret}
+                description='修改或重新授权会刷新密钥，旧密钥立即失效。'
+                placeholder='扫码授权后自动填写'
                 onChange={(secret) => patch({ secret })}
-              >
-                <Label>AppSecret</Label>
-                <div className='flex items-center gap-2'>
-                  <Input
-                    className='min-w-0 flex-1'
-                    autoComplete='new-password'
-                    spellCheck={false}
-                    placeholder='扫码授权后自动填写'
-                    type={showSecret ? 'text' : 'password'}
-                  />
-                  <Button
-                    isIconOnly
-                    variant='tertiary'
-                    type='button'
-                    aria-label={showSecret ? '隐藏 AppSecret' : '显示 AppSecret'}
-                    onPress={() => setShowSecret((current) => !current)}
-                  >
-                    {showSecret ? (
-                      <EyeOff className='size-4' aria-hidden='true' />
-                    ) : (
-                      <Eye className='size-4' aria-hidden='true' />
-                    )}
-                  </Button>
-                </div>
-                <Description>修改或重新授权会刷新密钥，旧密钥立即失效。</Description>
-                <FieldError>{errors.secret}</FieldError>
-              </TextField>
+              />
             </div>
           </SectionCard>
 

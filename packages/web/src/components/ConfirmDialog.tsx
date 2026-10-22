@@ -33,7 +33,7 @@ export const ConfirmDialog = ({
             <Button variant='secondary' isDisabled={isPending} onPress={() => onOpenChange(false)}>
               取消
             </Button>
-            <Button isPending={isPending} onPress={onConfirm}>
+            <Button variant='danger' isPending={isPending} onPress={onConfirm}>
               {confirmLabel}
             </Button>
           </Modal.Footer>

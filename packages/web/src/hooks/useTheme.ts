@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const THEME_KEY = 'theme'
 const THEME_EVENT = 'qqbot-theme-changed'
@@ -21,6 +21,8 @@ const readStoredTheme = (): StoredTheme => {
     // Karin 主 WebUI 有时会把 theme 写成普通字符串，这里兼容非 JSON 值。
   }
 
+  /** 没有有效偏好时跟随系统，并把默认值写回，保持和 Karin 主界面一致。 */
+  localStorage.setItem(THEME_KEY, 'system')
   return 'system'
 }
 
@@ -48,6 +50,7 @@ const applyTheme = (applied: AppliedTheme) => {
 export const useTheme = () => {
   const [theme, setThemeState] = useState<StoredTheme>(readStoredTheme)
   const [appliedTheme, setAppliedTheme] = useState<AppliedTheme>(() => resolveTheme(readStoredTheme()))
+  const isKarinUpdateRef = useRef(false)
 
   const setTheme = useCallback((next: StoredTheme) => {
     localStorage.setItem(THEME_KEY, next)
@@ -61,6 +64,13 @@ export const useTheme = () => {
   }, [setTheme, theme])
 
   useEffect(() => {
+    // Karin 通过 postMessage 指定了实际主题时，不要再用本地偏好覆盖它。
+    if (isKarinUpdateRef.current) {
+      isKarinUpdateRef.current = false
+    } else {
+      setAppliedTheme(applyTheme(resolveTheme(theme)))
+    }
+
     const media = window.matchMedia('(prefers-color-scheme: dark)')
 
     const handleSystemChange = () => {
@@ -92,6 +102,7 @@ export const useTheme = () => {
       const nextTheme = isStoredTheme(message.theme) ? message.theme : readStoredTheme()
       const nextApplied = isAppliedTheme(message.appliedTheme) ? message.appliedTheme : resolveTheme(nextTheme)
 
+      isKarinUpdateRef.current = true
       localStorage.setItem(THEME_KEY, nextTheme)
       setThemeState(nextTheme)
       setAppliedTheme(applyTheme(nextApplied))

@@ -47,6 +47,8 @@ export interface LoginSnapshot {
   createdAt: number
   expiresAt: number
   appId?: string
+  name?: string
+  avatar?: string
   updated?: boolean
   message?: string
 }

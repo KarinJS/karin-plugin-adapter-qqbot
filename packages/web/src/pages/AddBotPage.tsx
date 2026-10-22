@@ -1,10 +1,11 @@
 import { Button, Card, Description, FieldError, Input, Label, Tabs, TextField, toast } from '@heroui/react'
-import { Eye, EyeOff, KeyRound, QrCode, Save } from 'lucide-react'
+import { KeyRound, QrCode, Save } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { EventTypePicker, type EventType } from '@/components/EventTypePicker'
 import { PageHeader } from '@/components/PageHeader'
 import { QrPanel } from '@/components/QrPanel'
+import { SecretField } from '@/components/SecretField'
 import { useConfigStore } from '@/hooks/useConfigStore'
 import type { BotConfig } from '@/lib/types'
 
@@ -15,7 +16,6 @@ const ManualAddForm = () => {
   const [appId, setAppId] = useState('')
   const [secret, setSecret] = useState('')
   const [eventType, setEventType] = useState<EventType>(2)
-  const [showSecret, setShowSecret] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -60,7 +60,7 @@ const ManualAddForm = () => {
       </Card.Header>
 
       <Card.Content className='p-5'>
-        <form className='flex flex-col gap-5' onSubmit={handleSubmit}>
+        <form className='flex flex-col gap-5' autoComplete='off' onSubmit={handleSubmit}>
           <div className='grid gap-5 sm:grid-cols-2'>
             <TextField
               fullWidth
@@ -72,44 +72,27 @@ const ManualAddForm = () => {
               }}
             >
               <Label>AppID</Label>
-              <Input autoComplete='off' spellCheck={false} placeholder='机器人 AppID' />
+              <Input
+                autoComplete='off'
+                spellCheck={false}
+                placeholder='机器人 AppID'
+                data-1p-ignore
+                data-bwignore
+                data-lpignore='true'
+              />
               <FieldError>{errors.appId}</FieldError>
             </TextField>
 
-            <TextField
-              fullWidth
+            <SecretField
               value={secret}
               isInvalid={Boolean(errors.secret)}
+              error={errors.secret}
+              placeholder='机器人 AppSecret'
               onChange={(value) => {
                 setSecret(value)
                 if (errors.secret) setErrors((current) => ({ ...current, secret: '' }))
               }}
-            >
-              <Label>AppSecret</Label>
-              <div className='flex items-center gap-2'>
-                <Input
-                  className='min-w-0 flex-1'
-                  autoComplete='new-password'
-                  spellCheck={false}
-                  placeholder='机器人 AppSecret'
-                  type={showSecret ? 'text' : 'password'}
-                />
-                <Button
-                  isIconOnly
-                  variant='tertiary'
-                  type='button'
-                  aria-label={showSecret ? '隐藏 AppSecret' : '显示 AppSecret'}
-                  onPress={() => setShowSecret((current) => !current)}
-                >
-                  {showSecret ? (
-                    <EyeOff className='size-4' aria-hidden='true' />
-                  ) : (
-                    <Eye className='size-4' aria-hidden='true' />
-                  )}
-                </Button>
-              </div>
-              <FieldError>{errors.secret}</FieldError>
-            </TextField>
+            />
           </div>
 
           <div className='flex flex-col gap-3'>

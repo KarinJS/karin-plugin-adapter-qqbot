@@ -2,6 +2,7 @@ import { Alert, Button, Card, Spinner, cn, toast } from '@heroui/react'
 import { CheckCircle2, Clock3, ExternalLink, QrCode, RefreshCw, ShieldAlert } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BotAvatar } from '@/components/BotAvatar'
 import { SectionCard } from '@/components/SectionCard'
 import { useConfigStore } from '@/hooks/useConfigStore'
 import { useViewport } from '@/hooks/useViewport'
@@ -72,8 +73,9 @@ export const QrPanel = () => {
 
         if (next.status === 'completed') {
           await reload()
+          const label = next.name ? `${next.name}（${next.appId}）` : next.appId
           toast.success('授权成功', {
-            description: next.updated ? `已更新 ${next.appId} 的 AppSecret` : `已添加机器人 ${next.appId}`,
+            description: next.updated ? `已更新 ${label} 的 AppSecret` : `已添加机器人 ${label}`,
           })
         } else if (next.status === 'expired' || next.status === 'failed') {
           setError(next.message || '授权未完成，请重新生成二维码')
@@ -140,16 +142,26 @@ export const QrPanel = () => {
       {!starting && isCompleted ? (
         <div
           className={cn(
-            'flex flex-col items-center justify-center gap-4 rounded-2xl border border-border bg-surface-secondary',
+            'flex flex-col items-center justify-center gap-4 rounded-2xl border border-success/30 bg-success/5',
             qrBox
           )}
         >
-          <span className='flex size-14 items-center justify-center rounded-full border border-border bg-surface'>
-            <CheckCircle2 className='size-7' aria-hidden='true' />
+          <span className='relative'>
+            {status.name || status.avatar ? (
+              <BotAvatar name={status.name} avatar={status.avatar} size='lg' />
+            ) : (
+              <span className='flex size-16 items-center justify-center rounded-full border border-border bg-surface'>
+                <CheckCircle2 className='size-7 text-success' aria-hidden='true' />
+              </span>
+            )}
+            <span className='absolute -right-1 -bottom-1 flex size-6 items-center justify-center rounded-full border-2 border-surface bg-success text-success-foreground'>
+              <CheckCircle2 className='size-3.5' aria-hidden='true' />
+            </span>
           </span>
-          <div className='text-center'>
-            <p className='text-base font-semibold'>授权成功</p>
+          <div className='max-w-56 text-center'>
+            <p className='truncate text-base font-semibold'>{status.name || '授权成功'}</p>
             <p className='mt-1 text-xs text-muted'>{status.appId}</p>
+            {status.name ? <p className='mt-1 text-xs text-success'>授权成功</p> : null}
           </div>
         </div>
       ) : null}
@@ -292,8 +304,8 @@ export const QrPanel = () => {
         </SectionCard>
 
         <SectionCard title='注意事项' description='扫码授权会直接影响现有机器人凭据。'>
-          <div className='flex items-start gap-3 rounded-xl border border-border/70 bg-surface-secondary/40 p-4'>
-            <ShieldAlert className='mt-0.5 size-4 shrink-0' aria-hidden='true' />
+          <div className='flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4'>
+            <ShieldAlert className='mt-0.5 size-4 shrink-0 text-warning' aria-hidden='true' />
             <p className='text-sm leading-6 text-muted'>
               授权成功后 QQ 会刷新该机器人的 AppSecret，旧的 AppSecret
               立即失效。如果机器人已经在别处运行，请同步更新那边的配置。
