@@ -1,0 +1,35 @@
+---
+title: 部署指南
+description: 安装、登录、配置和排障。
+---
+
+## 前置条件
+
+| 依赖      | 要求                                                              |
+| --------- | ----------------------------------------------------------------- |
+| Node.js   | >= 22                                                             |
+| Karin     | >= 1.15                                                           |
+| QQ 机器人 | 在 [QQ 开放平台](https://q.qq.com/) 创建，拿到 AppID 和 AppSecret |
+
+## 接入
+
+<Steps>
+  <Step>
+    ### 安装并登录
+
+    安装适配器，用 `#QQBot登录` 扫码生成配置。[安装与登录](/docs/deploy/install)
+
+  </Step>
+  <Step>
+    ### 按需改配置
+
+    事件接收方式、文本预处理和消息缓存都在 `config.json`。[配置项](/docs/deploy/config)
+
+  </Step>
+  <Step>
+    ### 排障
+
+    收不到事件、发不出消息时看[常见问题](/docs/deploy/troubleshooting)。
+
+  </Step>
+</Steps>

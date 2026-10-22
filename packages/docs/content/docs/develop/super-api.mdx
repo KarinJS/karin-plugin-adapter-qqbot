@@ -1,0 +1,69 @@
+---
+title: 官方 API
+description: 通过 bot.super 调用 QQ 官方 OpenAPI。
+---
+
+`bot.super` 的类型是 `QQBotApi`。返回值和官方文档一致，适配器负责鉴权、解包和错误格式化。
+
+## 模块
+
+| 模块           | 说明                                                   |
+| -------------- | ------------------------------------------------------ |
+| `request`      | 裸请求，调用还没封装的官方接口                         |
+| `messages`     | 发送、撤回、输入中状态、流式消息                       |
+| `media`        | 图片、视频、语音、文件上传                             |
+| `mediaImages`  | Markdown 素材图片，返回 `qqbot-media://`               |
+| `interaction`  | 按钮回调 ack                                           |
+| `meta`         | 机器人信息、私信会话、网关、分享链接                   |
+| `groups`       | 群信息、成员、禁言、黑名单、入群申请，大多是白名单接口 |
+| `guilds`       | 频道和子频道                                           |
+| `menu`         | 全局自定义菜单，只在单聊生效                           |
+| `panels`       | 指令面板                                               |
+| `joinApproval` | 入群自动审批策略                                       |
+| `qq`           | QQ 单聊 / 群聊请求体构造器                             |
+| `guild`        | 频道请求体构造器                                       |
+
+字段和返回值以 TypeScript 类型和[官方接口文档](https://bot.q.qq.com/wiki/develop/api-v2/)为准。
+
+## 示例
+
+```ts twoslash
+import type { AdapterQQBot } from '@karinjs/adapter-qqbot'
+
+declare const bot: AdapterQQBot
+declare const groupOpenid: string
+declare const cursor: string
+
+const state = await bot.super.groups.getBotState(groupOpenid)
+//    ^?
+
+const members = await bot.super.groups.getGroupMemberList(groupOpenid, { cursor })
+//    ^?
+```
+
+群成员列表每次最多 30 条，只能按 `cursor` 翻页。首次不传，之后回传响应里的 `next_cursor`，空字符串表示到底。
+
+审批历史入群申请用 `bot.super.groups.approvalJoinRequest(groupOpenid, memberOpenid, { op: 'approve', join_request_id })`。
+
+## 裸请求
+
+官方新接口还没封装时用 `bot.super.request`。它会注入 access_token、解包 `response.data`，失败时抛出带路径、脱敏请求体、错误码中文描述和 TraceID 的 `Error`。
+
+```ts twoslash
+import type { AdapterQQBot } from '@karinjs/adapter-qqbot'
+
+declare const bot: AdapterQQBot
+
+interface MenuResponse {
+  items: Array<{ id: string; name: string }>
+}
+
+const menu = await bot.super.request.get<MenuResponse>('/v2/menu')
+//    ^?
+
+await bot.super.request.post('/v2/xxx', { foo: 1 })
+```
+
+路径相对官方 API 的 baseURL。需要读响应头或状态码用 `requestRaw`，需要完全裸的 axios 用 `bot.super.axios`。
+
+平台返回的 `err_code` 会翻成中文，和 `trace_id` 一起放进 `Error.message`。排查时把整段日志发给平台。

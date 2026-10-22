@@ -1,0 +1,64 @@
+---
+title: 能力边界
+description: 哪些 Karin 标准方法不可用或会降级。
+---
+
+QQ 官方 Bot API 和 OneBot 不对等。下面这些方法保留了签名，调用时只写一条 `warn` 日志并返回空结果，不会抛错。需要对应能力时改用 `bot.super`。
+
+不要靠返回值判断成功，插件只看 `try/catch` 会以为发送成功了。
+
+## 消息
+
+| 方法             | 状态                                        |
+| ---------------- | ------------------------------------------- |
+| `sendLongMsg`    | 不支持长消息                                |
+| `getForwardMsg`  | 不支持获取合并转发消息                      |
+| `setMsgReaction` | 不支持设置消息表情回应                      |
+| `sendLike`       | 不支持发送好友赞                            |
+| `pokeUser`       | 不支持戳一戳                                |
+| `getHistoryMsg`  | 仅支持按 `message_id`，不支持 `message_seq` |
+
+## 群与好友
+
+| 方法                    | 状态                                  |
+| ----------------------- | ------------------------------------- |
+| `setGroupAllMute`       | 只支持查询，不支持设置全员禁言        |
+| `setGroupAdmin`         | 不支持设置群管理员                    |
+| `setGroupMemberCard`    | 不支持设置群名片                      |
+| `setGroupMemberTitle`   | 不支持设置群专属头衔                  |
+| `setGroupName`          | 不支持设置群名                        |
+| `setGroupRemark`        | 不支持设置群备注                      |
+| `setGroupQuit`          | 不支持主动退群                        |
+| `getGroupList`          | 不支持获取群列表，频道列表用 `guilds` |
+| `getGroupHonor`         | 不支持获取群荣誉                      |
+| `getNotJoinedGroupInfo` | 不支持获取陌生群信息                  |
+| `getFriendList`         | 不支持获取好友列表                    |
+| `getStrangerInfo`       | 不支持获取陌生人信息                  |
+| `setFriendApplyResult`  | 不支持设置好友申请结果                |
+| `getAtAllCount`         | 不支持获取 @全体成员剩余次数          |
+
+## 文件
+
+| 方法                                                         | 状态                      |
+| ------------------------------------------------------------ | ------------------------- |
+| `uploadFile`（频道 / 频道私信）                              | 不支持上传文件            |
+| `downloadFile`                                               | 不支持下载文件到本地      |
+| `getGroupFileList` / `getGroupFileSystemInfo`                | 不支持查询群文件          |
+| `getFileUrl` / `delGroupFile`                                | 不支持获取 URL / 删除文件 |
+| `createGroupFolder` / `renameGroupFolder` / `delGroupFolder` | 不支持群文件夹管理        |
+
+## 账号与其他
+
+| 方法                                             | 状态              |
+| ------------------------------------------------ | ----------------- |
+| `setAvatar`                                      | 不支持设置头像    |
+| `getCookies` / `getCredentials` / `getCSRFToken` | 不适用            |
+| `getRkey`                                        | 不支持获取 rkey   |
+| `getAiCharacters` / `sendAiCharacter`            | 不支持 AI 声色    |
+| `createResId`                                    | 不支持构造资源 ID |
+
+## 部分支持
+
+- 群踢人。官方没有踢人理由字段，`kickReason` 只写日志；`rejectAddRequest` 会同时加入群黑名单。
+- 频道 Markdown。没开通内邀时降级成普通消息，按钮丢失。
+- 群头像。官方没有接口，`getGroupAvatarUrl` 用 QQ 群头像 CDN 兜底。

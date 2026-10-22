@@ -1,0 +1,17 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../.oxlintrc.json"],
+  "plugins": ["typescript", "import", "unicorn", "oxc", "promise", "node", "react", "nextjs", "jsx-a11y"],
+  "settings": {
+    "react": {
+      "version": "19.3.1"
+    },
+    "next": {
+      "rootDir": "app"
+    }
+  },
+  "rules": {
+    "import/no-unassigned-import": "off",
+    "react/react-in-jsx-scope": "off"
+  }
+}

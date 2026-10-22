@@ -1,0 +1,40 @@
+{
+  "name": "@karinjs/adapter-qqbot-docs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Karin QQBot 适配器开发者文档",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "serve out",
+    "typecheck": "next typegen && tsc --noEmit",
+    "lint": "oxlint app components lib",
+    "lint:fix": "oxlint app components lib --fix"
+  },
+  "dependencies": {
+    "@karinjs/adapter-qqbot": "workspace:*",
+    "fumadocs-core": "16.17.7",
+    "fumadocs-mdx": "15.4.9",
+    "fumadocs-ui": "npm:@fumadocs/base-ui@16.17.7",
+    "lucide-react": "^1.59.0",
+    "next": "16.4.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/mdx": "^2.0.14",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "fumadocs-twoslash": "^4.0.3",
+    "node-karin": "1.16.3",
+    "oxlint": "^1.89.0",
+    "postcss": "^8.5.31",
+    "serve": "^14.2.6",
+    "shiki": "^4.5.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2"
+  }
+}

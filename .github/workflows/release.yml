@@ -13,7 +13,7 @@ jobs:
       contents: write
       pull-requests: write
     outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
+      release_created: ${{ steps.release.outputs['packages/adapter--release_created'] }}
     steps:
       - name: Run release-please
         uses: googleapis/release-please-action@v5
@@ -38,7 +38,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 9
+          version: 12.9.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -50,12 +50,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: pnpm run build
+      - name: Build adapter
+        run: pnpm --filter @karinjs/adapter-qqbot build
 
       # 使用 npm trusted publishing（OIDC）
       # 需要在 npm 包后台启用：Settings → Trusted publishers
       # provider: GitHub Actions / repo: KarinJS/karin-plugin-adapter-qqbot /
       # workflow: .github/workflows/release.yml / environment: 留空
       - name: Publish to npm (trusted)
+        working-directory: packages/adapter
         run: npm publish --provenance --access public

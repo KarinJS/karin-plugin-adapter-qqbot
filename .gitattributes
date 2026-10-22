@@ -1,0 +1,11 @@
+# 只让 TypeScript 计入 GitHub 语言统计，其余语言全部排除。
+* linguist-vendored
+*.ts linguist-vendored=false
+
+# 文档与生成文件不计入语言统计
+*.md linguist-documentation
+packages/api-docs/docs/** linguist-documentation
+packages/docs/content/** linguist-documentation
+
+# 锁文件视为生成文件
+pnpm-lock.yaml linguist-generated=true

@@ -1,0 +1,77 @@
+---
+title: 安装与登录
+description: 安装适配器、扫码登录、手动配置。
+---
+
+## 安装
+
+在 Karin 根目录执行下面的命令。
+
+```bash
+pnpm add @karinjs/adapter-qqbot -w
+```
+
+重启 Karin，日志出现适配器加载信息即可。
+
+## 配置位置
+
+插件目录下的 `config/config.json`。首次启动时为空数组或不存在。
+
+## 扫码登录
+
+<Steps>
+  <Step>
+    ### 启动 Karin
+
+    确认适配器已加载。
+
+  </Step>
+  <Step>
+    ### 发送指令
+
+    在已连接的机器人会话或 Karin 控制台发送 `#QQBot登录`。
+
+  </Step>
+  <Step>
+    ### 扫码授权
+
+    用手机 QQ 扫码。适配器会换取 AppID 和 AppSecret，写入配置并自动连接。
+
+  </Step>
+</Steps>
+
+<Callout type='warn' title='扫码会刷新 AppSecret'>
+  旧的 Secret 会立刻失效。有其他服务在用同一个 Secret 时，先确认它们能一起改配置。
+</Callout>
+
+## 手动配置
+
+编辑 `config.json`。一个数组元素对应一个机器人。
+
+```json
+[
+  {
+    "appId": "1234567890",
+    "secret": "your-secret",
+    "qqEnable": true,
+    "guildEnable": true,
+    "guildMode": 0,
+    "event": { "type": 2 }
+  }
+]
+```
+
+字段见[配置项](/docs/deploy/config)。改完重启 Karin 或等配置热重载。
+
+## 确认上线
+
+WebSocket 模式会打印两行日志。
+
+```text
+[QQ Official Bot][1234567890] 获取 access_token...
+WebSocket 就绪: 你的机器人昵称
+```
+
+停在第一行时检查 Secret 是否有效、机器人是否已发布。
+
+Webhook 模式把回调地址填成 `https://你的域名/qqbot/webhook`，确认平台推送没有报错。
