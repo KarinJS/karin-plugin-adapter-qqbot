@@ -1,24 +1,14 @@
-import {
-  Button,
-  Drawer,
-  FieldError,
-  Input,
-  Label,
-  TextField,
-  ToggleButton,
-  ToggleButtonGroup,
-  toast,
-} from '@heroui/react'
-import { QrCode, Save, X } from 'lucide-react'
-import { useEffect, useState, type FormEvent } from 'react'
+import { Button, Drawer, FieldError, Input, Label, Tabs, TextField, toast } from '@heroui/react'
+import { PenLine, QrCode, Save, X } from 'lucide-react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QrPanel } from '@/components/QrPanel'
 import { SecretField } from '@/components/SecretField'
 import { MobileGroup, MobileRow } from '@/components/mobile/MobileGroup'
 import { MobileEventTypePicker } from '@/components/mobile/MobileEventTypePicker'
+import { MobileSegmentedTabs } from '@/components/mobile/MobileSegmentedTabs'
 import { MobileSheet } from '@/components/mobile/MobileSheet'
 import type { EventType } from '@/components/EventTypePicker'
-import { mobileSegmentSelectedStyle } from '@/components/mobile/mobileStyles'
 import { useConfigStore } from '@/hooks/useConfigStore'
 import { useMobileSheet } from '@/hooks/useMobileSheet'
 import type { BotConfig } from '@/lib/types'
@@ -122,23 +112,40 @@ const MobileManualAddForm = () => {
   )
 }
 
+const addTabs = [
+  { key: 'qr', label: '扫码授权', icon: QrCode },
+  { key: 'manual', label: '手动填写', icon: PenLine },
+] as const
+
 /**
  * 扫码 / 手动添加机器人的底部抽屉。
  *
- * 默认占可用高度 50%，向上拖动可展开到全屏；两种添加方式共用同一个抽屉。
+ * 默认全屏打开，并沿用机器人配置抽屉的滚动、收起和退场逻辑。
+ * 扫码和手动共用同一个分段标签；切换标签不会卸载二维码，
+ * 只有退出抽屉或点击「重新生成」才会结束当前二维码会话。
  */
 export const MobileAddBotSheet = () => {
   const { isAddOpen, closeAdd } = useMobileSheet()
   const [mode, setMode] = useState<'qr' | 'manual'>('qr')
+  const [sessionKey, setSessionKey] = useState(0)
 
   useEffect(() => {
     if (isAddOpen) setMode('qr')
   }, [isAddOpen])
 
+  const handleExited = useCallback(() => {
+    // 抽屉完全退场后销毁二维码和手动表单状态；下次打开是新的会话。
+    setSessionKey((value) => value + 1)
+    setMode('qr')
+  }, [])
+
   return (
     <MobileSheet
       isOpen={isAddOpen}
       onRequestClose={closeAdd}
+      onExited={handleExited}
+      initialRatio={1}
+      collapsedRatio={1}
       header={
         <header className='sheet-header px-5 pb-3'>
           <Drawer.Handle className='mx-auto mb-1' />
@@ -154,37 +161,23 @@ export const MobileAddBotSheet = () => {
         </header>
       }
     >
-      <div className='flex flex-col gap-4 safe-bottom'>
-        <ToggleButtonGroup
-          selectionMode='single'
-          disallowEmptySelection
-          selectedKeys={[mode]}
-          size='sm'
-          aria-label='添加方式'
-          className='grid grid-cols-2 gap-1 rounded-xl bg-default p-1'
-          onSelectionChange={(keys) => {
-            const [next] = Array.from(keys)
-            if (next === 'qr' || next === 'manual') setMode(next)
+      <div key={sessionKey} className='safe-bottom'>
+        <MobileSegmentedTabs
+          ariaLabel='添加方式'
+          items={[...addTabs]}
+          selectedKey={mode}
+          className='gap-4'
+          onSelectionChange={(key) => {
+            if (key === 'qr' || key === 'manual') setMode(key)
           }}
         >
-          <ToggleButton
-            id='qr'
-            className='h-9 justify-center gap-1.5 rounded-lg text-xs font-medium'
-            style={mode === 'qr' ? mobileSegmentSelectedStyle : undefined}
-          >
-            <QrCode className='size-3.5' aria-hidden='true' />
-            扫码授权
-          </ToggleButton>
-          <ToggleButton
-            id='manual'
-            className='h-9 justify-center gap-1.5 rounded-lg text-xs font-medium'
-            style={mode === 'manual' ? mobileSegmentSelectedStyle : undefined}
-          >
-            手动填写
-          </ToggleButton>
-        </ToggleButtonGroup>
-
-        {mode === 'qr' ? <QrPanel /> : <MobileManualAddForm />}
+          <Tabs.Panel id='qr' shouldForceMount style={{ display: mode === 'qr' ? undefined : 'none' }}>
+            <QrPanel />
+          </Tabs.Panel>
+          <Tabs.Panel id='manual' shouldForceMount style={{ display: mode === 'manual' ? undefined : 'none' }}>
+            <MobileManualAddForm />
+          </Tabs.Panel>
+        </MobileSegmentedTabs>
       </div>
     </MobileSheet>
   )

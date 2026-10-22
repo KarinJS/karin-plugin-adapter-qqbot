@@ -17,6 +17,8 @@ interface SheetDragOptions {
   scrollerRef: RefObject<HTMLDivElement | null>
   /** 打开时测量的可用高度；整个打开周期内保持不变，避免滚动时抽屉忽高忽低。 */
   baseHeightRef: RefObject<number>
+  /** 松手回弹的目标高度比例；默认半屏，添加机器人使用 1（只有全屏）。 */
+  collapsedRatio?: number
 }
 
 type DragMode = 'expand' | 'collapse' | 'scroll' | 'none'
@@ -47,7 +49,8 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
  *
  * 50% 时向上拖会把剩下的高度带出来；到顶后继续向上拖直接转成内容滚动。
  * 全屏时纵向手势由这里自己接管：内容先按 1:1 滚动，
- * 滚到顶部后继续向下就无缝转成收起抽屉；收起时松手低于 25% 直接退场。
+ * 滚到顶部后继续向下就无缝转成收起抽屉；收起时松手低于 25% 直接退场，
+ * 其余回到 collapsedRatio 指定的高度（默认半屏，添加机器人是全屏）。
  * 不依赖浏览器原生滚动，避免 iOS / 安卓在滚动过程中取消 touch 事件、
  * 或者滚动到顶部后无法把抽屉接回手势的问题。
  *
@@ -61,6 +64,7 @@ export const useSheetDrag = ({
   backdropRef,
   scrollerRef,
   baseHeightRef,
+  collapsedRatio = SHEET_COLLAPSED_RATIO,
 }: SheetDragOptions) => {
   useEffect(() => {
     if (!isOpen || !mounted) return
@@ -85,7 +89,7 @@ export const useSheetDrag = ({
 
     const base = () => baseHeightRef.current
     const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const ratio = () => (base() ? dialog.offsetHeight / base() : SHEET_COLLAPSED_RATIO)
+    const ratio = () => (base() ? dialog.offsetHeight / base() : collapsedRatio)
     const maxScroll = () => Math.max(0, scroller.scrollHeight - scroller.clientHeight)
     const isInScroller = (target: EventTarget | null) => target instanceof Node && scroller.contains(target)
 
@@ -103,7 +107,7 @@ export const useSheetDrag = ({
      * 手指移动方向决定这次手势做什么：
      * 没到全屏时向上拖展开，到全屏后向上拖滚内容；
      * 内容没到顶时向下拖先滚内容，到顶后继续向下拖收起抽屉。
-     * 收起没有 50% 下限，低于 25% 松手会直接退场。
+     * 收起没有半屏下限，低于 25% 松手会直接退场。
      */
     const resolveTouchMode = (dy: number, inScroller: boolean): DragMode => {
       if (dy < 0) {
@@ -258,30 +262,31 @@ export const useSheetDrag = ({
       }
 
       const expand = current > SHEET_EXPAND_THRESHOLD
-      const target = expand ? height : height * SHEET_COLLAPSED_RATIO
+      const target = collapsedRatio >= 0.999 ? height : expand ? height : height * collapsedRatio
+      const expanded = target >= height - 0.5
 
       // 已经在目标高度上（例如正好拖到 100%），不需要再空跑一段动画。
       if (Math.abs(dialog.offsetHeight - target) < 0.5) {
         dialog.style.height = `${target}px`
-        setExpanded(expand)
+        setExpanded(expanded)
         return
       }
 
       if (reduceMotion()) {
         dialog.style.height = `${target}px`
-        setExpanded(expand)
+        setExpanded(expanded)
         return
       }
 
       gsap.to(dialog, {
         height: target,
         duration: SHEET_SNAP_DURATION,
-        ease: expand ? SHEET_ENTER_EASE : SHEET_EXIT_EASE,
+        ease: expanded ? SHEET_ENTER_EASE : SHEET_EXIT_EASE,
         overwrite: 'auto',
         onComplete: () => {
           dialog.style.height = `${target}px`
           // 吸附结束后再切安全区，避免拖动中途顶栏高度跳变。
-          setExpanded(expand)
+          setExpanded(expanded)
         },
       })
     }
@@ -459,5 +464,5 @@ export const useSheetDrag = ({
       gsap.killTweensOf(dialog, 'height')
       gsap.killTweensOf(scroller)
     }
-  }, [isOpen, mounted, onRequestClose, backdropRef, scrollerRef, baseHeightRef])
+  }, [isOpen, mounted, onRequestClose, backdropRef, scrollerRef, baseHeightRef, collapsedRatio])
 }

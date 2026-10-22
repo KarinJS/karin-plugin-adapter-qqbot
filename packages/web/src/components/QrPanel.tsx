@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Spinner, cn, toast } from '@heroui/react'
-import { CheckCircle2, Clock3, ExternalLink, QrCode, RefreshCw, ShieldAlert } from 'lucide-react'
+import { CheckCircle2, Clock3, ExternalLink, QrCode, RefreshCw, ShieldAlert, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BotAvatar } from '@/components/BotAvatar'
@@ -18,11 +18,14 @@ const formatRemaining = (seconds: number) => {
 
 export const QrPanel = () => {
   const { reload } = useConfigStore()
-  const { isMobile, isShort } = useViewport()
+  const { isMobile, isShort, isTiny } = useViewport()
   const navigate = useNavigate()
   const compact = isMobile
-  const qrBox = compact ? (isShort ? 'size-40' : 'size-52') : isShort ? 'size-40' : 'size-64'
-  const qrPixels = compact ? (isShort ? 160 : 208) : isShort ? 160 : 256
+  // 桌面保持竖排大二维码；手机改成二维码在左、状态在右的横向布局。
+  const qrBox = isShort ? 'size-40' : 'size-64'
+  const qrPixels = isShort ? 160 : 256
+  const compactQrBox = isShort ? 'size-36' : 'size-40'
+  const compactQrPixels = isShort ? 144 : 160
 
   const [session, setSession] = useState<LoginStartResponse | null>(null)
   const [status, setStatus] = useState<LoginSnapshot | null>(null)
@@ -113,7 +116,7 @@ export const QrPanel = () => {
   const isCompleted = status?.status === 'completed'
 
   const qrArea = (
-    <div className={compact ? 'flex w-full flex-col items-center gap-3' : 'flex flex-col items-center gap-4'}>
+    <div className='flex flex-col items-center gap-4'>
       {starting ? (
         <div
           className={cn(
@@ -256,23 +259,197 @@ export const QrPanel = () => {
     </div>
   )
 
+  const compactVisual = (
+    <div className='shrink-0'>
+      {starting ? (
+        <div
+          className={cn(
+            'flex items-center justify-center rounded-2xl border border-border bg-surface-secondary',
+            compactQrBox
+          )}
+        >
+          <Spinner size='lg' aria-label='正在生成二维码' />
+        </div>
+      ) : null}
+
+      {!starting && isPending && session ? (
+        <div className='rounded-2xl bg-white p-2 shadow-sm'>
+          <img
+            src={session.qrCode}
+            alt='QQ 扫码授权二维码'
+            width={compactQrPixels}
+            height={compactQrPixels}
+            className={cn('rounded-lg', compactQrBox)}
+            decoding='async'
+          />
+        </div>
+      ) : null}
+
+      {!starting && isCompleted ? (
+        <div
+          className={cn(
+            'flex items-center justify-center rounded-2xl border border-success/30 bg-success/5',
+            compactQrBox
+          )}
+        >
+          <span className='relative'>
+            {status.name || status.avatar ? (
+              <BotAvatar name={status.name} avatar={status.avatar} size='lg' />
+            ) : (
+              <span className='flex size-16 items-center justify-center rounded-full border border-border bg-surface'>
+                <CheckCircle2 className='size-7 text-success' aria-hidden='true' />
+              </span>
+            )}
+            <span className='absolute -right-1 -bottom-1 flex size-6 items-center justify-center rounded-full border-2 border-surface bg-success text-success-foreground'>
+              <CheckCircle2 className='size-3.5' aria-hidden='true' />
+            </span>
+          </span>
+        </div>
+      ) : null}
+
+      {!starting && !isPending && !isCompleted ? (
+        <div
+          className={cn(
+            'flex items-center justify-center rounded-2xl border border-dashed border-border bg-surface-secondary/50',
+            compactQrBox
+          )}
+        >
+          <span className='flex size-14 items-center justify-center rounded-full border border-border bg-surface text-muted'>
+            <QrCode className='size-7' aria-hidden='true' />
+          </span>
+        </div>
+      ) : null}
+    </div>
+  )
+
+  const compactStatus = (
+    <div className={cn('min-w-0 flex-1', isTiny && 'w-full flex-none text-center')}>
+      {starting ? (
+        <>
+          <p className='text-sm font-semibold'>正在生成二维码</p>
+          <p className='mt-1 text-xs leading-5 text-muted'>正在向 QQ 开放平台申请授权，请稍候。</p>
+        </>
+      ) : null}
+
+      {!starting && isPending && session ? (
+        <>
+          <p className='text-sm font-semibold'>等待扫码确认</p>
+          <p className='mt-1 text-xs leading-5 text-muted'>使用手机 QQ 扫描二维码，并在打开的页面里确认授权。</p>
+          <div className={cn('mt-2 flex items-center gap-2 text-xs text-muted', isTiny && 'justify-center')}>
+            <Spinner size='sm' aria-label='等待扫码' />
+            <span className='tabular flex items-center gap-1.5'>
+              <Clock3 className='size-3.5' aria-hidden='true' />
+              剩余 {formatRemaining(remaining)}
+            </span>
+          </div>
+        </>
+      ) : null}
+
+      {!starting && isCompleted ? (
+        <>
+          <p className='truncate text-sm font-semibold'>{status.name || '授权成功'}</p>
+          <p className='mt-1 truncate text-xs text-muted'>{status.appId}</p>
+          <p className='mt-2 text-xs leading-5 text-muted'>
+            {status.updated ? '已更新现有机器人的 AppSecret。' : '新机器人已经写入配置。'}
+            适配器会自动建立连接。
+          </p>
+        </>
+      ) : null}
+
+      {!starting && !isPending && !isCompleted ? (
+        <>
+          <p className='text-sm font-semibold'>扫码授权</p>
+          <p className='mt-1 text-xs leading-5 text-muted'>用手机 QQ 扫码，授权后会自动写入 AppID 和 AppSecret。</p>
+          <Button fullWidth size='sm' className='mt-3' isPending={starting} onPress={start}>
+            {({ isPending: pending }) => (
+              <>
+                {pending ? null : <QrCode className='size-4' aria-hidden='true' />}
+                <span>{pending ? '生成中' : '生成二维码'}</span>
+              </>
+            )}
+          </Button>
+        </>
+      ) : null}
+    </div>
+  )
+
+  const compactControls =
+    isPending || isCompleted ? (
+      <div className='mt-3'>
+        {isPending ? (
+          <div className='grid grid-cols-3 gap-2'>
+            <Button
+              fullWidth
+              variant='secondary'
+              className='flex h-14 flex-col items-center justify-center gap-1 px-1 text-[11px]'
+              onPress={start}
+              isDisabled={starting}
+            >
+              <RefreshCw className='size-4' aria-hidden='true' />
+              <span>重新生成</span>
+            </Button>
+            <Button
+              fullWidth
+              variant='secondary'
+              className='flex h-14 flex-col items-center justify-center gap-1 px-1 text-[11px]'
+              onPress={() => {
+                if (session) window.open(session.connectUrl, '_blank', 'noopener,noreferrer')
+              }}
+              isDisabled={!session}
+            >
+              <ExternalLink className='size-4' aria-hidden='true' />
+              <span>浏览器打开</span>
+            </Button>
+            <Button
+              fullWidth
+              variant='ghost'
+              className='flex h-14 flex-col items-center justify-center gap-1 px-1 text-[11px]'
+              onPress={cancel}
+            >
+              <X className='size-4' aria-hidden='true' />
+              <span>取消授权</span>
+            </Button>
+          </div>
+        ) : null}
+
+        {isCompleted ? (
+          <div className='grid grid-cols-2 gap-2'>
+            <Button
+              fullWidth
+              className='h-10 text-xs'
+              onPress={() => navigate(`/bots/${encodeURIComponent(status.appId ?? '')}`)}
+              isDisabled={!status.appId}
+            >
+              查看配置
+            </Button>
+            <Button fullWidth variant='secondary' className='h-10 text-xs' onPress={start}>
+              再添加一个
+            </Button>
+          </div>
+        ) : null}
+      </div>
+    ) : null
+
   if (compact) {
     return (
       <div className='flex flex-col gap-3'>
-        <div className='rounded-2xl border border-border/60 bg-surface p-4'>
-          <div className='flex flex-col items-center gap-3'>
-            {qrArea}
-            {error ? (
-              <Alert status='danger' className='w-full'>
-                <Alert.Indicator />
-                <Alert.Content>
-                  <Alert.Title>授权未完成</Alert.Title>
-                  <Alert.Description>{error}</Alert.Description>
-                </Alert.Content>
-              </Alert>
-            ) : null}
-            <div className='w-full'>{controls}</div>
+        <div className='rounded-2xl border border-border/60 bg-surface p-3.5'>
+          <div className={cn('flex gap-3.5', isTiny ? 'flex-col items-center' : 'items-center')}>
+            {compactVisual}
+            {compactStatus}
           </div>
+
+          {error ? (
+            <Alert status='danger' className='mt-3'>
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title>授权未完成</Alert.Title>
+                <Alert.Description>{error}</Alert.Description>
+              </Alert.Content>
+            </Alert>
+          ) : null}
+
+          {compactControls}
         </div>
 
         <div className='flex items-start gap-2.5 rounded-xl border border-warning/30 bg-warning/10 p-3'>

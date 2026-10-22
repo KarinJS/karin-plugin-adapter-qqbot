@@ -1,5 +1,6 @@
 import { Tabs } from '@heroui/react'
 import { PowerOff, RadioTower, Webhook } from 'lucide-react'
+import { MobileSegmentedTabs } from '@/components/mobile/MobileSegmentedTabs'
 import type { EventType } from '@/components/EventTypePicker'
 
 const options = [
@@ -23,6 +24,12 @@ const options = [
   },
 ]
 
+const tabs = options.map((option) => ({
+  key: String(option.value),
+  label: option.label,
+  icon: option.icon,
+}))
+
 interface MobileEventTypePickerProps {
   value: EventType
   onChange: (value: EventType) => void
@@ -36,37 +43,21 @@ interface MobileEventTypePickerProps {
  * 说明文字放在下方面板里，避免桌面那三张大卡片占掉半屏。
  */
 export const MobileEventTypePicker = ({ value, onChange, isDisabled }: MobileEventTypePickerProps) => (
-  <Tabs
+  <MobileSegmentedTabs
+    ariaLabel='事件接收方式'
+    items={tabs}
     selectedKey={String(value)}
     isDisabled={isDisabled}
-    className='w-full gap-2'
+    className='gap-2'
     onSelectionChange={(key) => {
       const next = Number(key)
       if (next === 0 || next === 1 || next === 2) onChange(next)
     }}
   >
-    <Tabs.List aria-label='事件接收方式' className='grid grid-cols-3 gap-1 rounded-xl bg-default p-1'>
-      {options.map((option) => {
-        const Icon = option.icon
-
-        return (
-          <Tabs.Tab
-            key={option.value}
-            id={String(option.value)}
-            className='h-9 min-w-0 justify-center gap-1.5 rounded-lg px-1 text-[11px] font-medium data-[selected=true]:text-foreground'
-          >
-            <Icon className='size-3.5' aria-hidden='true' />
-            <span className='truncate'>{option.label}</span>
-            <Tabs.Indicator className='rounded-lg bg-surface shadow-sm' />
-          </Tabs.Tab>
-        )
-      })}
-    </Tabs.List>
-
     {options.map((option) => (
       <Tabs.Panel key={option.value} id={String(option.value)} className='mt-0 px-1 text-[11px] leading-5 text-muted'>
         {option.description}
       </Tabs.Panel>
     ))}
-  </Tabs>
+  </MobileSegmentedTabs>
 )

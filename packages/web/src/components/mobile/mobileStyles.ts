@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { SHEET_BACKDROP_COLOR } from '@/lib/sheetMotion'
 
 /**
  * 手机端 bottom sheet 共用样式。
@@ -20,17 +21,14 @@ export const mobileSheetStyle: CSSProperties = {
   transition: 'none',
 } as CSSProperties
 
-/** 抽屉背后压暗遮罩。遮罩不做透明度渐变，抽屉打开时直接到位。 */
+/**
+ * 抽屉背后压暗遮罩。
+ *
+ * 遮罩本身的透明度保持 1，只让背景色的 alpha 随抽屉一起变化：
+ * 如果直接动 opacity，抽屉会被一起淡入淡出。
+ */
 export const mobileSheetBackdropStyle: CSSProperties = {
-  backgroundColor: 'rgb(0 0 0 / 0.38)',
-  // HeroUI 遮罩自带 opacity 过渡，会和“100% 不透明弹出”冲突。
+  backgroundColor: SHEET_BACKDROP_COLOR,
+  // HeroUI 遮罩自带 opacity 过渡，会和 GSAP 驱动的压暗冲突。
   transition: 'none',
-} as CSSProperties
-
-/** 分段控件的选中态：跟随主题表面色，而不是 HeroUI 默认的强调色。 */
-export const mobileSegmentSelectedStyle: CSSProperties = {
-  '--toggle-button-bg-selected': 'var(--surface)',
-  '--toggle-button-bg-selected-hover': 'var(--surface)',
-  '--toggle-button-bg-selected-pressed': 'var(--surface)',
-  '--toggle-button-fg-selected': 'var(--foreground)',
 } as CSSProperties

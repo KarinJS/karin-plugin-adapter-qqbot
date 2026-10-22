@@ -59,42 +59,44 @@ const MobileShellContent = () => {
 
   return (
     <>
-      <div className='mobile-frame flex h-dvh flex-col overflow-hidden bg-background' inert={isDetail}>
+      <div className='mobile-frame relative flex h-dvh flex-col overflow-hidden bg-background' inert={isDetail}>
         <div className='min-h-0 flex-1'>
           <MobilePager items={items} activeKey={activeKey} onChange={handlePagerChange} disabled={sheetOpen} />
         </div>
 
-        <nav className='glass safe-bottom shrink-0 border-t border-border/60' aria-label='主导航'>
-          <div className='grid grid-cols-2'>
-            {tabs.map((tab) => {
-              const Icon = tab.icon
-              const active = activeKey === tab.key
+        <div className='pointer-events-none absolute inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]'>
+          <nav className='mobile-floating-nav pointer-events-auto mx-auto w-full max-w-md p-1.5' aria-label='主导航'>
+            <div className='grid grid-cols-2 gap-1'>
+              {tabs.map((tab) => {
+                const Icon = tab.icon
+                const active = activeKey === tab.key
 
-              return (
-                <button
-                  key={tab.key}
-                  type='button'
-                  aria-current={active ? 'page' : undefined}
-                  className={cn(
-                    'flex min-h-14 flex-col items-center justify-center gap-1 text-[10px]',
-                    active ? 'text-foreground' : 'text-muted'
-                  )}
-                  onClick={() => navigate(tab.to)}
-                >
-                  <span
+                return (
+                  <button
+                    key={tab.key}
+                    type='button'
+                    aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'flex h-7 min-w-12 items-center justify-center rounded-full transition-colors duration-150',
-                      active ? 'bg-default text-foreground' : 'text-muted'
+                      'flex min-h-[3.25rem] flex-col items-center justify-center gap-1 rounded-[16px] text-[10px] transition-colors duration-150',
+                      active ? 'text-foreground' : 'text-muted'
                     )}
+                    onClick={() => navigate(tab.to)}
                   >
-                    <Icon className='size-[18px]' aria-hidden='true' />
-                  </span>
-                  <span className={active ? 'font-medium' : undefined}>{tab.label}</span>
-                </button>
-              )
-            })}
-          </div>
-        </nav>
+                    <span
+                      className={cn(
+                        'flex h-7 min-w-12 items-center justify-center rounded-full transition-colors duration-150',
+                        active ? 'bg-accent text-accent-foreground' : 'text-muted'
+                      )}
+                    >
+                      <Icon className='size-[18px]' aria-hidden='true' />
+                    </span>
+                    <span className={active ? 'font-medium' : undefined}>{tab.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </nav>
+        </div>
       </div>
 
       {detailAppId ? <MobileBotDetailPage appId={detailAppId} /> : null}

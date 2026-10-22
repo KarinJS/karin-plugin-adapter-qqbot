@@ -1,6 +1,13 @@
 import { gsap } from 'gsap'
 import { useLayoutEffect, useRef, useState } from 'react'
-import { SHEET_ENTER_DURATION, SHEET_ENTER_EASE, SHEET_EXIT_DURATION, SHEET_EXIT_EASE } from '@/lib/sheetMotion'
+import {
+  SHEET_BACKDROP_COLOR,
+  SHEET_BACKDROP_COLOR_CLEAR,
+  SHEET_ENTER_DURATION,
+  SHEET_ENTER_EASE,
+  SHEET_EXIT_DURATION,
+  SHEET_EXIT_EASE,
+} from '@/lib/sheetMotion'
 
 interface SheetMotionOptions {
   isOpen: boolean
@@ -14,8 +21,9 @@ interface SheetMotionOptions {
 /**
  * 底部抽屉的进入 / 退出动画。
  *
- * 进入时遮罩直接到位、抽屉以 100% 不透明度从底部滑上来，不做透明度渐变；
- * 退出沿同一条路径滑回去，结束后再卸载。
+ * 进入时抽屉以 100% 不透明度从底部滑上来，不做透明度渐变；
+ * 背后的压暗用背景色的 alpha 跟随抽屉一起变化，避免连抽屉一起淡入。
+ * 退场沿同一条路径滑回去，结束后再卸载。
  * 动画直接驱动 dialog 的 transform，不依赖 HeroUI 的 data-entering。
  */
 export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }: SheetMotionOptions) => {
@@ -53,11 +61,18 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }
     beforeEnterRef.current?.(dialog)
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      gsap.set(backdrop, { backgroundColor: SHEET_BACKDROP_COLOR })
       gsap.set(dialog, { y: 0 })
       if (frame) gsap.set(frame, { scale: 0.94, y: 10, borderRadius: 24 })
       return
     }
 
+    // 压暗和外壳缩放、抽屉滑入同时开始，使用同一组时长与曲线。
+    gsap.fromTo(
+      backdrop,
+      { backgroundColor: SHEET_BACKDROP_COLOR_CLEAR },
+      { backgroundColor: SHEET_BACKDROP_COLOR, duration: SHEET_ENTER_DURATION, ease: SHEET_ENTER_EASE }
+    )
     gsap.fromTo(dialog, { y: dialog.offsetHeight }, { y: 0, duration: SHEET_ENTER_DURATION, ease: SHEET_ENTER_EASE })
     if (frame) {
       gsap.to(frame, {
@@ -95,6 +110,7 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }
     if (frame) gsap.killTweensOf(frame)
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      gsap.set(backdrop, { backgroundColor: SHEET_BACKDROP_COLOR_CLEAR })
       if (frame) gsap.set(frame, { scale: 1, y: 0, borderRadius: 0 })
       setMounted(false)
       closingRef.current = false
@@ -102,6 +118,11 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }
       return
     }
 
+    gsap.to(backdrop, {
+      backgroundColor: SHEET_BACKDROP_COLOR_CLEAR,
+      duration: SHEET_EXIT_DURATION,
+      ease: SHEET_EXIT_EASE,
+    })
     gsap.to(dialog, {
       y: dialog.offsetHeight,
       duration: SHEET_EXIT_DURATION,
