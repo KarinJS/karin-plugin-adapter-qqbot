@@ -11,8 +11,8 @@
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
   /* 与 src/lib/sheetMotion.ts 的时长 / 曲线保持一致。 */
-  --sheet-enter-duration: 920ms;
-  --sheet-exit-duration: 780ms;
+  --sheet-enter-duration: 420ms;
+  --sheet-exit-duration: 280ms;
   --sheet-enter-ease: cubic-bezier(0.165, 0.84, 0.44, 1); /* power3.out */
   --sheet-exit-ease: cubic-bezier(0.32, 0, 0.67, 0); /* power2.in */
 
@@ -263,12 +263,12 @@
  */
 .sheet-header {
   padding-top: 0.5rem;
-  /* 顶栏本身是拖动面：纵向交给 JS，横向仍交给浏览器。 */
-  touch-action: pan-x;
+  /* 纵向手势由 JS 接管；横向和双指缩放仍交给浏览器。 */
+  touch-action: pan-x pinch-zoom;
 }
 
 .sheet-footer {
-  touch-action: pan-x;
+  touch-action: pan-x pinch-zoom;
 }
 
 [data-slot='drawer-dialog'][data-sheet-expanded='true'] .sheet-header {
@@ -337,15 +337,18 @@
 
 .sheet-edge-blur--top {
   top: 0;
-  /*
-   * 安卓 Edge 不会用父级的圆角裁掉带 backdrop-filter 的子层，
-   * 模糊层会盖住顶部两角，看起来就像没有圆角。
-   * 给模糊层自己加同样的圆角和 clip-path，强制裁切。
-   */
   border-top-left-radius: 28px;
   border-top-right-radius: 28px;
-  overflow: hidden;
-  clip-path: inset(0 round 28px 28px 0 0);
+}
+
+/*
+ * 圆角交给每一层自己绘制。
+ * 不能用 overflow / clip-path 裁切容器：移动端浏览器会把带
+ * backdrop-filter 的子层一起裁掉，顶部模糊会直接消失。
+ */
+.sheet-edge-blur--top .sheet-edge-blur__layer {
+  border-top-left-radius: 28px;
+  border-top-right-radius: 28px;
 }
 
 .sheet-edge-blur--bottom {

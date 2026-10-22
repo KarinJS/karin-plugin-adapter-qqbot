@@ -25,7 +25,6 @@ interface MobileSheetProps {
 export const MobileSheet = ({ isOpen, onRequestClose, onExited, header, footer, children }: MobileSheetProps) => {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const baseHeightRef = useRef(0)
-  const ratioRef = useRef(SHEET_COLLAPSED_RATIO)
 
   const prepareHeight = useCallback((dialog: HTMLElement) => {
     const content = dialog.closest<HTMLElement>('[data-slot="drawer-content"]')
@@ -34,7 +33,6 @@ export const MobileSheet = ({ isOpen, onRequestClose, onExited, header, footer, 
     const height = Math.max(1, Math.round(base * SHEET_COLLAPSED_RATIO))
 
     baseHeightRef.current = base
-    ratioRef.current = SHEET_COLLAPSED_RATIO
     dialog.style.height = `${height}px`
     dialog.style.maxHeight = `${base}px`
     delete dialog.dataset.sheetExpanded
@@ -42,7 +40,6 @@ export const MobileSheet = ({ isOpen, onRequestClose, onExited, header, footer, 
 
   const handleExited = useCallback(() => {
     baseHeightRef.current = 0
-    ratioRef.current = SHEET_COLLAPSED_RATIO
     onExited?.()
   }, [onExited])
 
@@ -59,7 +56,6 @@ export const MobileSheet = ({ isOpen, onRequestClose, onExited, header, footer, 
     backdropRef,
     scrollerRef,
     baseHeightRef,
-    ratioRef,
   })
 
   // HeroUI 的 outside dismiss 会把 Select 的 portal 弹层当成“抽屉外部”，

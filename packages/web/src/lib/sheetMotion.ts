@@ -1,12 +1,12 @@
 /**
  * 底部抽屉的动画参数。
  *
- * 时长在原来的 0.42s / 0.28s 基础上各增加 0.5s；
- * 曲线与 styles.css 里的 --sheet-enter-ease / --sheet-exit-ease 对应，
+ * 时长回到 0.42s / 0.28s，曲线与 styles.css 里的
+ * --sheet-enter-ease / --sheet-exit-ease 对应；
  * 背景外壳的缩放和抽屉本身必须使用同一组时长与曲线。
  */
-export const SHEET_ENTER_DURATION = 0.92
-export const SHEET_EXIT_DURATION = 0.78
+export const SHEET_ENTER_DURATION = 0.42
+export const SHEET_EXIT_DURATION = 0.28
 
 /** 对应 CSS cubic-bezier(0.165, 0.84, 0.44, 1)，即 easeOutQuart。 */
 export const SHEET_ENTER_EASE = 'power3.out'
