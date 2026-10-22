@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.5.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.4.0...adapter-qqbot-v3.5.0) (2026-10-22)
+
+
+### Features
+
+* 迁移为 pnpm workspace，接入 oxc 与 TypeScript 7 ([#73](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/73)) ([e49e657](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/e49e657c7daafa5046f8baefc47f74b873e8f528))
+
+
+### Bug Fixes
+
+* **docs:** Twoslash 直接解析适配器源码 ([#75](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/75)) ([0225506](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/0225506c0498d28bf5334641480df95a0c2aebb6))
+
 ## [3.4.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.3.1...adapter-qqbot-v3.4.0) (2026-10-21)
 
 ### Features
