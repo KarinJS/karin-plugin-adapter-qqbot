@@ -34,7 +34,7 @@ test.js
 
 # 构建产物
 dist/
-lib/
+/lib/
 packages/docs/.next/
 packages/docs/.source/
 packages/docs/out/

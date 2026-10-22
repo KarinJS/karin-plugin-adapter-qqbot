@@ -8,12 +8,5 @@
   "env": {
     "builtin": true
   },
-  "ignorePatterns": [
-    "**/node_modules/**",
-    "**/dist/**",
-    "**/lib/**",
-    "**/.next/**",
-    "**/.source/**",
-    "packages/api-docs/docs/**"
-  ]
+  "ignorePatterns": ["**/node_modules/**", "**/dist/**", "**/.next/**", "**/.source/**", "packages/api-docs/docs/**"]
 }
