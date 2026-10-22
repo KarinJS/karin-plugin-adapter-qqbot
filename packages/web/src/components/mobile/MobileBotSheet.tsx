@@ -5,9 +5,11 @@ import { BotAvatar } from '@/components/BotAvatar'
 import { SaveStatus } from '@/components/SaveStatus'
 import { StatusPill } from '@/components/StatusPill'
 import { MobileBotFields } from '@/components/mobile/MobileBotFields'
+import { mobileSheetBackdropStyle, mobileSheetStyle } from '@/components/mobile/mobileStyles'
 import { useBotEditor } from '@/hooks/useBotEditor'
 import { useConfigStore } from '@/hooks/useConfigStore'
 import { useMobileSheet } from '@/hooks/useMobileSheet'
+import { useSheetMotion } from '@/hooks/useSheetMotion'
 import type { BotConfig } from '@/lib/types'
 
 interface SheetBodyProps {
@@ -33,13 +35,13 @@ const SheetBody = ({ bot, formId, onClose, onSaved, onRemove, removing }: SheetB
       <div className='flex shrink-0 items-start gap-3 px-5 pb-3'>
         <BotAvatar name={title} avatar={status?.avatar} size='md' />
         <div className='min-w-0 flex-1'>
-          <div className='flex min-w-0 items-center gap-2'>
-            <h2 className='truncate text-[17px] leading-tight font-semibold tracking-[-0.02em]'>{title}</h2>
+          <h2 className='truncate text-[17px] leading-tight font-semibold tracking-[-0.02em]'>{title}</h2>
+          <div className='mt-1 flex min-w-0 items-center gap-2'>
             <StatusPill online={status?.online ?? false} eventType={bot.event.type} className='shrink-0 text-[11px]' />
+            <span className='truncate text-[11px] text-muted'>{bot.appId}</span>
           </div>
-          <p className='mt-0.5 truncate text-[11px] text-muted'>{bot.appId}</p>
         </div>
-        <Button isIconOnly size='sm' variant='ghost' aria-label='关闭机器人配置' onPress={onClose}>
+        <Button isIconOnly size='sm' variant='tertiary' aria-label='关闭机器人配置' onPress={onClose}>
           <X className='size-4' aria-hidden='true' />
         </Button>
       </div>
@@ -77,13 +79,17 @@ const SheetBody = ({ bot, formId, onClose, onSaved, onRemove, removing }: SheetB
 /**
  * 手机端机器人配置抽屉。
  *
- * 占屏幕 80% 高度，背景由外壳负责压暗和缩放；抽屉本身只做内容与保存。
+ * 占屏幕 90% 高度，背景由外壳负责压暗和缩放；抽屉本身只做内容与保存。
  */
 export const MobileBotSheet = () => {
   const { activeAppId, isOpen, close, open } = useMobileSheet()
   const { config, remove } = useConfigStore()
   const formId = useId()
   const [removing, setRemoving] = useState(false)
+  const { backdropRef, mounted, handleOpenChange } = useSheetMotion({
+    isOpen,
+    onRequestClose: close,
+  })
   const bot = activeAppId ? config.find((item) => item.appId === activeAppId) : undefined
 
   useEffect(() => {
@@ -111,16 +117,15 @@ export const MobileBotSheet = () => {
 
   return (
     <Drawer.Backdrop
-      isOpen={isOpen}
-      onOpenChange={(next) => {
-        if (!next) close()
-      }}
-      style={{ backgroundColor: 'rgb(0 0 0 / 0.38)' }}
+      ref={backdropRef}
+      isOpen={mounted}
+      onOpenChange={handleOpenChange}
+      style={mobileSheetBackdropStyle}
     >
       <Drawer.Content placement='bottom'>
         <Drawer.Dialog
           className='flex flex-col border border-border/60 bg-surface shadow-overlay'
-          style={{ height: '80dvh', maxHeight: '80dvh', padding: 0, borderRadius: '28px 28px 0 0' }}
+          style={mobileSheetStyle}
         >
           <Drawer.Handle className='pt-2' />
           {bot ? (

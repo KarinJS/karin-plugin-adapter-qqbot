@@ -21,10 +21,14 @@ interface SaveStatusProps {
 export const SaveStatus = ({ state, errorMessage }: SaveStatusProps) => {
   const ref = useRef<HTMLDivElement>(null)
   const previous = useRef<SaveState>('idle')
-  const [shown, setShown] = useState<SaveState>('saving')
+  const [shown, setShown] = useState<SaveState>(state)
+  const [mounted, setMounted] = useState(state !== 'idle')
 
   useEffect(() => {
-    if (state !== 'idle') setShown(state)
+    if (state !== 'idle') {
+      setShown(state)
+      setMounted(true)
+    }
   }, [state])
 
   useGSAP(
@@ -68,8 +72,10 @@ export const SaveStatus = ({ state, errorMessage }: SaveStatusProps) => {
         { autoAlpha: 1, duration: reduceMotion ? 0.1 : 0.16, ease: 'power2.out', overwrite: 'auto' }
       )
     },
-    { dependencies: [state], scope: ref }
+    { dependencies: [state, mounted], scope: ref }
   )
+
+  if (!mounted) return null
 
   return createPortal(
     <div

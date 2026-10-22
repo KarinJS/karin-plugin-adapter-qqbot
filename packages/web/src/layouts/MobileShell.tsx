@@ -1,23 +1,21 @@
 import { cn } from '@heroui/react'
-import { Bot, LayoutGrid, QrCode } from 'lucide-react'
+import { Bot, LayoutGrid } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
 import { useLocation, useMatch, useNavigate } from 'react-router-dom'
+import { MobileAddBotSheet } from '@/components/mobile/MobileAddBotSheet'
 import { MobileBotSheet } from '@/components/mobile/MobileBotSheet'
 import { MobilePager, type MobilePagerItem } from '@/components/mobile/MobilePager'
 import { MobileSheetProvider, useMobileSheet } from '@/hooks/useMobileSheet'
-import { MobileAddBotPage } from '@/pages/mobile/MobileAddBotPage'
 import { MobileBotDetailPage } from '@/pages/mobile/MobileBotDetailPage'
 import { MobileBotsPage } from '@/pages/mobile/MobileBotsPage'
 import { MobileOverviewPage } from '@/pages/mobile/MobileOverviewPage'
 
 const tabs = [
   { key: 'bots', to: '/bots', label: '机器人', icon: Bot },
-  { key: 'add', to: '/bots/new', label: '扫码', icon: QrCode },
   { key: 'overview', to: '/overview', label: '概览', icon: LayoutGrid },
 ] as const
 
 const getActiveKey = (pathname: string) => {
-  if (pathname === '/bots/new') return 'add'
   if (pathname.startsWith('/bots')) return 'bots'
   if (pathname.startsWith('/overview')) return 'overview'
   return null
@@ -26,21 +24,29 @@ const getActiveKey = (pathname: string) => {
 const MobileShellContent = () => {
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const { isOpen } = useMobileSheet()
+  const { isOpen, isAddOpen, close, closeAdd } = useMobileSheet()
   const activeKey = getActiveKey(pathname) ?? 'bots'
   const detailMatch = useMatch('/bots/:appId')
   const rawDetailAppId = detailMatch?.params.appId
   const detailAppId = rawDetailAppId && rawDetailAppId !== 'new' ? decodeURIComponent(rawDetailAppId) : null
   const isDetail = Boolean(detailAppId)
+  const sheetOpen = isOpen || isAddOpen
 
   useEffect(() => {
-    if (getActiveKey(pathname) === null) navigate('/bots', { replace: true })
+    if (pathname === '/bots/new' || getActiveKey(pathname) === null) {
+      navigate('/bots', { replace: true })
+    }
   }, [navigate, pathname])
+
+  useEffect(() => {
+    if (!detailAppId) return
+    close()
+    closeAdd()
+  }, [close, closeAdd, detailAppId])
 
   const items = useMemo<MobilePagerItem[]>(
     () => [
       { key: 'bots', label: '机器人列表', element: <MobileBotsPage /> },
-      { key: 'add', label: '扫码添加', element: <MobileAddBotPage /> },
       { key: 'overview', label: '概览', element: <MobileOverviewPage /> },
     ],
     []
@@ -56,16 +62,16 @@ const MobileShellContent = () => {
       <div
         className={cn(
           'mobile-frame flex h-dvh flex-col overflow-hidden bg-background',
-          isOpen && 'mobile-frame--sheet'
+          sheetOpen && 'mobile-frame--sheet'
         )}
         inert={isDetail}
       >
         <div className='min-h-0 flex-1'>
-          <MobilePager items={items} activeKey={activeKey} onChange={handlePagerChange} disabled={isOpen} />
+          <MobilePager items={items} activeKey={activeKey} onChange={handlePagerChange} disabled={sheetOpen} />
         </div>
 
         <nav className='glass safe-bottom shrink-0 border-t border-border/60' aria-label='主导航'>
-          <div className='grid grid-cols-3'>
+          <div className='grid grid-cols-2'>
             {tabs.map((tab) => {
               const Icon = tab.icon
               const active = activeKey === tab.key
@@ -99,6 +105,7 @@ const MobileShellContent = () => {
 
       {detailAppId ? <MobileBotDetailPage appId={detailAppId} /> : null}
       <MobileBotSheet />
+      <MobileAddBotSheet />
     </>
   )
 }
@@ -106,8 +113,8 @@ const MobileShellContent = () => {
 /**
  * 手机端外壳。
  *
- * 三个顶层页面常驻在横向分页器里，底部导航参与 flex 布局，不再浮在内容上；
- * 机器人详情页是覆盖在分页器上的独立整页，返回按钮会随滚动连续收缩。
+ * 机器人列表与概览常驻在横向分页器里，底部导航参与 flex 布局；
+ * 机器人配置和扫码添加都是独立底部抽屉，详情页覆盖在分页器之上。
  */
 export const MobileShell = () => (
   <MobileSheetProvider>

@@ -259,7 +259,17 @@
   display: none;
 }
 
-/* 手机分页器：每个顶层页面独立滚动，滚动条不占视觉空间。 */
+/* 手机分页器：原生横向滚动 + 吸附，滚动条不占视觉空间。 */
+.mobile-pager {
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-pager::-webkit-scrollbar {
+  display: none;
+}
+
 .mobile-panel {
   padding: max(0.75rem, env(safe-area-inset-top, 0px)) 1rem 1.5rem;
   -webkit-overflow-scrolling: touch;

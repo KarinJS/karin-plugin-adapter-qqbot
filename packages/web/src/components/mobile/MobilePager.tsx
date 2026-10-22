@@ -1,7 +1,5 @@
-import { useGSAP } from '@gsap/react'
 import { cn } from '@heroui/react'
-import { gsap } from 'gsap'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, type ReactNode } from 'react'
 
 export interface MobilePagerItem {
   key: string
@@ -16,236 +14,116 @@ interface MobilePagerProps {
   disabled?: boolean
 }
 
-interface DragState {
-  pointerId: number | null
-  startX: number
-  startY: number
-  baseX: number
-  axis: 'x' | 'y' | null
-  active: boolean
-  lastX: number
-  lastTime: number
-  velocity: number
-}
-
-const emptyDrag: DragState = {
-  pointerId: null,
-  startX: 0,
-  startY: 0,
-  baseX: 0,
-  axis: null,
-  active: false,
-  lastX: 0,
-  lastTime: 0,
-  velocity: 0,
-}
-
-/** 边缘拖动时逐渐增加阻力，避免第一页/最后一页被拖出空白。 */
-const rubberband = (offset: number, dimension: number) => {
-  const constant = 0.55
-  return (offset * dimension * constant) / (dimension + constant * Math.abs(offset))
-}
-
 /**
  * 手机端顶层页面横向分页器。
  *
- * 所有顶层页面同时挂载，拖动时两页同时可见；松手后根据位移和速度吸附到目标页。
- * 吸附动画使用 GSAP，用户再次按下时会立刻停止并接管当前位移，所以可以随时反悔。
+ * 使用原生横向滚动 + scroll-snap，让浏览器自己处理触摸方向、惯性和吸附：
+ * 拖动时两页同时可见，松手后可以继续拖回，滑动到一半也能停住。
+ * 路由只在滚动真正吸附后同步，避免拖动过程中地址栏反复变化。
  */
 export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePagerProps) => {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const trackRef = useRef<HTMLDivElement>(null)
+  const scrollerRef = useRef<HTMLDivElement>(null)
   const activeIndex = Math.max(
     0,
     items.findIndex((item) => item.key === activeKey)
   )
   const indexRef = useRef(activeIndex)
-  const widthRef = useRef(0)
-  const dragRef = useRef<DragState>({ ...emptyDrag })
-  const suppressClickRef = useRef(0)
-  const [dragging, setDragging] = useState(false)
+  const firstRef = useRef(true)
+  const settleTimerRef = useRef<number | undefined>(undefined)
 
-  const snapTo = useCallback((index: number, animate: boolean) => {
-    const track = trackRef.current
-    const width = widthRef.current || containerRef.current?.clientWidth || 0
-    if (!track) return
+  const scrollToIndex = useCallback((index: number, behavior: ScrollBehavior) => {
+    const scroller = scrollerRef.current
+    if (!scroller) return
 
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const width = scroller.clientWidth
+    if (!width) return
 
-    if (!animate || reduceMotion) {
-      gsap.set(track, { x: -index * width })
-      return
-    }
-
-    gsap.to(track, {
-      x: -index * width,
-      duration: 0.36,
-      ease: 'power3.out',
-      overwrite: true,
-    })
+    scroller.scrollTo({ left: index * width, behavior })
   }, [])
 
   useEffect(() => {
-    const next = Math.max(
-      0,
-      items.findIndex((item) => item.key === activeKey)
-    )
-    if (next === indexRef.current) return
+    indexRef.current = activeIndex
 
-    indexRef.current = next
-    snapTo(next, true)
-  }, [activeKey, items, snapTo])
+    const scroller = scrollerRef.current
+    if (!scroller) return
 
-  useGSAP(
-    () => {
-      const container = containerRef.current
-      const track = trackRef.current
-      if (!container || !track) return
-
-      const measure = () => {
-        const width = container.clientWidth
-        widthRef.current = width
-        gsap.set(track, { x: -indexRef.current * width })
-      }
-
-      measure()
-
-      const observer = new ResizeObserver(measure)
-      observer.observe(container)
-
-      return () => observer.disconnect()
-    },
-    { scope: containerRef }
-  )
-
-  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (disabled || event.button !== 0) return
-
-    const target = event.target as HTMLElement
-    if (target.closest('input, textarea, select, [contenteditable="true"], [data-pager-no-drag]')) return
-
-    const track = trackRef.current
-    if (!track) return
-
-    gsap.killTweensOf(track)
-    const baseX = Number(gsap.getProperty(track, 'x')) || 0
-
-    dragRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      baseX,
-      axis: null,
-      active: false,
-      lastX: event.clientX,
-      lastTime: performance.now(),
-      velocity: 0,
-    }
-  }
-
-  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current
-    if (drag.pointerId !== event.pointerId) return
-
-    const dx = event.clientX - drag.startX
-    const dy = event.clientY - drag.startY
-
-    if (!drag.axis) {
-      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
-
-      if (Math.abs(dx) > Math.abs(dy) * 1.15) {
-        drag.axis = 'x'
-        drag.active = true
-        setDragging(true)
-        containerRef.current?.setPointerCapture(event.pointerId)
-      } else {
-        drag.axis = 'y'
-        return
-      }
-    }
-
-    if (drag.axis !== 'x') return
-
-    if (event.cancelable) event.preventDefault()
-
-    const width = widthRef.current
-    let next = drag.baseX + dx
-    const min = -(items.length - 1) * width
-
-    if (next > 0) next = rubberband(next, width)
-    else if (next < min) next = min + rubberband(next - min, width)
-
-    gsap.set(trackRef.current, { x: next })
-
-    const now = performance.now()
-    const dt = now - drag.lastTime
-    if (dt > 0) {
-      drag.velocity = (event.clientX - drag.lastX) / dt
-      drag.lastTime = now
-      drag.lastX = event.clientX
-    }
-  }
-
-  const finishDrag = (event: React.PointerEvent<HTMLDivElement>, cancelled: boolean) => {
-    const drag = dragRef.current
-    if (drag.pointerId !== event.pointerId) return
-
-    if (!drag.active) {
-      dragRef.current = { ...emptyDrag }
+    const target = activeIndex * scroller.clientWidth
+    if (Math.abs(scroller.scrollLeft - target) < 1) {
+      firstRef.current = false
       return
     }
 
-    const width = widthRef.current
-    const currentX = Number(gsap.getProperty(trackRef.current, 'x')) || 0
-    const offset = currentX + indexRef.current * width
-    let target = indexRef.current
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    scrollToIndex(activeIndex, firstRef.current || reduceMotion ? 'auto' : 'smooth')
+    firstRef.current = false
+  }, [activeIndex, scrollToIndex])
 
-    if (!cancelled) {
-      if (offset < -width * 0.22 || drag.velocity < -0.45) target += 1
-      else if (offset > width * 0.22 || drag.velocity > 0.45) target -= 1
+  useEffect(() => {
+    const scroller = scrollerRef.current
+    if (!scroller) return
+
+    const observer = new ResizeObserver(() => {
+      const width = scroller.clientWidth
+      if (!width) return
+      scroller.scrollTo({ left: indexRef.current * width, behavior: 'auto' })
+    })
+
+    observer.observe(scroller)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const scroller = scrollerRef.current
+    if (!scroller) return
+
+    const settle = () => {
+      const width = scroller.clientWidth
+      if (!width) return
+
+      const index = Math.max(0, Math.min(items.length - 1, Math.round(scroller.scrollLeft / width)))
+      const snapped = Math.abs(scroller.scrollLeft - index * width) < 2
+      if (!snapped) return
+
+      indexRef.current = index
+      const item = items[index]
+      if (item && item.key !== activeKey) onChange(item.key)
     }
 
-    target = Math.max(0, Math.min(items.length - 1, target))
-    indexRef.current = target
-    suppressClickRef.current = performance.now() + 320
-    setDragging(false)
-    dragRef.current = { ...emptyDrag }
-
-    try {
-      containerRef.current?.releasePointerCapture(event.pointerId)
-    } catch {
-      // 指针捕获可能已经释放。
+    const schedule = () => {
+      window.clearTimeout(settleTimerRef.current)
+      settleTimerRef.current = window.setTimeout(settle, 160)
     }
 
-    snapTo(target, true)
+    const handleScrollEnd = () => {
+      window.clearTimeout(settleTimerRef.current)
+      settle()
+    }
 
-    if (items[target].key !== activeKey) onChange(items[target].key)
-  }
+    scroller.addEventListener('scroll', schedule, { passive: true })
+    scroller.addEventListener('scrollend', handleScrollEnd)
 
-  const handleClickCapture = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (performance.now() >= suppressClickRef.current) return
-    event.preventDefault()
-    event.stopPropagation()
-  }
+    return () => {
+      window.clearTimeout(settleTimerRef.current)
+      scroller.removeEventListener('scroll', schedule)
+      scroller.removeEventListener('scrollend', handleScrollEnd)
+    }
+  }, [activeKey, items, onChange])
 
   return (
     <div
-      ref={containerRef}
+      ref={scrollerRef}
       className={cn(
-        'relative h-full touch-pan-y overflow-hidden',
-        dragging ? 'cursor-grabbing select-none' : 'cursor-grab'
+        'mobile-pager relative h-full overflow-x-auto overflow-y-hidden overscroll-x-contain',
+        disabled && 'pointer-events-none'
       )}
-      onClickCapture={handleClickCapture}
-      onPointerCancel={(event) => finishDrag(event, true)}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={(event) => finishDrag(event, false)}
+      aria-label='主导航页面'
     >
-      <div ref={trackRef} className='flex h-full will-change-transform'>
+      <div className='flex h-full'>
         {items.map((item, index) => (
+          // 不要给面板加 overscroll-contain：它会吞掉横向手势，原生分页就收不到滑动。
           <section
             key={item.key}
-            className='mobile-panel mobile-scroll h-full w-full shrink-0 overflow-y-auto overscroll-contain'
+            className='mobile-panel mobile-scroll h-full w-full shrink-0 snap-start snap-always overflow-y-auto'
             aria-label={item.label}
             aria-hidden={index !== activeIndex}
             inert={index !== activeIndex}

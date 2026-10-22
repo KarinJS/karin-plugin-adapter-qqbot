@@ -1,24 +1,35 @@
-import { Button, FieldError, Input, Label, ToggleButton, ToggleButtonGroup, TextField, toast } from '@heroui/react'
-import { QrCode, Save } from 'lucide-react'
-import { useState, type CSSProperties, type FormEvent } from 'react'
+import {
+  Button,
+  Drawer,
+  FieldError,
+  Input,
+  Label,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  toast,
+} from '@heroui/react'
+import { QrCode, Save, X } from 'lucide-react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QrPanel } from '@/components/QrPanel'
 import { SecretField } from '@/components/SecretField'
-import { MobileGroup, MobilePageHeader, MobileRow } from '@/components/mobile/MobileGroup'
+import { MobileGroup, MobileRow } from '@/components/mobile/MobileGroup'
 import { MobileEventTypePicker } from '@/components/mobile/MobileEventTypePicker'
 import type { EventType } from '@/components/EventTypePicker'
+import {
+  mobileSegmentSelectedStyle,
+  mobileSheetBackdropStyle,
+  mobileSheetStyle,
+} from '@/components/mobile/mobileStyles'
 import { useConfigStore } from '@/hooks/useConfigStore'
+import { useMobileSheet } from '@/hooks/useMobileSheet'
+import { useSheetMotion } from '@/hooks/useSheetMotion'
 import type { BotConfig } from '@/lib/types'
-
-const selectedStyle: CSSProperties = {
-  '--toggle-button-bg-selected': 'var(--surface)',
-  '--toggle-button-bg-selected-hover': 'var(--surface)',
-  '--toggle-button-bg-selected-pressed': 'var(--surface)',
-  '--toggle-button-fg-selected': 'var(--foreground)',
-} as CSSProperties
 
 const MobileManualAddForm = () => {
   const { config, defaults, save, saving } = useConfigStore()
+  const { closeAdd } = useMobileSheet()
   const navigate = useNavigate()
 
   const [appId, setAppId] = useState('')
@@ -52,6 +63,7 @@ const MobileManualAddForm = () => {
     try {
       await save([...config, bot])
       toast.success('机器人已添加', { description: '配置已写入，适配器会自动建立连接' })
+      closeAdd()
       navigate(`/bots/${encodeURIComponent(id)}`)
     } catch {
       // ConfigProvider 已经记录错误。
@@ -114,43 +126,81 @@ const MobileManualAddForm = () => {
   )
 }
 
-export const MobileAddBotPage = () => {
+/**
+ * 扫码 / 手动添加机器人的底部抽屉。
+ *
+ * 占屏幕 90%，从机器人列表右上角的按钮打开；两种添加方式共用同一个抽屉。
+ */
+export const MobileAddBotSheet = () => {
+  const { isAddOpen, closeAdd } = useMobileSheet()
+  const { backdropRef, mounted, handleOpenChange } = useSheetMotion({
+    isOpen: isAddOpen,
+    onRequestClose: closeAdd,
+  })
   const [mode, setMode] = useState<'qr' | 'manual'>('qr')
 
+  useEffect(() => {
+    if (isAddOpen) setMode('qr')
+  }, [isAddOpen])
+
   return (
-    <div className='mx-auto flex w-full max-w-2xl flex-col gap-4'>
-      <MobilePageHeader title='添加机器人' description='扫码授权，或手动填写 AppID 与 AppSecret。' />
-
-      <ToggleButtonGroup
-        selectionMode='single'
-        disallowEmptySelection
-        selectedKeys={[mode]}
-        size='sm'
-        aria-label='添加方式'
-        className='grid grid-cols-2 gap-1 rounded-xl bg-default p-1'
-        onSelectionChange={(keys) => {
-          const [next] = Array.from(keys)
-          if (next === 'qr' || next === 'manual') setMode(next)
-        }}
-      >
-        <ToggleButton
-          id='qr'
-          className='h-9 justify-center gap-1.5 rounded-lg text-xs font-medium'
-          style={mode === 'qr' ? selectedStyle : undefined}
+    <Drawer.Backdrop
+      ref={backdropRef}
+      isOpen={mounted}
+      onOpenChange={handleOpenChange}
+      style={mobileSheetBackdropStyle}
+    >
+      <Drawer.Content placement='bottom'>
+        <Drawer.Dialog
+          className='flex flex-col border border-border/60 bg-surface shadow-overlay'
+          style={mobileSheetStyle}
         >
-          <QrCode className='size-3.5' aria-hidden='true' />
-          扫码授权
-        </ToggleButton>
-        <ToggleButton
-          id='manual'
-          className='h-9 justify-center gap-1.5 rounded-lg text-xs font-medium'
-          style={mode === 'manual' ? selectedStyle : undefined}
-        >
-          手动填写
-        </ToggleButton>
-      </ToggleButtonGroup>
+          <Drawer.Handle className='pt-2' />
 
-      {mode === 'qr' ? <QrPanel /> : <MobileManualAddForm />}
-    </div>
+          <header className='flex shrink-0 items-start justify-between gap-3 px-5 pb-3'>
+            <div className='min-w-0'>
+              <h2 className='text-[17px] leading-tight font-semibold tracking-[-0.02em]'>添加机器人</h2>
+              <p className='mt-0.5 text-[11px] text-muted'>扫码授权，或手动填写凭据。</p>
+            </div>
+            <Button isIconOnly size='sm' variant='tertiary' aria-label='关闭添加机器人' onPress={closeAdd}>
+              <X className='size-4' aria-hidden='true' />
+            </Button>
+          </header>
+
+          <div className='mobile-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4'>
+            <ToggleButtonGroup
+              selectionMode='single'
+              disallowEmptySelection
+              selectedKeys={[mode]}
+              size='sm'
+              aria-label='添加方式'
+              className='mb-4 grid grid-cols-2 gap-1 rounded-xl bg-default p-1'
+              onSelectionChange={(keys) => {
+                const [next] = Array.from(keys)
+                if (next === 'qr' || next === 'manual') setMode(next)
+              }}
+            >
+              <ToggleButton
+                id='qr'
+                className='h-9 justify-center gap-1.5 rounded-lg text-xs font-medium'
+                style={mode === 'qr' ? mobileSegmentSelectedStyle : undefined}
+              >
+                <QrCode className='size-3.5' aria-hidden='true' />
+                扫码授权
+              </ToggleButton>
+              <ToggleButton
+                id='manual'
+                className='h-9 justify-center gap-1.5 rounded-lg text-xs font-medium'
+                style={mode === 'manual' ? mobileSegmentSelectedStyle : undefined}
+              >
+                手动填写
+              </ToggleButton>
+            </ToggleButtonGroup>
+
+            {mode === 'qr' ? <QrPanel /> : <MobileManualAddForm />}
+          </div>
+        </Drawer.Dialog>
+      </Drawer.Content>
+    </Drawer.Backdrop>
   )
 }

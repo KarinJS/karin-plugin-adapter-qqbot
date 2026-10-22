@@ -1,13 +1,13 @@
 import { Button } from '@heroui/react'
 import { Plus } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 import { MobileBotList } from '@/components/mobile/MobileBotList'
 import { MobilePageHeader } from '@/components/mobile/MobileGroup'
 import { useConfigStore } from '@/hooks/useConfigStore'
+import { useMobileSheet } from '@/hooks/useMobileSheet'
 
 export const MobileBotsPage = () => {
   const { config, statuses, loading } = useConfigStore()
-  const navigate = useNavigate()
+  const { openAdd } = useMobileSheet()
   const onlineCount = config.filter((bot) => statuses[bot.appId]?.online).length
 
   const description =
@@ -23,13 +23,7 @@ export const MobileBotsPage = () => {
         title='机器人'
         description={description}
         action={
-          <Button
-            isIconOnly
-            size='sm'
-            variant='secondary'
-            aria-label='添加机器人'
-            onPress={() => navigate('/bots/new')}
-          >
+          <Button isIconOnly size='sm' variant='secondary' aria-label='添加机器人' onPress={openAdd}>
             <Plus className='size-4' aria-hidden='true' />
           </Button>
         }

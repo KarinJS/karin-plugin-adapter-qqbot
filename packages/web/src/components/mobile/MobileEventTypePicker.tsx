@@ -1,6 +1,5 @@
-import { ToggleButton, ToggleButtonGroup, cn } from '@heroui/react'
+import { Tabs } from '@heroui/react'
 import { PowerOff, RadioTower, Webhook } from 'lucide-react'
-import type { CSSProperties } from 'react'
 import type { EventType } from '@/components/EventTypePicker'
 
 const options = [
@@ -24,13 +23,6 @@ const options = [
   },
 ]
 
-const selectedStyle: CSSProperties = {
-  '--toggle-button-bg-selected': 'var(--surface)',
-  '--toggle-button-bg-selected-hover': 'var(--surface)',
-  '--toggle-button-bg-selected-pressed': 'var(--surface)',
-  '--toggle-button-fg-selected': 'var(--foreground)',
-} as CSSProperties
-
 interface MobileEventTypePickerProps {
   value: EventType
   onChange: (value: EventType) => void
@@ -40,49 +32,41 @@ interface MobileEventTypePickerProps {
 /**
  * 手机端事件通道选择器。
  *
- * 桌面用三张大卡片，手机改成一行分段控件，只把当前选项的说明放在下方，
- * 避免一个单选占掉半屏高度。
+ * 用 HeroUI Tabs 的分段样式：选中指示器在三个等宽标签之间连续移动，
+ * 说明文字放在下方面板里，避免桌面那三张大卡片占掉半屏。
  */
-export const MobileEventTypePicker = ({ value, onChange, isDisabled }: MobileEventTypePickerProps) => {
-  const selected = options.find((option) => option.value === value) ?? options[0]
+export const MobileEventTypePicker = ({ value, onChange, isDisabled }: MobileEventTypePickerProps) => (
+  <Tabs
+    selectedKey={String(value)}
+    isDisabled={isDisabled}
+    className='w-full gap-2'
+    onSelectionChange={(key) => {
+      const next = Number(key)
+      if (next === 0 || next === 1 || next === 2) onChange(next)
+    }}
+  >
+    <Tabs.List aria-label='事件接收方式' className='grid grid-cols-3 gap-1 rounded-xl bg-default p-1'>
+      {options.map((option) => {
+        const Icon = option.icon
 
-  return (
-    <div className='flex flex-col gap-2'>
-      <ToggleButtonGroup
-        selectionMode='single'
-        disallowEmptySelection
-        isDisabled={isDisabled}
-        selectedKeys={[String(value)]}
-        size='sm'
-        aria-label='事件接收方式'
-        className='grid grid-cols-3 gap-1 rounded-xl bg-default p-1'
-        onSelectionChange={(keys) => {
-          const [next] = Array.from(keys)
-          const parsed = Number(next)
-          if (parsed === 0 || parsed === 1 || parsed === 2) onChange(parsed)
-        }}
-      >
-        {options.map((option) => {
-          const Icon = option.icon
-          const active = value === option.value
+        return (
+          <Tabs.Tab
+            key={option.value}
+            id={String(option.value)}
+            className='h-9 min-w-0 justify-center gap-1.5 rounded-lg px-1 text-[11px] font-medium data-[selected=true]:text-foreground'
+          >
+            <Icon className='size-3.5' aria-hidden='true' />
+            <span className='truncate'>{option.label}</span>
+            <Tabs.Indicator className='rounded-lg bg-surface shadow-sm' />
+          </Tabs.Tab>
+        )
+      })}
+    </Tabs.List>
 
-          return (
-            <ToggleButton
-              key={option.value}
-              id={String(option.value)}
-              className={cn(
-                'h-9 min-w-0 justify-center gap-1.5 rounded-lg px-1 text-[11px] font-medium',
-                active ? 'shadow-sm' : 'text-muted'
-              )}
-              style={active ? selectedStyle : undefined}
-            >
-              <Icon className='size-3.5' aria-hidden='true' />
-              <span className='truncate'>{option.label}</span>
-            </ToggleButton>
-          )
-        })}
-      </ToggleButtonGroup>
-      <p className='px-1 text-[11px] leading-5 text-muted'>{selected.description}</p>
-    </div>
-  )
-}
+    {options.map((option) => (
+      <Tabs.Panel key={option.value} id={String(option.value)} className='mt-0 px-1 text-[11px] leading-5 text-muted'>
+        {option.description}
+      </Tabs.Panel>
+    ))}
+  </Tabs>
+)

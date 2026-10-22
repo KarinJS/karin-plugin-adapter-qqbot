@@ -4,7 +4,6 @@ import { BotAvatar } from '@/components/BotAvatar'
 import { getEventLabel } from '@/components/StatusPill'
 import { useConfigStore } from '@/hooks/useConfigStore'
 import { useMobileSheet } from '@/hooks/useMobileSheet'
-import { useNavigate } from 'react-router-dom'
 
 interface MobileBotListProps {
   title?: string
@@ -18,8 +17,7 @@ interface MobileBotListProps {
  */
 export const MobileBotList = ({ title, className }: MobileBotListProps) => {
   const { config, statuses, loading } = useConfigStore()
-  const { activeAppId, isOpen, open } = useMobileSheet()
-  const navigate = useNavigate()
+  const { activeAppId, isOpen, open, openAdd } = useMobileSheet()
 
   return (
     <section className={cn('flex flex-col gap-2', className)} aria-label='机器人列表'>
@@ -48,7 +46,7 @@ export const MobileBotList = ({ title, className }: MobileBotListProps) => {
               <p className='text-sm font-medium'>还没有机器人</p>
               <p className='mt-1 text-[11px] leading-5 text-muted'>扫码授权后会自动创建配置。</p>
             </div>
-            <Button size='sm' onPress={() => navigate('/bots/new')}>
+            <Button size='sm' onPress={openAdd}>
               扫码添加
             </Button>
           </div>

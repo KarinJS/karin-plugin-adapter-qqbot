@@ -1,9 +1,9 @@
 import { cn } from '@heroui/react'
 import { BookOpen, Bot, Database, ExternalLink, GitFork, QrCode, RadioTower, Webhook } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 import { MobileActionRow, MobileGroup, MobilePageHeader, MobileRow } from '@/components/mobile/MobileGroup'
 import { MobileBotList } from '@/components/mobile/MobileBotList'
 import { useConfigStore } from '@/hooks/useConfigStore'
+import { useMobileSheet } from '@/hooks/useMobileSheet'
 
 const DOCS_URL = 'https://karinjs.github.io/karin-plugin-adapter-qqbot/'
 const GITHUB_URL = 'https://github.com/KarinJS/karin-plugin-adapter-qqbot'
@@ -49,7 +49,7 @@ const MobileStat = ({
 
 export const MobileOverviewPage = () => {
   const { config, statuses } = useConfigStore()
-  const navigate = useNavigate()
+  const { openAdd } = useMobileSheet()
 
   const onlineCount = config.filter((bot) => statuses[bot.appId]?.online).length
   const wsCount = config.filter((bot) => bot.event.type === 2).length
@@ -115,7 +115,7 @@ export const MobileOverviewPage = () => {
         <MobileActionRow
           icon={<QrCode className='size-4' aria-hidden='true' />}
           label='扫码添加机器人'
-          onPress={() => navigate('/bots/new')}
+          onPress={openAdd}
         />
         <MobileActionRow
           icon={<BookOpen className='size-4' aria-hidden='true' />}

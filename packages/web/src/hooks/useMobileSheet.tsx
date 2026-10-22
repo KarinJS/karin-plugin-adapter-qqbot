@@ -5,29 +5,40 @@ interface MobileSheetContextValue {
   isOpen: boolean
   open: (appId: string) => void
   close: () => void
+  isAddOpen: boolean
+  openAdd: () => void
+  closeAdd: () => void
 }
 
 const MobileSheetContext = createContext<MobileSheetContextValue | null>(null)
 
 /**
- * 手机端机器人配置抽屉的全局状态。
+ * 手机端底部抽屉的全局状态。
  *
- * 抽屉挂在外壳层，背景缩放的也是整个外壳；列表和概览只负责调用 open。
+ * 机器人配置和添加机器人共用一层外壳：抽屉挂在外壳之外，
+ * 打开时由外壳负责压暗和缩放，列表与概览只负责调用 open / openAdd。
  */
 export const MobileSheetProvider = ({ children }: { children: ReactNode }) => {
   const [activeAppId, setActiveAppId] = useState<string | null>(null)
   const [isOpen, setIsOpen] = useState(false)
+  const [isAddOpen, setIsAddOpen] = useState(false)
 
   const open = useCallback((appId: string) => {
     setActiveAppId(appId)
+    setIsAddOpen(false)
     setIsOpen(true)
   }, [])
 
   const close = useCallback(() => setIsOpen(false), [])
+  const openAdd = useCallback(() => {
+    setIsOpen(false)
+    setIsAddOpen(true)
+  }, [])
+  const closeAdd = useCallback(() => setIsAddOpen(false), [])
 
   const value = useMemo<MobileSheetContextValue>(
-    () => ({ activeAppId, isOpen, open, close }),
-    [activeAppId, close, isOpen, open]
+    () => ({ activeAppId, isOpen, open, close, isAddOpen, openAdd, closeAdd }),
+    [activeAppId, close, closeAdd, isAddOpen, isOpen, open, openAdd]
   )
 
   return <MobileSheetContext.Provider value={value}>{children}</MobileSheetContext.Provider>
