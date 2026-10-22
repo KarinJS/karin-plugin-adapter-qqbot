@@ -1,0 +1,86 @@
+---
+title: 消息能力
+description: 各场景能发什么，以及被动回复限制。
+---
+
+## 场景与能力
+
+| 能力               | 单聊 | 群聊 | 频道 / 频道私信 |
+| ------------------ | ---- | ---- | --------------- |
+| 文本               | ✅   | ✅   | ✅              |
+| Markdown           | ✅   | ✅   | 需内邀          |
+| 按钮               | ✅   | ✅   | 随 Markdown     |
+| 图片               | ✅   | ✅   | ✅              |
+| 视频 / 语音 / 文件 | ✅   | ✅   | ❌              |
+| 流式消息           | ✅   | ❌   | ❌              |
+
+## 发送规则
+
+- 单聊和群聊的文本、图片合并成一条 Markdown。视频、语音、文件作为独立富媒体消息补发。
+- 单聊和群聊的 Markdown 已对所有机器人开放。频道需要内邀，适配器先试 Markdown，被权限错误拒绝后降级成普通消息，并记住这个机器人，本次运行不再重试。
+- 按钮只能挂在 Markdown 上，频道降级后按钮不会发送。
+- `segment.reply` 在纯文本场景走 `msg_type=0`，其余场景走原通道。
+
+## 按钮
+
+- 跳转按钮打开 `link`。
+- 指令按钮把 `data` 当普通消息发出。
+- 回调按钮不发消息，适配器下发一条 Karin 消息事件，内容是 `data`。
+
+```ts twoslash
+import { segment, type Message } from 'node-karin'
+
+declare const e: Message
+
+await e.reply([
+  segment.markdown('#### 请选择'),
+  segment.button([
+    { text: '打开文档', link: 'https://bot.q.qq.com/wiki/' },
+    { text: '发送指令', data: '菜单 2', enter: true },
+    { text: '回调确认', callback: true, data: '确认' },
+  ]),
+])
+```
+
+回调按钮的 `data` 会变成普通消息，直接写成插件能识别的命令最省事。需要手动处理时用 `bot.super.interaction.ack()`。
+
+## 被动回复
+
+| 场景 | 有效期  | 可回复次数 |
+| ---- | ------- | ---------- |
+| 单聊 | 60 分钟 | 4 次       |
+| 群聊 | 5 分钟  | 5 次       |
+| 频道 | 5 分钟  | 无限制     |
+
+超过时间或次数后改用主动消息。主动消息受平台配额和用户开关限制。
+
+## 流式消息
+
+只在单聊可用。首帧不带 `stream_msg_id`，响应里的 `id` 作为后续帧的 `stream_msg_id`。`index` 从 0 递增，`msg_seq` 保持一致，帧间隔建议 300 到 500 毫秒。
+
+```ts twoslash
+import type { AdapterQQBot } from '@karinjs/adapter-qqbot'
+
+declare const bot: AdapterQQBot
+declare const openid: string
+declare const messageId: string
+
+const first = await bot.super.messages.sendFriendStreamMsg(openid, {
+  input_state: 1,
+  index: 0,
+  content_type: 'markdown',
+  content_raw: '正在生成',
+  msg_id: messageId,
+})
+
+await bot.super.messages.sendFriendStreamMsg(openid, {
+  input_state: 10,
+  index: 1,
+  content_type: 'markdown',
+  content_raw: '完成',
+  stream_msg_id: first.id,
+  msg_id: messageId,
+})
+```
+
+`input_state` 为 1 表示生成中，10 表示结束。`content_type` 默认 `text`，`content_raw` 在 append 模式传增量，replace 模式传全量。字段以 `SendQQStreamMessageRequest` 为准。

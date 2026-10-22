@@ -1,0 +1,55 @@
+---
+title: 事件映射
+description: 官方事件到 Karin 事件的映射。
+---
+
+## 消息
+
+| 官方事件                  | 场景          | Karin 事件          |
+| ------------------------- | ------------- | ------------------- |
+| `C2C_MESSAGE_CREATE`      | 单聊          | `message`（friend） |
+| `GROUP_AT_MESSAGE_CREATE` | 群里 @ 机器人 | `message`（group）  |
+| `GROUP_MESSAGE_CREATE`    | 群内全部消息  | `message`（group）  |
+| `AT_MESSAGE_CREATE`       | 频道 @ 机器人 | `message`（guild）  |
+| `MESSAGE_CREATE`          | 频道全部消息  | `message`（guild）  |
+| `DIRECT_MESSAGE_CREATE`   | 频道私信      | `message`（direct） |
+
+插件用 `karin.command` 接收，`e.contact.scene` 是对应场景。
+
+## 通知与请求
+
+| 官方事件              | Karin 事件                 |
+| --------------------- | -------------------------- |
+| `GROUP_ADD_ROBOT`     | `notice.groupMemberAdd`    |
+| `GROUP_DEL_ROBOT`     | `notice.groupMemberRemove` |
+| `GROUP_MEMBER_ADD`    | `notice.groupMemberAdd`    |
+| `GROUP_MEMBER_REMOVE` | `notice.groupMemberRemove` |
+| `FRIEND_ADD`          | `notice.friendIncrease`    |
+| `FRIEND_DEL`          | `notice.friendDecrease`    |
+| `GROUP_JOIN_REQUEST`  | `request.groupApply`       |
+
+群成员进退群只有成员 openid，官方没有操作人。适配器把 `operatorId` 留空，并用 `type: 'approve'` 或 `'leave'` 补齐。这两个事件不能当被动回复的 `event_id`，回复按普通消息发送。
+
+`GROUP_JOIN_REQUEST` 只在机器人是群管理员时下发。适配器会缓存本次运行期间的申请，`bot.setGroupApplyResult()` 可以直接审批。
+
+```ts twoslash
+import karin from 'node-karin'
+import type { AdapterQQBot } from '@karinjs/adapter-qqbot'
+
+export const approveJoin = karin.accept('request.groupApply', async (e) => {
+  const bot = e.bot as AdapterQQBot
+  await bot.setGroupApplyResult(e.content.flag, true)
+})
+```
+
+历史申请不在缓存里，用 `bot.super.groups.getJoinRequestList()` 拿 `join_request_id`，再调用 `approvalJoinRequest()`。
+
+`GROUP_MSG_RECEIVE`、`GROUP_MSG_REJECT`、`C2C_MSG_RECEIVE`、`C2C_MSG_REJECT` 只写日志。
+
+## 互动与连接
+
+- `INTERACTION_CREATE` 会变成一条 Karin 消息，内容是按钮的 `data`。需要手动 ack 时调用 `bot.super.interaction.ack(interactionId)`。
+- `READY`、`RESUMED` 只写日志。
+- `MESSAGE_AUDIT_PASS`、`MESSAGE_AUDIT_REJECT` 只写 debug 日志。
+
+官方事件比 OneBot 精简，没有操作人、群号、好友列表。不要假设 `e.sender` 或 `e.group_id` 一定有值，详见[能力边界](/docs/develop/limitations)。

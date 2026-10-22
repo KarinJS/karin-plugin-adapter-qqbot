@@ -1,0 +1,77 @@
+{
+  "name": "@karinjs/adapter-qqbot",
+  "version": "3.4.0",
+  "description": "karin adapter for QQ Official Bot (2.0)",
+  "homepage": "https://github.com/KarinJS/karin-plugin-adapter-qqbot",
+  "bugs": {
+    "url": "https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues"
+  },
+  "author": "shijin",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KarinJS/karin-plugin-adapter-qqbot.git",
+    "directory": "packages/adapter"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "scripts": {
+    "build": "tsc && tsdown",
+    "dev": "tsx watch --include \"src/**/*.ts\" src/app.ts",
+    "karin": "karin",
+    "lint": "oxlint src tests",
+    "lint:fix": "oxlint src tests --fix",
+    "pub": "npm publish --access public",
+    "sort": "npx sort-package-json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tests/tsconfig.json"
+  },
+  "dependencies": {
+    "@karinjs/geturls": "^1.0.2",
+    "form-data": "^4.0.6",
+    "image-size": "^2.0.2",
+    "qrcode": "^1.5.4",
+    "silk-wasm": "^3.7.1",
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "@tencent-connect/qqbot-nodejs": "^1.0.4",
+    "@types/express": "5.0.6",
+    "@types/node": "^24.13.3",
+    "@types/qrcode": "^1.5.6",
+    "node-karin": "1.16.3",
+    "oxlint": "^1.89.0",
+    "tsdown": "^0.23.1",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "karin": {
+    "main": "src/index.ts",
+    "apps": [
+      "dist/apps"
+    ],
+    "ts-apps": [
+      "src/apps"
+    ],
+    "static": [
+      "resources"
+    ],
+    "files": [
+      "config",
+      "data",
+      "resources"
+    ],
+    "ts-web": "src/web.config.ts",
+    "web": "dist/web.config.js"
+  },
+  "time": "2026-10-22T17:26:37.913Z"
+}

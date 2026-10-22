@@ -1,0 +1,41 @@
+---
+title: 常见问题
+description: 部署和运行时最常见的问题。
+---
+
+日志都带 `[QQ Official Bot][appId]`。先确认配置已读取、access_token 已换到、连接是 WebSocket 还是 Webhook。
+
+<Accordions>
+  <Accordion title='扫码后旧 Secret 立刻失效'>
+    `#QQBot登录` 会重新生成 AppSecret。其他服务如果还在用旧 Secret，扫码后会立刻鉴权失败，需要同步新值。
+  </Accordion>
+  <Accordion title='收不到事件'>
+    1. `event.type` 是 `2` 或 `1`，不是 `0`。
+    2. 机器人已发布，并且在目标群或频道里。
+    3. `qqEnable` 和 `guildEnable` 没有关掉对应场景。
+    4. 群聊只有 @ 机器人才会收到 `GROUP_AT_MESSAGE_CREATE`。要收全部消息，需要在开放平台开通权限并订阅 `GROUP_MESSAGE_CREATE`。
+    5. 频道公域模式只收 @ 消息，私域模式收全部消息，检查 `guildMode`。
+  </Accordion>
+  <Accordion title='Webhook 收不到回调'>
+    Karin 的 HTTP 服务必须能从公网访问，回调地址填 `https://你的域名/qqbot/webhook`。适配器会检查 `x-bot-appid` 和 `User-Agent: QQBot-Callback`，不对会直接丢弃。HTTPS 证书必须有效。
+  </Accordion>
+  <Accordion title='消息发不出去'>
+    - 主动消息超出平台配额。
+    - 被动回复超时或超次数。单聊 60 分钟内最多 4 次，群聊 5 分钟内最多 5 次。
+    - 频道没开通 Markdown 内邀时降级成普通消息，按钮一起丢失。
+    - 群管理接口大多是白名单接口，没开通会返回错误码。
+  </Accordion>
+  <Accordion title='getMsg 查不到历史消息'>
+    缓存默认关闭。打开后只对之后收到的消息生效，之前的历史不会补录。
+
+    ```json
+    "messageCache": { "enable": true, "level": "standard" }
+    ```
+
+    `minimal` 只存 ID 和引用关系，读正文要用 `standard` 或 `full`。
+
+  </Accordion>
+  <Accordion title='频道按钮不见了'>
+    按钮只能挂在 Markdown 消息上。频道没开通内邀时会降级成普通消息，按钮不会单独发送。
+  </Accordion>
+</Accordions>

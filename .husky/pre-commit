@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# 任意改动都刷新 @karinjs/adapter-qqbot 的 time 字段，
+# 让 release-please 把这次提交纳入 adapter 包的发布范围。
+node scripts/update-adapter-time.mjs

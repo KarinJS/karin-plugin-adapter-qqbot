@@ -1,0 +1,32 @@
+---
+title: 插件开发
+description: QQBot 适配器的开发差异。
+---
+
+QQBot 不改变 Karin 的插件写法。`karin.command`、`e.reply`、`segment`、`karin.accept` 以 [Karin 官方文档](https://karinjs.com)为准。
+
+## 这里覆盖
+
+- [事件映射](/docs/develop/events) 官方事件怎么变成 `message`、`notice`、`request`。
+- [消息能力](/docs/develop/messages) 各场景能发什么，按钮和被动回复限制。
+- [图片与文件](/docs/develop/media) 媒体处理顺序、`fileToUrl`、素材管理。
+- [官方 API](/docs/develop/super-api) `bot.super` 的模块和裸请求。
+- [能力边界](/docs/develop/limitations) 哪些标准方法不可用或会降级。
+
+## 拿到适配器实例
+
+`e.bot` 是 `AdapterType`，调用官方接口前收窄成 `AdapterQQBot`。
+
+```ts twoslash
+import karin from 'node-karin'
+import type { AdapterQQBot } from '@karinjs/adapter-qqbot'
+
+export const me = karin.command(/^#me$/i, async (e) => {
+  const bot = e.bot as AdapterQQBot
+  const info = await bot.super.meta.getMe()
+  //    ^?
+  await e.reply(`我是 ${info.username}`)
+})
+```
+
+`info` 的类型是 `GetMeResponse`。适配器不会替换 `e.bot`，其他插件按 Karin 标准字段读消息不用改。

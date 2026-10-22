@@ -1,0 +1,27 @@
+{
+  "name": "@karinjs/adapter-qqbot-api-docs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "QQ 机器人开放平台文档抓取与转换工具",
+  "type": "module",
+  "scripts": {
+    "crawl": "tsx src/crawl.ts",
+    "convert": "tsx src/convert.ts",
+    "sync": "tsx src/crawl.ts && tsx src/convert.ts && tsx src/sync.ts",
+    "lint": "oxlint src",
+    "lint:fix": "oxlint src --fix",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "fs-extra": "^11.4.1",
+    "html-to-md": "^0.8.8"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^24.13.3",
+    "oxlint": "^1.89.0",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
+  }
+}

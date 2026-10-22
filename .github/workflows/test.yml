@@ -20,7 +20,7 @@ jobs:
       - name: 设置 pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 9
+          version: 12.9.1
 
       - name: 设置 Node.js 环境
         uses: actions/setup-node@v6
@@ -29,13 +29,19 @@ jobs:
           cache: pnpm
 
       - name: 安装依赖
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: 类型检查
-        run: pnpm exec tsc --noEmit
+        run: pnpm typecheck
 
       - name: Lint
-        run: pnpm run lint
+        run: pnpm lint
 
-      - name: 存储层测试
+      - name: 构建适配器
+        run: pnpm build
+
+      - name: 构建文档
+        run: pnpm docs:build
+
+      - name: 测试
         run: pnpm test

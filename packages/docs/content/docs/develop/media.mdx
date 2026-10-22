@@ -1,0 +1,73 @@
+---
+title: 图片与文件
+description: 媒体处理顺序和 fileToUrl 约定。
+---
+
+## 发送
+
+单聊和群聊的图片、视频、语音、文件直接交给 QQ，较大的资源自动分片上传。视频、语音、文件作为独立富媒体消息发送，不进入 Markdown。
+
+频道和频道私信只支持文本、图片、Markdown、按钮，不支持视频、语音、文件。
+
+## Markdown 图片
+
+图片要写进 Markdown，必须先有 QQ 能访问的地址。适配器按下面的顺序找。
+
+1. 插件注册的 `fileToUrl` handler，返回值直接使用。
+2. `mediaImages` 上传，拿到 `qqbot-media://` 引用。
+3. 内置临时图床，用 QQ 分片上传换临时直链，只在单聊和群聊生效，链接会过期。
+4. 前三步都失败时，图片改走独立富媒体消息。
+
+频道和频道私信必须自己配置 `fileToUrl` 或先用 `mediaImages` 上传，内置图床不覆盖频道。
+
+## fileToUrl
+
+注册方式见 [Karin 官方文档](https://karinjs.com/guide/api/utils/system)。图片需要返回宽高，其他类型只返回 `url`。
+
+```ts twoslash
+import karin, { common } from 'node-karin'
+
+declare function uploadToYourStorage(buffer: Buffer, filename: string): Promise<string>
+declare function getImageSize(buffer: Buffer): { width?: number; height?: number }
+
+export const uploadResource = karin.handler('fileToUrl', async (payload) => {
+  const { file, type, filename } = payload as {
+    file: string | Buffer | Uint8Array
+    type: 'image' | 'video' | 'record' | 'file'
+    filename: string
+  }
+
+  const buffer = await common.buffer(file)
+  const url = await uploadToYourStorage(buffer, filename)
+
+  if (type !== 'image') return { url }
+
+  const size = getImageSize(buffer)
+  return { url, width: size.width || 100, height: size.height || 100 }
+})
+```
+
+`args` 里还有几个字段。
+
+- `selfId` 是正在发送的机器人 appId。
+- `purpose` 为 `markdown` 时地址会写进正文，必须是公网地址；为 `media` 时交给富媒体接口转存。
+- `origin` 是 `{ scene, peer }`，频道场景可能没有 openid，此时为 `undefined`。
+- `allowBuiltinFileToUrl` 表示是否允许内置图床接手，可以忽略。
+
+## 素材管理
+
+`mediaImages.upload()` 把图片上传成可长期复用的 `qqbot-media://` 引用。
+
+```ts twoslash
+import type { AdapterQQBot } from '@karinjs/adapter-qqbot'
+
+declare const bot: AdapterQQBot
+
+const image = await bot.super.mediaImages.upload('https://example.com/image.png')
+//    ^?
+console.log(image.url)
+```
+
+`upload` 会自动识别格式、计算 MD5 和 SHA1、完成预签名 PUT 和 complete，并按内容 MD5 在进程内复用。需要自己控制时用 `prepare` 和 `complete`，查询、删除用 `list` 和 `delete`。
+
+生产环境建议准备自己的文件服务，临时直链只适合兜底。

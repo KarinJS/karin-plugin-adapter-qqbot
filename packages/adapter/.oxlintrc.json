@@ -1,0 +1,14 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../.oxlintrc.json"],
+  "plugins": ["typescript", "import", "unicorn", "oxc", "promise", "node", "vitest"],
+  "rules": {
+    "import/no-named-as-default": "off",
+    "import/no-named-as-default-member": "off",
+    "no-shadow": "off",
+    "no-underscore-dangle": "off",
+    "unicorn/consistent-function-scoping": "off",
+    "vitest/no-conditional-expect": "off",
+    "vitest/require-mock-type-parameters": "off"
+  }
+}
