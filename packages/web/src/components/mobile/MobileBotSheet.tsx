@@ -1,29 +1,38 @@
-import { AlertDialog, Button, Drawer, Spinner, toast } from '@heroui/react'
+import { AlertDialog, Button, Drawer, toast } from '@heroui/react'
 import { RotateCcw, Save, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { BotAvatar } from '@/components/BotAvatar'
 import { SaveStatus } from '@/components/SaveStatus'
 import { StatusPill } from '@/components/StatusPill'
 import { MobileBotFields } from '@/components/mobile/MobileBotFields'
-import { SheetScaffold } from '@/components/mobile/SheetScaffold'
-import { mobileSheetBackdropStyle, mobileSheetStyle } from '@/components/mobile/mobileStyles'
+import { MobileSheet } from '@/components/mobile/MobileSheet'
 import { useBotEditor } from '@/hooks/useBotEditor'
 import { useConfigStore } from '@/hooks/useConfigStore'
 import { useMobileSheet } from '@/hooks/useMobileSheet'
-import { useSheetMotion } from '@/hooks/useSheetMotion'
 import { dissolveBotCard } from '@/lib/dissolveBotCard'
 import type { BotConfig } from '@/lib/types'
 
 interface SheetBodyProps {
   bot: BotConfig
   formId: string
-  onClose: () => void
+  isOpen: boolean
+  onRequestClose: () => void
+  onExited: () => void
   onSaved: (saved: BotConfig) => void
   onRequestRemove: () => void
   removing: boolean
 }
 
-const SheetBody = ({ bot, formId, onClose, onSaved, onRequestRemove, removing }: SheetBodyProps) => {
+const SheetBody = ({
+  bot,
+  formId,
+  isOpen,
+  onRequestClose,
+  onExited,
+  onSaved,
+  onRequestRemove,
+  removing,
+}: SheetBodyProps) => {
   const { statuses } = useConfigStore()
   const controller = useBotEditor(bot)
   const { dirty, saving, reset, saveState } = controller
@@ -34,9 +43,12 @@ const SheetBody = ({ bot, formId, onClose, onSaved, onRequestRemove, removing }:
     <>
       <SaveStatus state={saveState} />
 
-      <SheetScaffold
+      <MobileSheet
+        isOpen={isOpen}
+        onRequestClose={onRequestClose}
+        onExited={onExited}
         header={
-          <header className='px-5 pb-3'>
+          <header className='sheet-header px-5 pb-3'>
             <Drawer.Handle className='mx-auto mb-1' />
             <div className='flex items-start gap-3'>
               <BotAvatar name={title} avatar={status?.avatar} size='md' />
@@ -51,14 +63,14 @@ const SheetBody = ({ bot, formId, onClose, onSaved, onRequestRemove, removing }:
                   <span className='truncate text-[11px] text-muted'>{bot.appId}</span>
                 </div>
               </div>
-              <Button isIconOnly size='sm' variant='tertiary' aria-label='关闭机器人配置' onPress={onClose}>
+              <Button isIconOnly size='sm' variant='tertiary' aria-label='关闭机器人配置' onPress={onRequestClose}>
                 <X className='size-4' aria-hidden='true' />
               </Button>
             </div>
           </header>
         }
         footer={
-          <footer className='safe-bottom px-4 pt-3'>
+          <footer className='sheet-footer safe-bottom px-4 pt-3'>
             <div className='flex items-center gap-2'>
               <Button variant='secondary' isDisabled={!dirty || saving} onPress={reset}>
                 <RotateCcw className='size-4' aria-hidden='true' />
@@ -83,7 +95,7 @@ const SheetBody = ({ bot, formId, onClose, onSaved, onRequestRemove, removing }:
           onRemove={onRequestRemove}
           removing={removing}
         />
-      </SheetScaffold>
+      </MobileSheet>
     </>
   )
 }
@@ -128,12 +140,6 @@ export const MobileBotSheet = () => {
     })()
   }, [remove])
 
-  const { backdropRef, mounted, handleOpenChange } = useSheetMotion({
-    isOpen,
-    onRequestClose: close,
-    onExited: handleSheetExited,
-  })
-
   useEffect(() => {
     if (isOpen && !bot) close()
   }, [bot, close, isOpen])
@@ -158,35 +164,18 @@ export const MobileBotSheet = () => {
 
   return (
     <>
-      <Drawer.Backdrop
-        ref={backdropRef}
-        isOpen={mounted}
-        onOpenChange={handleOpenChange}
-        style={mobileSheetBackdropStyle}
-      >
-        <Drawer.Content placement='bottom'>
-          <Drawer.Dialog
-            className='flex flex-col overflow-hidden border border-border/60 bg-surface shadow-overlay'
-            style={mobileSheetStyle}
-          >
-            {bot ? (
-              <SheetBody
-                key={bot.appId}
-                bot={bot}
-                formId={formId}
-                onClose={close}
-                onSaved={handleSaved}
-                onRequestRemove={() => setConfirmOpen(true)}
-                removing={removing}
-              />
-            ) : (
-              <div className='flex flex-1 items-center justify-center'>
-                <Spinner aria-label='正在加载机器人配置' />
-              </div>
-            )}
-          </Drawer.Dialog>
-        </Drawer.Content>
-      </Drawer.Backdrop>
+      {bot ? (
+        <SheetBody
+          bot={bot}
+          formId={formId}
+          isOpen={isOpen}
+          onRequestClose={close}
+          onExited={handleSheetExited}
+          onSaved={handleSaved}
+          onRequestRemove={() => setConfirmOpen(true)}
+          removing={removing}
+        />
+      ) : null}
 
       <AlertDialog isOpen={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialog.Backdrop isDismissable={false} isKeyboardDismissDisabled style={{ zIndex: 100010 }}>

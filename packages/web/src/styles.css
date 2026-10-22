@@ -10,6 +10,12 @@
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
+  /* 与 src/lib/sheetMotion.ts 的时长 / 曲线保持一致。 */
+  --sheet-enter-duration: 920ms;
+  --sheet-exit-duration: 780ms;
+  --sheet-enter-ease: cubic-bezier(0.165, 0.84, 0.44, 1); /* power3.out */
+  --sheet-exit-ease: cubic-bezier(0.32, 0, 0.67, 0); /* power2.in */
+
   --font-sans:
     -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
     sans-serif;
@@ -251,6 +257,30 @@
   padding-top: max(0.5rem, env(safe-area-inset-top));
 }
 
+/*
+ * 抽屉顶栏的顶部留白。
+ * 半屏时不需要让开刘海；展开到接近全屏时才把安全区高度加回来。
+ */
+.sheet-header {
+  padding-top: 0.5rem;
+  /* 顶栏本身是拖动面：纵向交给 JS，横向仍交给浏览器。 */
+  touch-action: pan-x;
+}
+
+.sheet-footer {
+  touch-action: pan-x;
+}
+
+[data-slot='drawer-dialog'][data-sheet-expanded='true'] .sheet-header {
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+
+[data-slot='drawer-dialog'][data-resizing='true'] {
+  cursor: grabbing;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .no-scrollbar {
   scrollbar-width: none;
 }
@@ -307,6 +337,15 @@
 
 .sheet-edge-blur--top {
   top: 0;
+  /*
+   * 安卓 Edge 不会用父级的圆角裁掉带 backdrop-filter 的子层，
+   * 模糊层会盖住顶部两角，看起来就像没有圆角。
+   * 给模糊层自己加同样的圆角和 clip-path，强制裁切。
+   */
+  border-top-left-radius: 28px;
+  border-top-right-radius: 28px;
+  overflow: hidden;
+  clip-path: inset(0 round 28px 28px 0 0);
 }
 
 .sheet-edge-blur--bottom {
@@ -394,18 +433,22 @@
 /*
  * 打开底部抽屉时，整个手机外壳向后退并轻微缩小；
  * 抽屉通过 portal 渲染在外壳之外，因此不会被一起缩放。
+ * 缩小时长 / 曲线与抽屉进场一致，恢复时与抽屉退场一致。
  */
 .mobile-frame {
   transform-origin: 50% 0%;
   transition:
-    transform 320ms var(--ease-drawer),
-    border-radius 320ms var(--ease-drawer);
+    transform var(--sheet-exit-duration) var(--sheet-exit-ease),
+    border-radius var(--sheet-exit-duration) var(--sheet-exit-ease);
 }
 
 .mobile-frame--sheet {
   transform: scale(0.94) translateY(10px);
   border-radius: 24px;
   will-change: transform;
+  transition:
+    transform var(--sheet-enter-duration) var(--sheet-enter-ease),
+    border-radius var(--sheet-enter-duration) var(--sheet-enter-ease);
 }
 
 /*

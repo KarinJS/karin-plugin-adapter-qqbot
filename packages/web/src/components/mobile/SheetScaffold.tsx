@@ -1,5 +1,5 @@
 import { cn } from '@heroui/react'
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 
 const EDGE_GAP = 8
 
@@ -16,6 +16,8 @@ interface SheetScaffoldProps {
   footer?: ReactNode
   children: ReactNode
   contentClassName?: string
+  /** 供抽屉的拖动手势读取 scrollTop。 */
+  scrollerRef?: RefObject<HTMLDivElement | null>
 }
 
 /**
@@ -24,8 +26,9 @@ interface SheetScaffoldProps {
  * 顶栏和底栏不再铺默认底色，而是浮在滚动内容之上：
  * 内容从它们下方滚过，由三层不同半径的模糊把文字逐渐化开。
  * 滚动容器的上下内边距根据顶栏/底栏的实际高度测量，避免内容被挡住。
+ * 顶栏 / 底栏固定在骨架的上下边缘，抽屉高度变化时不会跟着内容滚走。
  */
-export const SheetScaffold = ({ header, footer, children, contentClassName }: SheetScaffoldProps) => {
+export const SheetScaffold = ({ header, footer, children, contentClassName, scrollerRef }: SheetScaffoldProps) => {
   const headerRef = useRef<HTMLDivElement>(null)
   const footerRef = useRef<HTMLDivElement>(null)
   const [insets, setInsets] = useState({ top: 0, bottom: 0 })
@@ -52,6 +55,7 @@ export const SheetScaffold = ({ header, footer, children, contentClassName }: Sh
   return (
     <div className='relative min-h-0 flex-1 overflow-hidden'>
       <div
+        ref={scrollerRef}
         className={cn('mobile-scroll h-full overflow-y-auto overscroll-contain px-4', contentClassName)}
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       >

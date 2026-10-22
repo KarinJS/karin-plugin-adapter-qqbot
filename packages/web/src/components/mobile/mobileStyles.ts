@@ -1,11 +1,19 @@
 import type { CSSProperties } from 'react'
 
-/** 手机端 bottom sheet 共用尺寸：占屏幕 90%，底部圆角。 */
+/**
+ * 手机端 bottom sheet 共用样式。
+ *
+ * 高度不再写死：打开时由 MobileSheet 按可用高度设为 50%，拖动 / 吸附时动态变化。
+ * 顶部圆角同时写物理和逻辑属性：部分安卓浏览器（例如安卓 Edge）在
+ * overflow + backdrop-filter 的组合下会按逻辑属性绘制，只写 border-radius 会丢圆角。
+ */
 export const mobileSheetStyle: CSSProperties = {
-  height: '90dvh',
-  maxHeight: '90dvh',
   padding: 0,
   borderRadius: '28px 28px 0 0',
+  borderTopLeftRadius: '28px',
+  borderTopRightRadius: '28px',
+  borderStartStartRadius: '28px',
+  borderStartEndRadius: '28px',
   // HeroUI 自己还有一条 translate 过渡，会和 GSAP 的 transform 叠加；
   // 这里关掉，滑入滑出完全由 useSheetMotion 驱动。
   translate: 'none',

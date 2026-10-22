@@ -1,11 +1,14 @@
 import { gsap } from 'gsap'
 import { useLayoutEffect, useRef, useState } from 'react'
+import { SHEET_ENTER_DURATION, SHEET_ENTER_EASE, SHEET_EXIT_DURATION, SHEET_EXIT_EASE } from '@/lib/sheetMotion'
 
 interface SheetMotionOptions {
   isOpen: boolean
   onRequestClose: () => void
   /** 抽屉完全退出、即将卸载时触发；用于衔接移除机器人这类后续动画。 */
   onExited?: () => void
+  /** 进入动画开始前执行，用来把 dialog 设到本次打开的初始高度。 */
+  beforeEnter?: (dialog: HTMLElement) => void
 }
 
 /**
@@ -15,15 +18,17 @@ interface SheetMotionOptions {
  * 退出沿同一条路径滑回去，结束后再卸载。
  * 动画直接驱动 dialog 的 transform，不依赖 HeroUI 的 data-entering。
  */
-export const useSheetMotion = ({ isOpen, onRequestClose, onExited }: SheetMotionOptions) => {
+export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }: SheetMotionOptions) => {
   const backdropRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(isOpen)
   const closingRef = useRef(false)
   const onExitedRef = useRef(onExited)
+  const beforeEnterRef = useRef(beforeEnter)
 
   useLayoutEffect(() => {
     onExitedRef.current = onExited
-  }, [onExited])
+    beforeEnterRef.current = beforeEnter
+  }, [onExited, beforeEnter])
 
   useLayoutEffect(() => {
     if (!isOpen) return
@@ -40,13 +45,15 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited }: SheetMotion
 
     gsap.killTweensOf([backdrop, dialog])
     gsap.set(backdrop, { opacity: 1 })
+    // 先确定本次打开的高度，再读取 offsetHeight 作为滑入距离。
+    beforeEnterRef.current?.(dialog)
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       gsap.set(dialog, { y: 0 })
       return
     }
 
-    gsap.fromTo(dialog, { y: dialog.offsetHeight }, { y: 0, duration: 0.42, ease: 'power3.out' })
+    gsap.fromTo(dialog, { y: dialog.offsetHeight }, { y: 0, duration: SHEET_ENTER_DURATION, ease: SHEET_ENTER_EASE })
 
     return () => {
       gsap.killTweensOf([backdrop, dialog])
@@ -77,8 +84,8 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited }: SheetMotion
 
     gsap.to(dialog, {
       y: dialog.offsetHeight,
-      duration: 0.28,
-      ease: 'power2.in',
+      duration: SHEET_EXIT_DURATION,
+      ease: SHEET_EXIT_EASE,
       onComplete: () => {
         setMounted(false)
         closingRef.current = false
