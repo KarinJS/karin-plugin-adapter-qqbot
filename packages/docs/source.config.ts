@@ -9,13 +9,14 @@ import { createFileSystemTypesCache } from 'fumadocs-twoslash/cache-fs'
  * Next 的构建目录是 packages/docs，所以 baseUrl 指向 packages/。
  */
 const workspaceRoot = path.resolve(process.cwd(), '..')
+const defaultTransformers = rehypeCodeDefaultOptions.transformers ?? []
 
 export default defineConfig({
   mdxOptions: {
     rehypeCodeOptions: {
       ...rehypeCodeDefaultOptions,
       transformers: [
-        ...rehypeCodeDefaultOptions.transformers,
+        ...defaultTransformers,
         transformerTwoslash({
           typesCache: createFileSystemTypesCache(),
           twoslashOptions: {
