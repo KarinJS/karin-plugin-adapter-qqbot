@@ -4,19 +4,26 @@ import { useLayoutEffect, useRef, useState } from 'react'
 interface SheetMotionOptions {
   isOpen: boolean
   onRequestClose: () => void
+  /** 抽屉完全退出、即将卸载时触发；用于衔接移除机器人这类后续动画。 */
+  onExited?: () => void
 }
 
 /**
  * 底部抽屉的进入 / 退出动画。
  *
- * HeroUI 的抽屉依赖 content 上的 data-entering，但当前版本里 dialog 不会滑入，
- * 所以这里直接驱动 dialog 的 transform：进入用强 ease-out（先快后慢），
- * 退出用 ease-in；关闭时先保留抽屉挂载，等退出动画结束再卸载。
+ * 进入时遮罩直接到位、抽屉以 100% 不透明度从底部滑上来，不做透明度渐变；
+ * 退出沿同一条路径滑回去，结束后再卸载。
+ * 动画直接驱动 dialog 的 transform，不依赖 HeroUI 的 data-entering。
  */
-export const useSheetMotion = ({ isOpen, onRequestClose }: SheetMotionOptions) => {
+export const useSheetMotion = ({ isOpen, onRequestClose, onExited }: SheetMotionOptions) => {
   const backdropRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(isOpen)
   const closingRef = useRef(false)
+  const onExitedRef = useRef(onExited)
+
+  useLayoutEffect(() => {
+    onExitedRef.current = onExited
+  }, [onExited])
 
   useLayoutEffect(() => {
     if (!isOpen) return
@@ -32,16 +39,14 @@ export const useSheetMotion = ({ isOpen, onRequestClose }: SheetMotionOptions) =
     if (!backdrop || !dialog) return
 
     gsap.killTweensOf([backdrop, dialog])
+    gsap.set(backdrop, { opacity: 1 })
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       gsap.set(dialog, { y: 0 })
-      gsap.set(backdrop, { opacity: 1 })
       return
     }
 
-    gsap.set(backdrop, { opacity: 0 })
     gsap.fromTo(dialog, { y: dialog.offsetHeight }, { y: 0, duration: 0.42, ease: 'power3.out' })
-    gsap.to(backdrop, { opacity: 1, duration: 0.3, ease: 'power2.out' })
 
     return () => {
       gsap.killTweensOf([backdrop, dialog])
@@ -57,6 +62,7 @@ export const useSheetMotion = ({ isOpen, onRequestClose }: SheetMotionOptions) =
     if (!backdrop || !dialog) {
       setMounted(false)
       closingRef.current = false
+      onExitedRef.current?.()
       return
     }
 
@@ -65,6 +71,7 @@ export const useSheetMotion = ({ isOpen, onRequestClose }: SheetMotionOptions) =
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       setMounted(false)
       closingRef.current = false
+      onExitedRef.current?.()
       return
     }
 
@@ -75,9 +82,9 @@ export const useSheetMotion = ({ isOpen, onRequestClose }: SheetMotionOptions) =
       onComplete: () => {
         setMounted(false)
         closingRef.current = false
+        onExitedRef.current?.()
       },
     })
-    gsap.to(backdrop, { opacity: 0, duration: 0.24, ease: 'power2.in' })
 
     return () => {
       gsap.killTweensOf([backdrop, dialog])

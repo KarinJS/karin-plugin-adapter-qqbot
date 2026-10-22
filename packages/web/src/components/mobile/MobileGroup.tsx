@@ -40,6 +40,7 @@ interface MobileActionRowProps {
   description?: string
   trailing?: ReactNode
   danger?: boolean
+  disabled?: boolean
   onPress: () => void
   className?: string
 }
@@ -50,13 +51,15 @@ export const MobileActionRow = ({
   description,
   trailing,
   danger,
+  disabled,
   onPress,
   className,
 }: MobileActionRowProps) => (
   <button
     type='button'
+    disabled={disabled}
     className={cn(
-      'pressable flex w-full items-center gap-3 border-b border-border/50 px-4 py-3 text-left last:border-b-0 active:bg-default/70',
+      'pressable flex w-full items-center gap-3 border-b border-border/50 px-4 py-3 text-left last:border-b-0 active:bg-default/70 disabled:opacity-50',
       className
     )}
     onClick={onPress}

@@ -16,6 +16,7 @@ import { QrPanel } from '@/components/QrPanel'
 import { SecretField } from '@/components/SecretField'
 import { MobileGroup, MobileRow } from '@/components/mobile/MobileGroup'
 import { MobileEventTypePicker } from '@/components/mobile/MobileEventTypePicker'
+import { SheetScaffold } from '@/components/mobile/SheetScaffold'
 import type { EventType } from '@/components/EventTypePicker'
 import {
   mobileSegmentSelectedStyle,
@@ -152,53 +153,58 @@ export const MobileAddBotSheet = () => {
     >
       <Drawer.Content placement='bottom'>
         <Drawer.Dialog
-          className='flex flex-col border border-border/60 bg-surface shadow-overlay'
+          className='flex flex-col overflow-hidden border border-border/60 bg-surface shadow-overlay'
           style={mobileSheetStyle}
         >
-          <Drawer.Handle className='pt-2' />
+          <SheetScaffold
+            header={
+              <header className='px-5 pb-3'>
+                <Drawer.Handle className='mx-auto mb-1' />
+                <div className='flex items-start justify-between gap-3'>
+                  <div className='min-w-0'>
+                    <h2 className='text-[17px] leading-tight font-semibold tracking-[-0.02em]'>添加机器人</h2>
+                    <p className='mt-0.5 text-[11px] text-muted'>扫码授权，或手动填写凭据。</p>
+                  </div>
+                  <Button isIconOnly size='sm' variant='tertiary' aria-label='关闭添加机器人' onPress={closeAdd}>
+                    <X className='size-4' aria-hidden='true' />
+                  </Button>
+                </div>
+              </header>
+            }
+          >
+            <div className='flex flex-col gap-4 pb-4'>
+              <ToggleButtonGroup
+                selectionMode='single'
+                disallowEmptySelection
+                selectedKeys={[mode]}
+                size='sm'
+                aria-label='添加方式'
+                className='grid grid-cols-2 gap-1 rounded-xl bg-default p-1'
+                onSelectionChange={(keys) => {
+                  const [next] = Array.from(keys)
+                  if (next === 'qr' || next === 'manual') setMode(next)
+                }}
+              >
+                <ToggleButton
+                  id='qr'
+                  className='h-9 justify-center gap-1.5 rounded-lg text-xs font-medium'
+                  style={mode === 'qr' ? mobileSegmentSelectedStyle : undefined}
+                >
+                  <QrCode className='size-3.5' aria-hidden='true' />
+                  扫码授权
+                </ToggleButton>
+                <ToggleButton
+                  id='manual'
+                  className='h-9 justify-center gap-1.5 rounded-lg text-xs font-medium'
+                  style={mode === 'manual' ? mobileSegmentSelectedStyle : undefined}
+                >
+                  手动填写
+                </ToggleButton>
+              </ToggleButtonGroup>
 
-          <header className='flex shrink-0 items-start justify-between gap-3 px-5 pb-3'>
-            <div className='min-w-0'>
-              <h2 className='text-[17px] leading-tight font-semibold tracking-[-0.02em]'>添加机器人</h2>
-              <p className='mt-0.5 text-[11px] text-muted'>扫码授权，或手动填写凭据。</p>
+              {mode === 'qr' ? <QrPanel /> : <MobileManualAddForm />}
             </div>
-            <Button isIconOnly size='sm' variant='tertiary' aria-label='关闭添加机器人' onPress={closeAdd}>
-              <X className='size-4' aria-hidden='true' />
-            </Button>
-          </header>
-
-          <div className='mobile-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4'>
-            <ToggleButtonGroup
-              selectionMode='single'
-              disallowEmptySelection
-              selectedKeys={[mode]}
-              size='sm'
-              aria-label='添加方式'
-              className='mb-4 grid grid-cols-2 gap-1 rounded-xl bg-default p-1'
-              onSelectionChange={(keys) => {
-                const [next] = Array.from(keys)
-                if (next === 'qr' || next === 'manual') setMode(next)
-              }}
-            >
-              <ToggleButton
-                id='qr'
-                className='h-9 justify-center gap-1.5 rounded-lg text-xs font-medium'
-                style={mode === 'qr' ? mobileSegmentSelectedStyle : undefined}
-              >
-                <QrCode className='size-3.5' aria-hidden='true' />
-                扫码授权
-              </ToggleButton>
-              <ToggleButton
-                id='manual'
-                className='h-9 justify-center gap-1.5 rounded-lg text-xs font-medium'
-                style={mode === 'manual' ? mobileSegmentSelectedStyle : undefined}
-              >
-                手动填写
-              </ToggleButton>
-            </ToggleButtonGroup>
-
-            {mode === 'qr' ? <QrPanel /> : <MobileManualAddForm />}
-          </div>
+          </SheetScaffold>
         </Drawer.Dialog>
       </Drawer.Content>
     </Drawer.Backdrop>

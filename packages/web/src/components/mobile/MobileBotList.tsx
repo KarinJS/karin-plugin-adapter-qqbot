@@ -64,6 +64,7 @@ export const MobileBotList = ({ title, className }: MobileBotListProps) => {
             <button
               key={bot.appId}
               type='button'
+              data-bot-id={bot.appId}
               className={cn(
                 'pressable flex w-full items-center gap-3 border-b border-border/50 px-3.5 py-3 text-left last:border-b-0 active:bg-default/70',
                 selected && 'bg-default/70'

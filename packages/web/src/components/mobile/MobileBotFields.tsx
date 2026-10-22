@@ -1,6 +1,6 @@
-import { Alert, Button, Description, FieldError, Input, Label, ListBox, Select, Switch, TextField } from '@heroui/react'
+import { Alert, Description, FieldError, Input, Label, ListBox, Select, Switch, TextField } from '@heroui/react'
 import { Trash2 } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import type { FormEvent } from 'react'
 import { MessageCacheFields } from '@/components/MessageCacheFields'
 import { RegexEditor } from '@/components/RegexEditor'
 import { SecretField } from '@/components/SecretField'
@@ -48,7 +48,6 @@ interface MobileBotFieldsProps {
  */
 export const MobileBotFields = ({ formId, controller, onSaved, onRemove, removing }: MobileBotFieldsProps) => {
   const { draft, errors, saving, error, patch, submit } = controller
-  const [confirmingRemove, setConfirmingRemove] = useState(false)
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     const saved = await submit(event)
@@ -163,36 +162,14 @@ export const MobileBotFields = ({ formId, controller, onSaved, onRemove, removin
 
       {onRemove ? (
         <MobileGroup>
-          {confirmingRemove ? (
-            <div className='p-4'>
-              <p className='text-sm font-medium text-danger'>移除这个机器人？</p>
-              <p className='mt-1 text-[11px] leading-5 text-muted'>
-                从 config.json 中删除并断开当前连接。不会删除 QQ 开放平台侧的机器人。
-              </p>
-              <div className='mt-3 flex gap-2'>
-                <Button
-                  size='sm'
-                  className='flex-1'
-                  variant='secondary'
-                  isDisabled={removing}
-                  onPress={() => setConfirmingRemove(false)}
-                >
-                  取消
-                </Button>
-                <Button size='sm' className='flex-1' variant='danger' isPending={removing} onPress={onRemove}>
-                  移除
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <MobileActionRow
-              danger
-              icon={<Trash2 className='size-4' aria-hidden='true' />}
-              label='移除机器人'
-              description='从配置中删除并断开连接'
-              onPress={() => setConfirmingRemove(true)}
-            />
-          )}
+          <MobileActionRow
+            danger
+            disabled={removing}
+            icon={<Trash2 className='size-4' aria-hidden='true' />}
+            label='移除机器人'
+            description='从配置中删除并断开连接'
+            onPress={onRemove}
+          />
         </MobileGroup>
       ) : null}
     </form>

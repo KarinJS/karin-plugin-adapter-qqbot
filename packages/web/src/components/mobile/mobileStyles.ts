@@ -6,13 +6,17 @@ export const mobileSheetStyle: CSSProperties = {
   maxHeight: '90dvh',
   padding: 0,
   borderRadius: '28px 28px 0 0',
+  // HeroUI 自己还有一条 translate 过渡，会和 GSAP 的 transform 叠加；
+  // 这里关掉，滑入滑出完全由 useSheetMotion 驱动。
+  translate: 'none',
+  transition: 'none',
 } as CSSProperties
 
-/** 抽屉背后压暗遮罩。 */
+/** 抽屉背后压暗遮罩。遮罩不做透明度渐变，抽屉打开时直接到位。 */
 export const mobileSheetBackdropStyle: CSSProperties = {
   backgroundColor: 'rgb(0 0 0 / 0.38)',
-  // 入场前先保持透明，避免挂载瞬间闪一帧全黑遮罩；GSAP 会接管后续透明度。
-  opacity: 0,
+  // HeroUI 遮罩自带 opacity 过渡，会和“100% 不透明弹出”冲突。
+  transition: 'none',
 } as CSSProperties
 
 /** 分段控件的选中态：跟随主题表面色，而不是 HeroUI 默认的强调色。 */

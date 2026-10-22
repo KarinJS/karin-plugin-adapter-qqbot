@@ -259,15 +259,21 @@
   display: none;
 }
 
-/* 手机分页器：原生横向滚动 + 吸附，滚动条不占视觉空间。 */
+/* 手机分页器：横向手势由组件接管，纵向仍交给浏览器。 */
 .mobile-pager {
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
-.mobile-pager::-webkit-scrollbar {
-  display: none;
+.mobile-pager[data-dragging='true'] {
+  cursor: grabbing;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@media (pointer: fine) {
+  .mobile-pager {
+    cursor: grab;
+  }
 }
 
 .mobile-panel {
@@ -281,6 +287,108 @@
 
 .mobile-scroll::-webkit-scrollbar {
   display: none;
+}
+
+/*
+ * 抽屉顶栏 / 底栏的渐进模糊。
+ *
+ * 不再铺一层默认底色，而是用三层不同半径的 backdrop-filter 叠出阶梯式模糊：
+ * 靠近边缘是强模糊，往内容方向依次减弱，最后一段完全透明。
+ * 每层用 mask 把下边缘拉长，避免出现一条能看出来的分层线；
+ * 最内层的透明区留得足够高，内容不会一进抽屉就整片发虚。
+ */
+.sheet-edge-blur {
+  position: absolute;
+  inset-inline: 0;
+  height: 176px;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.sheet-edge-blur--top {
+  top: 0;
+}
+
+.sheet-edge-blur--bottom {
+  bottom: 0;
+}
+
+.sheet-edge-blur__layer {
+  position: absolute;
+  inset-inline: 0;
+  background: transparent;
+}
+
+.sheet-edge-blur--top .sheet-edge-blur__layer {
+  top: 0;
+}
+
+.sheet-edge-blur--bottom .sheet-edge-blur__layer {
+  bottom: 0;
+}
+
+.sheet-edge-blur__layer--strong {
+  height: 42px;
+  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
+}
+
+.sheet-edge-blur__layer--medium {
+  height: 84px;
+  -webkit-backdrop-filter: blur(4.5px);
+  backdrop-filter: blur(4.5px);
+}
+
+.sheet-edge-blur__layer--soft {
+  height: 132px;
+  -webkit-backdrop-filter: blur(1.75px);
+  backdrop-filter: blur(1.75px);
+}
+
+.sheet-edge-blur--top .sheet-edge-blur__layer--strong {
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 100%);
+}
+
+.sheet-edge-blur--top .sheet-edge-blur__layer--medium {
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%);
+}
+
+.sheet-edge-blur--top .sheet-edge-blur__layer--soft {
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 100%);
+}
+
+.sheet-edge-blur--bottom .sheet-edge-blur__layer--strong {
+  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 50%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 0%, #000 50%, transparent 100%);
+}
+
+.sheet-edge-blur--bottom .sheet-edge-blur__layer--medium {
+  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 42%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 0%, #000 42%, transparent 100%);
+}
+
+.sheet-edge-blur--bottom .sheet-edge-blur__layer--soft {
+  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 30%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 0%, #000 30%, transparent 100%);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .sheet-edge-blur {
+    background: color-mix(in oklab, var(--surface) 92%, transparent);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .sheet-edge-blur {
+    background: var(--surface);
+  }
+
+  .sheet-edge-blur__layer {
+    display: none;
+  }
 }
 
 /*
