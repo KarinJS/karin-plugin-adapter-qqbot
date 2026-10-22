@@ -46,10 +46,13 @@ export const config = (): Config => {
 
 /**
  * 直接从磁盘读取配置，不使用内存缓存。
+ *
+ * `requireFileSync` 自身还有一层 300 秒文件缓存，写盘后必须强制重读，
+ * 否则 Web 端保存后拿到的仍是旧配置。
  */
 export const readConfigFile = (): Config => {
   if (!fs.existsSync(configPath)) return config()
-  return formatConfig(requireFileSync<Config>(configPath))
+  return formatConfig(requireFileSync<Config>(configPath, { force: true }))
 }
 
 /**
