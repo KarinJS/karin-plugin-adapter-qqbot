@@ -24,13 +24,14 @@ const levelOptions: { value: MessageCacheLevel; label: string; description: stri
 interface MessageCacheFieldsProps {
   value: MessageCache
   onChange: (value: MessageCache) => void
+  compact?: boolean
 }
 
-export const MessageCacheFields = ({ value, onChange }: MessageCacheFieldsProps) => {
+export const MessageCacheFields = ({ value, onChange, compact = false }: MessageCacheFieldsProps) => {
   const patch = (next: Partial<MessageCache>) => onChange({ ...value, ...next })
 
   return (
-    <div className='flex flex-col gap-5'>
+    <div className={compact ? 'flex flex-col gap-3' : 'flex flex-col gap-5'}>
       <Switch isSelected={value.enable} onChange={(enable) => patch({ enable })}>
         <Switch.Content>
           <Switch.Control>
@@ -38,13 +39,19 @@ export const MessageCacheFields = ({ value, onChange }: MessageCacheFieldsProps)
           </Switch.Control>
           <span className='flex flex-col'>
             <span className='text-sm font-medium'>启用消息缓存</span>
-            <span className='text-xs leading-5 text-muted'>用于 bot.getMsg、引用与撤回解析</span>
+            <span className={compact ? 'text-[11px] leading-4 text-muted' : 'text-xs leading-5 text-muted'}>
+              用于 bot.getMsg、引用与撤回解析
+            </span>
           </span>
         </Switch.Content>
       </Switch>
 
       <div
-        className={cn('grid gap-5 transition-opacity duration-200', !value.enable && 'pointer-events-none opacity-45')}
+        className={cn(
+          'grid transition-opacity duration-200',
+          compact ? 'gap-3' : 'gap-5',
+          !value.enable && 'pointer-events-none opacity-45'
+        )}
       >
         <Switch isSelected={value.self} isDisabled={!value.enable} onChange={(self) => patch({ self })}>
           <Switch.Content>
@@ -53,7 +60,9 @@ export const MessageCacheFields = ({ value, onChange }: MessageCacheFieldsProps)
             </Switch.Control>
             <span className='flex flex-col'>
               <span className='text-sm font-medium'>缓存机器人自己的消息</span>
-              <span className='text-xs leading-5 text-muted'>发送后仍能通过消息 ID 回查</span>
+              <span className={compact ? 'text-[11px] leading-4 text-muted' : 'text-xs leading-5 text-muted'}>
+                发送后仍能通过消息 ID 回查
+              </span>
             </span>
           </Switch.Content>
         </Switch>
@@ -67,7 +76,7 @@ export const MessageCacheFields = ({ value, onChange }: MessageCacheFieldsProps)
             patch({ level: next as MessageCacheLevel })
           }}
         >
-          <Label>存储分级</Label>
+          <Label className={compact ? 'text-xs text-muted' : undefined}>存储分级</Label>
           <Select.Trigger>
             <Select.Value />
             <Select.Indicator />
@@ -96,13 +105,15 @@ export const MessageCacheFields = ({ value, onChange }: MessageCacheFieldsProps)
             if (typeof next === 'number' && Number.isFinite(next)) patch({ ttlHours: next })
           }}
         >
-          <Label>保留小时数</Label>
+          <Label className={compact ? 'text-xs text-muted' : undefined}>保留小时数</Label>
           <NumberField.Group>
             <NumberField.DecrementButton />
             <NumberField.Input />
             <NumberField.IncrementButton />
           </NumberField.Group>
-          <Description>1 到 720 小时，默认 24 小时</Description>
+          <Description className={compact ? 'text-[11px] leading-4' : undefined}>
+            1 到 720 小时，默认 24 小时
+          </Description>
         </NumberField>
 
         <NumberField
@@ -115,13 +126,15 @@ export const MessageCacheFields = ({ value, onChange }: MessageCacheFieldsProps)
             if (typeof next === 'number' && Number.isFinite(next)) patch({ maxRows: next })
           }}
         >
-          <Label>最大行数</Label>
+          <Label className={compact ? 'text-xs text-muted' : undefined}>最大行数</Label>
           <NumberField.Group>
             <NumberField.DecrementButton />
             <NumberField.Input />
             <NumberField.IncrementButton />
           </NumberField.Group>
-          <Description>超出后删除最旧记录，多个机器人取最大值</Description>
+          <Description className={compact ? 'text-[11px] leading-4' : undefined}>
+            超出后删除最旧记录，多个机器人取最大值
+          </Description>
         </NumberField>
       </div>
     </div>

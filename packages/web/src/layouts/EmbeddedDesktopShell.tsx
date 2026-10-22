@@ -6,12 +6,13 @@ import { PageTransition } from '@/components/PageTransition'
 const navItems = [
   { to: '/bots', label: '机器人列表', icon: Bot, key: 'bots' },
   { to: '/bots/new', label: '扫码添加', icon: QrCode, key: 'add' },
-  { to: '/', label: '概览', icon: LayoutGrid, key: 'overview' },
+  { to: '/overview', label: '概览', icon: LayoutGrid, key: 'overview' },
 ] as const
 
 const getActiveKey = (pathname: string) => {
   if (pathname === '/bots/new') return 'add'
   if (pathname.startsWith('/bots')) return 'bots'
+  if (pathname.startsWith('/overview')) return 'overview'
   return 'overview'
 }
 

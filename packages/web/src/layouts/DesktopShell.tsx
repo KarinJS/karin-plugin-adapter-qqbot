@@ -7,7 +7,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { useConfigStore } from '@/hooks/useConfigStore'
 
 const navItems = [
-  { to: '/', label: '概览', icon: Home, key: 'overview' },
+  { to: '/overview', label: '概览', icon: Home, key: 'overview' },
   { to: '/bots', label: '机器人', icon: Bot, key: 'bots' },
   { to: '/bots/new', label: '扫码添加', icon: QrCode, key: 'add' },
   { to: '/settings', label: '设置', icon: Settings, key: 'settings' },

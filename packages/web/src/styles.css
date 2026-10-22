@@ -125,13 +125,38 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;
   }
 
   body {
     margin: 0;
     background: var(--background);
     color: var(--foreground);
-    overscroll-behavior-y: none;
+    overscroll-behavior: none;
+  }
+
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  @media (pointer: fine) {
+    input,
+    textarea,
+    select {
+      font-size: inherit;
+    }
+  }
+
+  button,
+  a,
+  [role='button'] {
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   ::selection {
@@ -232,6 +257,79 @@
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* 手机分页器：每个顶层页面独立滚动，滚动条不占视觉空间。 */
+.mobile-panel {
+  padding: max(0.75rem, env(safe-area-inset-top, 0px)) 1rem 1.5rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-scroll {
+  scrollbar-width: none;
+}
+
+.mobile-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * 打开底部抽屉时，整个手机外壳向后退并轻微缩小；
+ * 抽屉通过 portal 渲染在外壳之外，因此不会被一起缩放。
+ */
+.mobile-frame {
+  transform-origin: 50% 0%;
+  transition:
+    transform 320ms var(--ease-drawer),
+    border-radius 320ms var(--ease-drawer);
+}
+
+.mobile-frame--sheet {
+  transform: scale(0.94) translateY(10px);
+  border-radius: 24px;
+  will-change: transform;
+}
+
+/*
+ * 详情页返回按钮：--back-p 从 0 到 1 连续变化。
+ * 宽度、内边距、背景和文字宽度都由这个变量插值，不依赖阈值切换。
+ */
+.morph-back {
+  --back-p: 0;
+  width: calc(2.5rem + (1 - var(--back-p)) * 6.5rem);
+  padding-inline: calc(0.5rem + (1 - var(--back-p)) * 0.5rem);
+  border-color: color-mix(in oklab, var(--border) calc(var(--back-p) * 100%), transparent);
+  background-color: color-mix(in oklab, var(--background) calc(var(--back-p) * 82%), transparent);
+  box-shadow: 0 calc(var(--back-p) * 6px) calc(var(--back-p) * 18px) rgb(0 0 0 / calc(var(--back-p) * 0.12));
+  backdrop-filter: blur(calc(var(--back-p) * 18px));
+  -webkit-backdrop-filter: blur(calc(var(--back-p) * 18px));
+  transition:
+    background-color 100ms linear,
+    border-color 100ms linear;
+}
+
+.morph-back-label {
+  max-width: calc((1 - var(--back-p)) * 6rem);
+  margin-left: calc((1 - var(--back-p)) * 0.5rem);
+  opacity: calc(1 - var(--back-p));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-frame {
+    transition: none;
+  }
+
+  .morph-back {
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .morph-back {
+    background-color: color-mix(in oklab, var(--background) calc(var(--back-p) * 100%), transparent);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 .status-dot {

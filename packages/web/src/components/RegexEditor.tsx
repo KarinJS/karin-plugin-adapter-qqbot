@@ -5,9 +5,10 @@ interface RegexEditorProps {
   value: { reg: string; rep: string }[]
   onChange: (value: { reg: string; rep: string }[]) => void
   isDisabled?: boolean
+  compact?: boolean
 }
 
-export const RegexEditor = ({ value, onChange, isDisabled }: RegexEditorProps) => {
+export const RegexEditor = ({ value, onChange, isDisabled, compact = false }: RegexEditorProps) => {
   const updateRule = (index: number, patch: Partial<{ reg: string; rep: string }>) => {
     onChange(value.map((rule, ruleIndex) => (ruleIndex === index ? { ...rule, ...patch } : rule)))
   }
@@ -17,9 +18,15 @@ export const RegexEditor = ({ value, onChange, isDisabled }: RegexEditorProps) =
   }
 
   return (
-    <div className='flex flex-col gap-3'>
+    <div className={compact ? 'flex flex-col gap-2' : 'flex flex-col gap-3'}>
       {value.length === 0 ? (
-        <p className='rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted'>
+        <p
+          className={
+            compact
+              ? 'rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted'
+              : 'rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted'
+          }
+        >
           没有替换规则，消息文本会原样处理。
         </p>
       ) : null}
@@ -27,7 +34,11 @@ export const RegexEditor = ({ value, onChange, isDisabled }: RegexEditorProps) =
       {value.map((rule, index) => (
         <div
           key={`${index}-${rule.reg}`}
-          className='flex flex-col gap-3 rounded-xl border border-border/70 bg-surface-secondary/40 p-3 sm:flex-row sm:items-end'
+          className={
+            compact
+              ? 'flex flex-col gap-2 rounded-xl border border-border/70 bg-surface-secondary/40 p-2.5'
+              : 'flex flex-col gap-3 rounded-xl border border-border/70 bg-surface-secondary/40 p-3 sm:flex-row sm:items-end'
+          }
         >
           <TextField
             className='min-w-0 flex-1'
@@ -51,6 +62,7 @@ export const RegexEditor = ({ value, onChange, isDisabled }: RegexEditorProps) =
 
           <Button
             isIconOnly
+            size={compact ? 'sm' : undefined}
             className='self-end'
             variant='ghost'
             aria-label={`删除第 ${index + 1} 条替换规则`}

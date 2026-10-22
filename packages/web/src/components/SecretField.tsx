@@ -13,6 +13,7 @@ interface SecretFieldProps {
   description?: string
   placeholder?: string
   label?: string
+  compact?: boolean
 }
 
 export const SecretField = ({
@@ -23,6 +24,7 @@ export const SecretField = ({
   description,
   placeholder = 'AppSecret',
   label = 'AppSecret',
+  compact = false,
 }: SecretFieldProps) => {
   const [visible, setVisible] = useState(false)
   const masked = !visible && supportsTextSecurity
@@ -30,7 +32,7 @@ export const SecretField = ({
 
   return (
     <TextField fullWidth value={value} isInvalid={isInvalid} onChange={onChange}>
-      <Label>{label}</Label>
+      <Label className={compact ? 'text-xs text-muted' : undefined}>{label}</Label>
       <div className='flex items-center gap-2'>
         <Input
           className={cn('min-w-0 flex-1', masked && 'secret-mask')}
@@ -46,6 +48,7 @@ export const SecretField = ({
         />
         <Button
           isIconOnly
+          size={compact ? 'sm' : undefined}
           variant='tertiary'
           type='button'
           aria-label={visible ? `隐藏 ${label}` : `显示 ${label}`}
@@ -54,7 +57,9 @@ export const SecretField = ({
           {visible ? <EyeOff className='size-4' aria-hidden='true' /> : <Eye className='size-4' aria-hidden='true' />}
         </Button>
       </div>
-      {description ? <Description>{description}</Description> : null}
+      {description ? (
+        <Description className={compact ? 'text-[11px] leading-4' : undefined}>{description}</Description>
+      ) : null}
       <FieldError>{error}</FieldError>
     </TextField>
   )

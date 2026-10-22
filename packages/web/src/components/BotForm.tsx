@@ -1,16 +1,16 @@
 import { Alert, Button, Description, FieldError, Input, Label, ListBox, Select, Switch, TextField } from '@heroui/react'
 import { RotateCcw, Save } from 'lucide-react'
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useId, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { EventTypePicker } from '@/components/EventTypePicker'
 import { MessageCacheFields } from '@/components/MessageCacheFields'
 import { RegexEditor } from '@/components/RegexEditor'
-import { SaveStatus, type SaveState } from '@/components/SaveStatus'
+import { SaveStatus } from '@/components/SaveStatus'
 import { SecretField } from '@/components/SecretField'
 import { SectionCard } from '@/components/SectionCard'
 import { StatusPill } from '@/components/StatusPill'
+import { useBotEditor } from '@/hooks/useBotEditor'
 import { useConfigStore } from '@/hooks/useConfigStore'
-import { useViewport } from '@/hooks/useViewport'
 import type { BotConfig } from '@/lib/types'
 
 interface BotFormProps {
@@ -18,111 +18,22 @@ interface BotFormProps {
   onSaved?: (appId: string) => void
 }
 
-const cloneBot = (bot: BotConfig): BotConfig => structuredClone(bot)
-
-/**
- * 服务端会重新格式化配置，对象键顺序可能变化；比较草稿时忽略顺序。
- */
-const stableStringify = (value: unknown): string => {
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
-  if (value && typeof value === 'object') {
-    const record = value as Record<string, unknown>
-    return `{${Object.keys(record)
-      .toSorted()
-      .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
-      .join(',')}}`
-  }
-  return JSON.stringify(value)
-}
-
 export const BotForm = ({ bot, onSaved }: BotFormProps) => {
-  const { config, statuses, save, saving, error, clearError } = useConfigStore()
-  const { isMobile } = useViewport()
+  const { statuses } = useConfigStore()
   const navigate = useNavigate()
   const formId = useId()
-
-  const [draft, setDraft] = useState<BotConfig>(() => cloneBot(bot))
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [saveState, setSaveState] = useState<SaveState>('idle')
-  const timerRef = useRef<number | undefined>(undefined)
-
-  useEffect(() => {
-    setDraft(cloneBot(bot))
-    setErrors({})
-  }, [bot])
-
-  useEffect(() => () => window.clearTimeout(timerRef.current), [])
-
-  const showSaveState = (next: SaveState, hideAfter?: number) => {
-    window.clearTimeout(timerRef.current)
-    setSaveState(next)
-    if (hideAfter) {
-      timerRef.current = window.setTimeout(() => setSaveState('idle'), hideAfter)
-    }
-  }
+  const { draft, errors, dirty, saving, error, saveState, patch, reset, submit } = useBotEditor(bot)
 
   const status = statuses[bot.appId]
-  const otherAppIds = config.filter((item) => item.appId !== bot.appId).map((item) => item.appId)
-  const dirty = stableStringify(draft) !== stableStringify(bot)
-
-  const patch = (next: Partial<BotConfig>) => {
-    setDraft((current) => ({ ...current, ...next }))
-    clearError()
-  }
-
-  const reset = () => {
-    setDraft(cloneBot(bot))
-    setErrors({})
-    clearError()
-    window.clearTimeout(timerRef.current)
-    setSaveState('idle')
-  }
-
-  const validate = (value: BotConfig) => {
-    const next: Record<string, string> = {}
-    const appId = value.appId.trim()
-
-    if (!appId) next.appId = '请填写 AppID'
-    else if (/\s/.test(appId)) next.appId = 'AppID 不能包含空格'
-    else if (otherAppIds.includes(appId)) next.appId = '这个 AppID 已经存在'
-
-    if (value.event.type !== 0 && !value.secret.trim()) {
-      next.secret = '连接机器人需要 AppSecret，扫码授权会自动填写'
-    }
-
-    return next
-  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+    const saved = await submit(event)
+    if (!saved) return
 
-    const nextErrors = validate(draft)
-    setErrors(nextErrors)
-    if (Object.keys(nextErrors).length > 0) return
+    onSaved?.(saved.appId)
 
-    const normalized: BotConfig = {
-      ...draft,
-      appId: draft.appId.trim(),
-      secret: draft.secret.trim(),
-      regex: draft.regex.map((rule) => ({ reg: rule.reg.trim(), rep: rule.rep })).filter((rule) => rule.reg.length > 0),
-    }
-
-    const nextConfig = config.map((item) => (item.appId === bot.appId ? normalized : item))
-
-    showSaveState('saving')
-
-    try {
-      await save(nextConfig)
-      setDraft(cloneBot(normalized))
-      showSaveState('saved', 1600)
-      onSaved?.(normalized.appId)
-
-      if (normalized.appId !== bot.appId) {
-        navigate(`/bots/${encodeURIComponent(normalized.appId)}`, { replace: true })
-      }
-    } catch {
-      showSaveState('error', 3200)
-      // 错误已经由 ConfigProvider 统一记录并展示。
+    if (saved.appId !== bot.appId) {
+      navigate(`/bots/${encodeURIComponent(saved.appId)}`, { replace: true })
     }
   }
 
@@ -144,12 +55,7 @@ export const BotForm = ({ bot, onSaved }: BotFormProps) => {
   )
 
   return (
-    <form
-      id={formId}
-      autoComplete='off'
-      className={isMobile ? 'flex flex-col gap-5 pb-28' : 'flex flex-col gap-5'}
-      onSubmit={handleSubmit}
-    >
+    <form id={formId} autoComplete='off' className='flex flex-col gap-5' onSubmit={handleSubmit}>
       <SaveStatus state={saveState} />
 
       <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
@@ -165,7 +71,7 @@ export const BotForm = ({ bot, onSaved }: BotFormProps) => {
           </div>
           <p className='mt-1 text-xs text-muted'>{bot.appId} · 保存后适配器会销毁旧连接并重新初始化</p>
         </div>
-        {isMobile ? null : actions}
+        {actions}
       </div>
 
       {error ? (
@@ -289,19 +195,6 @@ export const BotForm = ({ bot, onSaved }: BotFormProps) => {
           </SectionCard>
         </div>
       </div>
-
-      {isMobile ? (
-        <div className='glass fixed inset-x-0 bottom-0 z-30 border-t border-border px-4 pt-3 safe-bottom'>
-          <div className='flex items-center gap-3'>
-            <Button variant='secondary' isDisabled={!dirty || saving} onPress={reset}>
-              撤销
-            </Button>
-            <Button type='submit' fullWidth isPending={saving} isDisabled={!dirty}>
-              {({ isPending }) => <span>{isPending ? '保存中' : '保存配置'}</span>}
-            </Button>
-          </div>
-        </div>
-      ) : null}
     </form>
   )
 }

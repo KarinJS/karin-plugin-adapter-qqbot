@@ -3,6 +3,7 @@ import { Spinner, cn } from '@heroui/react'
 import { gsap } from 'gsap'
 import { Check, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
@@ -70,8 +71,11 @@ export const SaveStatus = ({ state, errorMessage }: SaveStatusProps) => {
     { dependencies: [state], scope: ref }
   )
 
-  return (
-    <div className='pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center'>
+  return createPortal(
+    <div
+      className='pointer-events-none fixed inset-x-0 z-[100001] flex justify-center'
+      style={{ top: 'max(0.75rem, env(safe-area-inset-top, 0px))' }}
+    >
       <div
         ref={ref}
         role='status'
@@ -93,6 +97,7 @@ export const SaveStatus = ({ state, errorMessage }: SaveStatusProps) => {
           {shown === 'saving' ? '保存中' : shown === 'saved' ? '已保存' : errorMessage || '保存失败'}
         </span>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

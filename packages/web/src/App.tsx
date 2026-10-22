@@ -24,6 +24,12 @@ const AppShell = () => {
   return embedded ? <EmbeddedDesktopShell /> : <DesktopShell />
 }
 
+const DefaultRedirect = () => {
+  const embedded = useEmbedded()
+  const { isMobile } = useViewport()
+  return <Navigate to={embedded || isMobile ? '/bots' : '/overview'} replace />
+}
+
 const App = () => {
   const [authenticated, setAuthenticated] = useState(hasAuth)
   const { isMobile } = useViewport()
@@ -54,12 +60,13 @@ const App = () => {
       <BrowserRouter basename='/qqbot/web'>
         <Routes>
           <Route element={<AppShell />}>
-            <Route index element={<OverviewPage />} />
+            <Route index element={<DefaultRedirect />} />
+            <Route path='overview' element={<OverviewPage />} />
             <Route path='bots' element={<BotsPage />} />
             <Route path='bots/new' element={<AddBotPage />} />
             <Route path='bots/:appId' element={<BotDetailPage />} />
-            <Route path='settings' element={embedded ? <Navigate to='/' replace /> : <SettingsPage />} />
-            <Route path='*' element={<Navigate to='/' replace />} />
+            <Route path='settings' element={embedded ? <Navigate to='/bots' replace /> : <SettingsPage />} />
+            <Route path='*' element={<DefaultRedirect />} />
           </Route>
         </Routes>
       </BrowserRouter>

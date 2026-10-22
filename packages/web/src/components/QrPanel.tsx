@@ -18,12 +18,11 @@ const formatRemaining = (seconds: number) => {
 
 export const QrPanel = () => {
   const { reload } = useConfigStore()
-  const { isMobile, isShort, isLandscape } = useViewport()
+  const { isMobile, isShort } = useViewport()
   const navigate = useNavigate()
-  const qrBox = isShort ? 'size-40' : 'size-64'
-  const qrPixels = isShort ? 160 : 256
-  /** 横屏手机高度不足时改成左右布局，把说明放到二维码旁边。 */
-  const split = !isMobile || (isShort && isLandscape)
+  const compact = isMobile
+  const qrBox = compact ? (isShort ? 'size-40' : 'size-52') : isShort ? 'size-40' : 'size-64'
+  const qrPixels = compact ? (isShort ? 160 : 208) : isShort ? 160 : 256
 
   const [session, setSession] = useState<LoginStartResponse | null>(null)
   const [status, setStatus] = useState<LoginSnapshot | null>(null)
@@ -114,7 +113,7 @@ export const QrPanel = () => {
   const isCompleted = status?.status === 'completed'
 
   const qrArea = (
-    <div className='flex flex-col items-center gap-4'>
+    <div className={compact ? 'flex w-full flex-col items-center gap-3' : 'flex flex-col items-center gap-4'}>
       {starting ? (
         <div
           className={cn(
@@ -257,17 +256,37 @@ export const QrPanel = () => {
     </div>
   )
 
+  if (compact) {
+    return (
+      <div className='flex flex-col gap-3'>
+        <div className='rounded-2xl border border-border/60 bg-surface p-4'>
+          <div className='flex flex-col items-center gap-3'>
+            {qrArea}
+            {error ? (
+              <Alert status='danger' className='w-full'>
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Alert.Title>授权未完成</Alert.Title>
+                  <Alert.Description>{error}</Alert.Description>
+                </Alert.Content>
+              </Alert>
+            ) : null}
+            <div className='w-full'>{controls}</div>
+          </div>
+        </div>
+
+        <div className='flex items-start gap-2.5 rounded-xl border border-warning/30 bg-warning/10 p-3'>
+          <ShieldAlert className='mt-0.5 size-4 shrink-0 text-warning' aria-hidden='true' />
+          <p className='text-[11px] leading-5 text-muted'>
+            授权成功后 QQ 会刷新 AppSecret，旧密钥立即失效。如果机器人已在别处运行，请同步更新。
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div
-      className={cn(
-        'grid items-start gap-5',
-        split
-          ? isMobile
-            ? 'grid-cols-[minmax(0,22rem)_minmax(0,1fr)]'
-            : 'grid-cols-[minmax(0,26rem)_minmax(0,1fr)]'
-          : 'grid-cols-1'
-      )}
-    >
+    <div className='grid grid-cols-[minmax(0,26rem)_minmax(0,1fr)] items-start gap-5'>
       <Card className='border border-border/80 bg-surface shadow-none'>
         <Card.Content className='flex flex-col gap-5 p-5'>
           {qrArea}

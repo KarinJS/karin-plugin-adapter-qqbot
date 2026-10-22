@@ -1,90 +1,85 @@
-import { Button, cn } from '@heroui/react'
-import { ArrowLeft, Bot, Home, QrCode, Settings } from 'lucide-react'
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Brand } from '@/components/Brand'
-import { PageTransition } from '@/components/PageTransition'
-import { ThemeToggle } from '@/components/ThemeToggle'
-import { useEmbedded } from '@/hooks/useEmbedded'
-import { useViewport } from '@/hooks/useViewport'
+import { cn } from '@heroui/react'
+import { Bot, LayoutGrid, QrCode } from 'lucide-react'
+import { useEffect, useMemo } from 'react'
+import { useLocation, useMatch, useNavigate } from 'react-router-dom'
+import { MobileBotSheet } from '@/components/mobile/MobileBotSheet'
+import { MobilePager, type MobilePagerItem } from '@/components/mobile/MobilePager'
+import { MobileSheetProvider, useMobileSheet } from '@/hooks/useMobileSheet'
+import { MobileAddBotPage } from '@/pages/mobile/MobileAddBotPage'
+import { MobileBotDetailPage } from '@/pages/mobile/MobileBotDetailPage'
+import { MobileBotsPage } from '@/pages/mobile/MobileBotsPage'
+import { MobileOverviewPage } from '@/pages/mobile/MobileOverviewPage'
 
-const standaloneTabs = [
-  { to: '/', label: '概览', icon: Home, key: 'overview' },
-  { to: '/bots', label: '机器人', icon: Bot, key: 'bots' },
-  { to: '/bots/new', label: '扫码', icon: QrCode, key: 'add' },
-  { to: '/settings', label: '设置', icon: Settings, key: 'settings' },
-] as const
-
-const embeddedTabs = [
-  { to: '/bots', label: '机器人', icon: Bot, key: 'bots' },
-  { to: '/bots/new', label: '扫码', icon: QrCode, key: 'add' },
-  { to: '/', label: '概览', icon: Home, key: 'overview' },
+const tabs = [
+  { key: 'bots', to: '/bots', label: '机器人', icon: Bot },
+  { key: 'add', to: '/bots/new', label: '扫码', icon: QrCode },
+  { key: 'overview', to: '/overview', label: '概览', icon: LayoutGrid },
 ] as const
 
 const getActiveKey = (pathname: string) => {
   if (pathname === '/bots/new') return 'add'
   if (pathname.startsWith('/bots')) return 'bots'
-  if (pathname.startsWith('/settings')) return 'settings'
-  return 'overview'
+  if (pathname.startsWith('/overview')) return 'overview'
+  return null
 }
 
-export const MobileShell = () => {
+const MobileShellContent = () => {
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const embedded = useEmbedded()
-  const { isShort, isTiny } = useViewport()
-  const activeKey = getActiveKey(pathname)
-  /** 扫码添加是独立入口，只有机器人详情才收起底部导航。 */
-  const isSubPage = pathname.startsWith('/bots/') && pathname !== '/bots/new'
-  const tabHeight = isShort ? '3.5rem' : '4rem'
-  const gutter = isTiny ? 'px-3' : 'px-4'
-  const tabs = embedded ? embeddedTabs : standaloneTabs
+  const { isOpen } = useMobileSheet()
+  const activeKey = getActiveKey(pathname) ?? 'bots'
+  const detailMatch = useMatch('/bots/:appId')
+  const rawDetailAppId = detailMatch?.params.appId
+  const detailAppId = rawDetailAppId && rawDetailAppId !== 'new' ? decodeURIComponent(rawDetailAppId) : null
+  const isDetail = Boolean(detailAppId)
+
+  useEffect(() => {
+    if (getActiveKey(pathname) === null) navigate('/bots', { replace: true })
+  }, [navigate, pathname])
+
+  const items = useMemo<MobilePagerItem[]>(
+    () => [
+      { key: 'bots', label: '机器人列表', element: <MobileBotsPage /> },
+      { key: 'add', label: '扫码添加', element: <MobileAddBotPage /> },
+      { key: 'overview', label: '概览', element: <MobileOverviewPage /> },
+    ],
+    []
+  )
+
+  const handlePagerChange = (key: string) => {
+    const tab = tabs.find((item) => item.key === key)
+    if (tab) navigate(tab.to, { replace: true })
+  }
 
   return (
-    <div className='flex min-h-dvh flex-col bg-background'>
-      {embedded ? null : (
-        <header className='glass safe-top sticky top-0 z-40 border-b border-border/60'>
-          <div className={cn('flex items-center justify-between', gutter, isShort ? 'h-12' : 'h-14')}>
-            {isSubPage ? (
-              <Button isIconOnly variant='ghost' aria-label='返回机器人列表' onPress={() => navigate('/bots')}>
-                <ArrowLeft className='size-5' aria-hidden='true' />
-              </Button>
-            ) : (
-              <Brand compact />
-            )}
-            <ThemeToggle />
-          </div>
-        </header>
-      )}
-
-      <main
-        className={cn('flex-1', gutter, embedded || isShort ? 'pt-3' : 'pt-5')}
-        style={{
-          paddingBottom: isSubPage
-            ? `calc(${isShort ? '0.75rem' : '1.25rem'} + env(safe-area-inset-bottom))`
-            : `calc(${tabHeight} + 1.5rem + env(safe-area-inset-bottom))`,
-        }}
+    <>
+      <div
+        className={cn(
+          'mobile-frame flex h-dvh flex-col overflow-hidden bg-background',
+          isOpen && 'mobile-frame--sheet'
+        )}
+        inert={isDetail}
       >
-        <PageTransition sectionKey={activeKey}>
-          <Outlet />
-        </PageTransition>
-      </main>
+        <div className='min-h-0 flex-1'>
+          <MobilePager items={items} activeKey={activeKey} onChange={handlePagerChange} disabled={isOpen} />
+        </div>
 
-      {isSubPage ? null : (
-        <nav className='glass fixed inset-x-0 bottom-0 z-40 border-t border-border/60 safe-bottom' aria-label='主导航'>
-          <div className={cn('grid', embedded ? 'grid-cols-3' : 'grid-cols-4')}>
+        <nav className='glass safe-bottom shrink-0 border-t border-border/60' aria-label='主导航'>
+          <div className='grid grid-cols-3'>
             {tabs.map((tab) => {
               const Icon = tab.icon
               const active = activeKey === tab.key
 
               return (
-                <Link
+                <button
                   key={tab.key}
-                  to={tab.to}
+                  type='button'
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'flex flex-col items-center justify-center gap-1 text-[0.6875rem]',
-                    isShort ? 'min-h-14' : 'min-h-16'
+                    'flex min-h-14 flex-col items-center justify-center gap-1 text-[10px]',
+                    active ? 'text-foreground' : 'text-muted'
                   )}
+                  onClick={() => navigate(tab.to)}
                 >
                   <span
                     className={cn(
@@ -92,15 +87,30 @@ export const MobileShell = () => {
                       active ? 'bg-default text-foreground' : 'text-muted'
                     )}
                   >
-                    <Icon className='size-4' aria-hidden='true' />
+                    <Icon className='size-[18px]' aria-hidden='true' />
                   </span>
-                  <span className={active ? 'font-medium text-foreground' : 'text-muted'}>{tab.label}</span>
-                </Link>
+                  <span className={active ? 'font-medium' : undefined}>{tab.label}</span>
+                </button>
               )
             })}
           </div>
         </nav>
-      )}
-    </div>
+      </div>
+
+      {detailAppId ? <MobileBotDetailPage appId={detailAppId} /> : null}
+      <MobileBotSheet />
+    </>
   )
 }
+
+/**
+ * 手机端外壳。
+ *
+ * 三个顶层页面常驻在横向分页器里，底部导航参与 flex 布局，不再浮在内容上；
+ * 机器人详情页是覆盖在分页器上的独立整页，返回按钮会随滚动连续收缩。
+ */
+export const MobileShell = () => (
+  <MobileSheetProvider>
+    <MobileShellContent />
+  </MobileSheetProvider>
+)
