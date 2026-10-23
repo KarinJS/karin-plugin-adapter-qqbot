@@ -1,6 +1,6 @@
 import { Button, Skeleton, cn } from '@heroui/react'
 import { ChevronRight, Plus, RadioTower } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BotAvatar } from '@/components/BotAvatar'
 import { StatusPill } from '@/components/StatusPill'
@@ -10,23 +10,18 @@ interface BotListProps {
   selectedAppId?: string
   className?: string
   showAdd?: boolean
+  /**
+   * 整列固定高度，标题浮在滚动区上方（宽屏工作区）。
+   * 概览页的列表仍然跟着页面滚，不启用。
+   */
+  overlay?: boolean
 }
 
-export const BotList = ({ selectedAppId, className, showAdd = true }: BotListProps) => {
+export const BotList = ({ selectedAppId, className, showAdd = true, overlay = false }: BotListProps) => {
   const { config, statuses, loading } = useConfigStore()
   const navigate = useNavigate()
   const listRef = useRef<HTMLDivElement>(null)
   const sectionRef = useRef<HTMLElement>(null)
-  const scrolledRef = useRef(false)
-  const [scrolled, setScrolled] = useState(false)
-
-  // 只在跨过顶部时改一次状态，滚动过程中不跟着 setState。
-  const handleScroll = () => {
-    const next = (listRef.current?.scrollTop ?? 0) > 1
-    if (scrolledRef.current === next) return
-    scrolledRef.current = next
-    setScrolled(next)
-  }
 
   useEffect(() => {
     const section = sectionRef.current
@@ -87,12 +82,14 @@ export const BotList = ({ selectedAppId, className, showAdd = true }: BotListPro
   }, [])
 
   return (
-    <section ref={sectionRef} className={cn('flex min-h-0 flex-col gap-3', className)} aria-label='机器人列表'>
+    <section ref={sectionRef} className={cn('relative flex min-h-0 flex-col gap-3', className)} aria-label='机器人列表'>
       {/*
-        标题固定在列表上方：宽屏时整列高度固定，标题不参与任何滚动；
-        窄屏整页滚动时由 sticky 把它钉在屏幕顶部。背后用带遮罩的背景模糊做渐变。
+        宽屏时标题浮在滚动区上方，卡片从底部进入、向上滚过标题后从顶部消失；
+        窄屏整页滚动时由 sticky 把标题钉在屏幕顶部。
       */}
-      <div className='sticky top-0 z-20 -mx-1 px-1'>
+      <div
+        className={cn('sticky top-0 z-20 -mx-1 px-1', overlay && 'xl:absolute xl:inset-x-0 xl:top-0 xl:mx-0 xl:px-0')}
+      >
         <div className='bot-list-header flex items-center justify-between gap-3 px-1 py-3'>
           <div className='flex items-baseline gap-2'>
             <h2 className='text-heading text-base font-semibold'>机器人</h2>
@@ -108,7 +105,10 @@ export const BotList = ({ selectedAppId, className, showAdd = true }: BotListPro
       </div>
 
       <div className='relative min-h-0 flex-1'>
-        <div ref={listRef} onScroll={handleScroll} className='no-scrollbar h-full overflow-y-auto overscroll-contain'>
+        <div
+          ref={listRef}
+          className={cn('no-scrollbar h-full overflow-y-auto overscroll-contain', overlay && 'xl:pt-20 xl:pb-20')}
+        >
           {loading && config.length === 0 ? (
             <div className='flex flex-col gap-2 py-2'>
               <Skeleton className='h-16 w-full rounded-xl' />
@@ -172,14 +172,22 @@ export const BotList = ({ selectedAppId, className, showAdd = true }: BotListPro
           })}
         </div>
 
-        {/* 卡片在列表内部滚动时，顶部同样渐隐，避免第一张卡被硬切。 */}
-        <div
-          aria-hidden='true'
-          className={cn(
-            'list-edge-blur pointer-events-none absolute inset-x-0 top-0 h-8 transition-opacity duration-200',
-            scrolled ? 'opacity-100' : 'opacity-0'
-          )}
-        />
+        {/*
+          上下两端都用带遮罩的背景模糊：卡片从底部渐入、滚过标题后从顶部渐出。
+          只在固定高度的列表里出现，概览页和窄屏没有固定边缘。
+        */}
+        {overlay ? (
+          <>
+            <div
+              aria-hidden='true'
+              className='list-top-blur pointer-events-none absolute inset-x-0 top-0 z-10 hidden h-20 xl:block'
+            />
+            <div
+              aria-hidden='true'
+              className='list-bottom-blur pointer-events-none absolute inset-x-0 bottom-0 z-10 hidden h-20 xl:block'
+            />
+          </>
+        ) : null}
       </div>
     </section>
   )

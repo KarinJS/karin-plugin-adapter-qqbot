@@ -362,15 +362,33 @@
   mask-image: linear-gradient(to bottom, #000 0%, #000 52%, transparent 100%);
 }
 
-.list-edge-blur {
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%);
+/*
+ * 列表上下边缘的渐隐。
+ * 卡片从底部进入、向上滚过标题后从顶部消失，两端都用带遮罩的背景模糊压住：
+ * 越靠近边缘越不透明，往列表内部逐渐化开，不会出现硬切。
+ */
+.list-top-blur,
+.list-bottom-blur {
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 52%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 52%, transparent 100%);
   background: linear-gradient(
     to bottom,
-    color-mix(in oklab, var(--background) 58%, transparent),
-    transparent
+    color-mix(in oklab, var(--background) 92%, transparent) 0%,
+    color-mix(in oklab, var(--background) 72%, transparent) 52%,
+    transparent 100%
+  );
+}
+
+.list-bottom-blur {
+  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 52%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 0%, #000 52%, transparent 100%);
+  background: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--background) 92%, transparent) 0%,
+    color-mix(in oklab, var(--background) 72%, transparent) 52%,
+    transparent 100%
   );
 }
 
@@ -391,8 +409,10 @@
     mask-image: none;
   }
 
-  .list-edge-blur {
-    display: none;
+  .list-top-blur,
+  .list-bottom-blur {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 

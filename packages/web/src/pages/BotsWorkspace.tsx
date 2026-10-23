@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { PageHeader } from '@/components/PageHeader'
 import { SectionCard } from '@/components/SectionCard'
 import { useConfigStore } from '@/hooks/useConfigStore'
+import { useEmbedded } from '@/hooks/useEmbedded'
 import { dissolveBotCard } from '@/lib/dissolveBotCard'
 
 const HEADER_COLLAPSE_DURATION = 0.26
@@ -39,6 +40,7 @@ export const BotsWorkspace = () => {
   const appId = decodeAppId(match?.params.appId)
   const selected = Boolean(appId)
   const { config, statuses, loading, remove, saving } = useConfigStore()
+  const embedded = useEmbedded()
   const navigate = useNavigate()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [removing, setRemoving] = useState(false)
@@ -222,7 +224,7 @@ export const BotsWorkspace = () => {
             左列占满工作区高度，标题固定在列顶不参与滚动，卡片在列表内部滚。
             右侧表单自己是一个滚动容器，两列各滚各的，整页不再滚动。
           */}
-          <BotList selectedAppId={bot?.appId} showAdd={false} className='xl:h-full xl:min-h-0' />
+          <BotList selectedAppId={bot?.appId} showAdd={false} overlay={embedded} className='xl:h-full xl:min-h-0' />
 
           <div
             ref={panelRef}
