@@ -120,7 +120,8 @@ const addTabs = [
 /**
  * 扫码 / 手动添加机器人的底部抽屉。
  *
- * 默认全屏打开，并沿用机器人配置抽屉的滚动、收起和退场逻辑。
+ * 默认全屏打开，其余拖动、吸附和退场逻辑与机器人配置抽屉完全一致：
+ * 50% 和 100% 两档，低于 25% 松手退场。
  * 扫码和手动共用同一个分段标签；切换标签不会卸载二维码，
  * 只有退出抽屉或点击「重新生成」才会结束当前二维码会话。
  */
@@ -145,7 +146,6 @@ export const MobileAddBotSheet = () => {
       onRequestClose={closeAdd}
       onExited={handleExited}
       initialRatio={1}
-      collapsedRatio={1}
       header={
         <header className='sheet-header px-5 pb-3'>
           <Drawer.Handle className='mx-auto mb-1' />

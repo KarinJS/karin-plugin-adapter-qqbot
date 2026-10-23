@@ -221,17 +221,19 @@
 
 /*
  * 手机端底部导航。
- * 不改变原有布局，只把底栏的背景换成模糊渐变。
+ * 整条底栏覆盖在内容上，内容从下方滚过；背景用半透明渐变 + 模糊。
+ * 不再有圆角、外边距和投影，避免看起来像悬浮 dock。
  */
 .mobile-bottom-nav {
   border-top: 1px solid color-mix(in oklab, var(--foreground) 6%, transparent);
+  padding: 0.25rem 0.5rem max(0.375rem, env(safe-area-inset-bottom));
   background: linear-gradient(
     180deg,
-    color-mix(in oklab, var(--surface) 55%, transparent) 0%,
-    color-mix(in oklab, var(--surface) 90%, transparent) 100%
+    color-mix(in oklab, var(--surface) 38%, transparent) 0%,
+    color-mix(in oklab, var(--surface-secondary) 88%, transparent) 100%
   );
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -324,7 +326,8 @@
 }
 
 .mobile-panel {
-  padding: max(0.75rem, env(safe-area-inset-top, 0px)) 1rem 1.5rem;
+  /* 底栏覆盖在内容上，底部留出它的高度，最后一项可以滚到导航上方。 */
+  padding: max(0.75rem, env(safe-area-inset-top, 0px)) 1rem calc(4rem + env(safe-area-inset-bottom, 0px));
   -webkit-overflow-scrolling: touch;
 }
 
@@ -347,7 +350,8 @@
 .sheet-edge-blur {
   position: absolute;
   inset-inline: 0;
-  height: 176px;
+  /* 只覆盖顶栏 / 底栏附近，避免模糊渗进正文。 */
+  height: 96px;
   z-index: 20;
   pointer-events: none;
 }
@@ -387,21 +391,21 @@
 }
 
 .sheet-edge-blur__layer--strong {
-  height: 42px;
-  -webkit-backdrop-filter: blur(9px);
-  backdrop-filter: blur(9px);
+  height: 30px;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 
 .sheet-edge-blur__layer--medium {
-  height: 84px;
-  -webkit-backdrop-filter: blur(4.5px);
-  backdrop-filter: blur(4.5px);
+  height: 54px;
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
 }
 
 .sheet-edge-blur__layer--soft {
-  height: 132px;
-  -webkit-backdrop-filter: blur(1.75px);
-  backdrop-filter: blur(1.75px);
+  height: 84px;
+  -webkit-backdrop-filter: blur(1.25px);
+  backdrop-filter: blur(1.25px);
 }
 
 .sheet-edge-blur--top .sheet-edge-blur__layer--strong {

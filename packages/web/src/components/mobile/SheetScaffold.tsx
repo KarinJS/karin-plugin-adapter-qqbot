@@ -25,6 +25,7 @@ interface SheetScaffoldProps {
  *
  * 顶栏和底栏不再铺默认底色，而是浮在滚动内容之上：
  * 内容从它们下方滚过，由三层不同半径的模糊把文字逐渐化开。
+ * 只有存在底栏时才需要底部模糊，没有悬浮组件的抽屉直接省掉这一层。
  * 滚动容器的上下内边距根据顶栏/底栏的实际高度测量，避免内容被挡住。
  * 顶栏 / 底栏固定在骨架的上下边缘，抽屉高度变化时不会跟着内容滚走。
  */
@@ -65,7 +66,7 @@ export const SheetScaffold = ({ header, footer, children, contentClassName, scro
       </div>
 
       <SheetEdgeBlur edge='top' />
-      <SheetEdgeBlur edge='bottom' />
+      {footer ? <SheetEdgeBlur edge='bottom' /> : null}
 
       <div ref={headerRef} className='absolute inset-x-0 top-0 z-30'>
         {header}
