@@ -19,6 +19,10 @@ export default defineConfig({
         name: 'shijin',
         avatar: 'https://github.com/sj817.png',
       },
+      {
+        name: 'ikenxuan',
+        avatar: 'https://github.com/ikenxuan.png',
+      },
     ],
   },
   page: {
