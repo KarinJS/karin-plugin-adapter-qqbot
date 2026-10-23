@@ -1,10 +1,12 @@
 import { Button, cn } from '@heroui/react'
 import { Bot, Home, Plus, QrCode, Settings } from 'lucide-react'
+import { useRef } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Brand } from '@/components/Brand'
 import { PageTransition } from '@/components/PageTransition'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { useConfigStore } from '@/hooks/useConfigStore'
+import { useSmoothScroll } from '@/hooks/useSmoothScroll'
 
 const navItems = [
   { to: '/overview', label: '概览', icon: Home, key: 'overview' },
@@ -34,6 +36,10 @@ export const DesktopShell = () => {
   const activeKey = getActiveKey(pathname)
   const onlineCount = config.filter((bot) => statuses[bot.appId]?.online).length
   const allOnline = config.length > 0 && onlineCount === config.length
+  const mainRef = useRef<HTMLElement>(null)
+  const mainContentRef = useRef<HTMLDivElement>(null)
+
+  useSmoothScroll(mainRef, mainContentRef)
 
   return (
     <div className='flex h-dvh overflow-hidden bg-background'>
@@ -102,8 +108,8 @@ export const DesktopShell = () => {
           )}
         </header>
 
-        <main className='flex-1 overflow-y-auto'>
-          <div className='mx-auto w-full max-w-[78rem] px-8 py-7'>
+        <main ref={mainRef} className='flex-1 overflow-y-auto'>
+          <div ref={mainContentRef} className='mx-auto w-full max-w-[78rem] px-8 py-7'>
             <PageTransition sectionKey={activeKey}>
               <Outlet />
             </PageTransition>

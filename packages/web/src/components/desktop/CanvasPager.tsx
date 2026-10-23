@@ -1,7 +1,8 @@
 import { cn } from '@heroui/react'
 import { gsap } from 'gsap'
-import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { CANVAS_SLIDE_DURATION, CANVAS_SLIDE_EASE } from '@/lib/canvasMotion'
+import { attachSmoothScroll, detachSmoothScroll } from '@/lib/smoothScroll'
 
 export interface CanvasPage {
   key: string
@@ -73,6 +74,21 @@ export const CanvasPager = ({ pages, activeKey }: CanvasPagerProps) => {
 
     observer.observe(root)
     return () => observer.disconnect()
+  }, [])
+
+  // 每个画布页面都是独立滚动区，各自挂一个 Lenis；页面常驻，切页不会丢平滑状态。
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+
+    const sections = [...root.querySelectorAll<HTMLElement>('section[data-canvas-page]')]
+    for (const section of sections) {
+      attachSmoothScroll(section, { content: section.firstElementChild as HTMLElement | null })
+    }
+
+    return () => {
+      for (const section of sections) detachSmoothScroll(section)
+    }
   }, [])
 
   return (

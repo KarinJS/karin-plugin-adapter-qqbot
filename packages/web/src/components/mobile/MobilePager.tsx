@@ -1,6 +1,7 @@
 import { cn } from '@heroui/react'
 import { gsap } from 'gsap'
 import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { attachSmoothScroll, detachSmoothScroll } from '@/lib/smoothScroll'
 
 export interface MobilePagerItem {
   key: string
@@ -99,6 +100,21 @@ export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePage
 
     observer.observe(root)
     return () => observer.disconnect()
+  }, [])
+
+  // 手机端两个纵向页面各自挂 Lenis；触摸仍走原生滚动，只平滑鼠标滚轮。
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+
+    const sections = [...root.querySelectorAll<HTMLElement>('section.mobile-panel')]
+    for (const section of sections) {
+      attachSmoothScroll(section, { content: section.firstElementChild as HTMLElement | null })
+    }
+
+    return () => {
+      for (const section of sections) detachSmoothScroll(section)
+    }
   }, [])
 
   useEffect(() => {

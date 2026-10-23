@@ -11,7 +11,9 @@ import { PageHeader } from '@/components/PageHeader'
 import { SectionCard } from '@/components/SectionCard'
 import { useConfigStore } from '@/hooks/useConfigStore'
 import { useEmbedded } from '@/hooks/useEmbedded'
+import { useSmoothScroll } from '@/hooks/useSmoothScroll'
 import { dissolveBotCard } from '@/lib/dissolveBotCard'
+import { getSmoothScroll, resizeSmoothScroll } from '@/lib/smoothScroll'
 
 const HEADER_COLLAPSE_DURATION = 0.26
 const PANEL_ENTER_DURATION = 0.22
@@ -46,6 +48,7 @@ export const BotsWorkspace = () => {
   const [removing, setRemoving] = useState(false)
   const headerRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const panelContentRef = useRef<HTMLDivElement>(null)
   const headerFirstRef = useRef(true)
   const panelFirstRef = useRef(true)
 
@@ -88,6 +91,8 @@ export const BotsWorkspace = () => {
     gsap.killTweensOf(element)
     // 换机器人时表单从顶部开始，不沿用上一个机器人的滚动位置。
     element.scrollTop = 0
+    getSmoothScroll(element)?.scrollTo(0, { immediate: true })
+    resizeSmoothScroll(element)
 
     if (panelFirstRef.current) {
       panelFirstRef.current = false
@@ -192,9 +197,16 @@ export const BotsWorkspace = () => {
 
   const empty = !loading && config.length === 0 && !selected
 
+  // 表单面板是独立滚动区，滚轮平滑交给 Lenis；空状态时面板不存在。
+  useSmoothScroll(panelRef, panelContentRef, { enabled: !empty })
+
   return (
     <div className='flex flex-col xl:h-full xl:min-h-0'>
-      <div ref={headerRef} className='overflow-hidden'>
+      {/*
+        嵌入画布的宽屏工作区不需要再放一遍「机器人」大标题：
+        列表自己的标题已经说明了内容，去掉后列表才能占满整屏、卡片从屏幕顶部滚出。
+      */}
+      <div ref={headerRef} className={cn('overflow-hidden', embedded && 'xl:hidden')}>
         <PageHeader
           eyebrow='Bots'
           title='机器人'
@@ -233,10 +245,12 @@ export const BotsWorkspace = () => {
             data-bots-panel=''
             className={cn(
               'no-scrollbar flex min-w-0 flex-col gap-5 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain',
-              embedded && 'xl:py-6 xl:pr-6'
+              embedded && 'xl:pr-6 xl:pb-6'
             )}
           >
-            {panel}
+            <div ref={panelContentRef} className={cn('flex min-w-0 flex-col gap-5', embedded && 'xl:pt-6')}>
+              {panel}
+            </div>
           </div>
         </div>
       )}

@@ -11,6 +11,7 @@ import { MorphBackButton } from '@/components/mobile/MorphBackButton'
 import { MobileBotFields } from '@/components/mobile/MobileBotFields'
 import { useBotEditor } from '@/hooks/useBotEditor'
 import { useConfigStore } from '@/hooks/useConfigStore'
+import { useSmoothScroll } from '@/hooks/useSmoothScroll'
 import type { BotConfig } from '@/lib/types'
 
 interface MobileBotDetailPageProps {
@@ -30,9 +31,12 @@ const DetailBody = ({ bot, onBack, onRemoved }: DetailBodyProps) => {
   const navigate = useNavigate()
   const formId = useId()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const scrollContentRef = useRef<HTMLDivElement>(null)
   const [removing, setRemoving] = useState(false)
   const status = statuses[bot.appId]
   const title = status?.name || bot.appId
+
+  useSmoothScroll(scrollRef, scrollContentRef)
 
   const handleSaved = (saved: BotConfig) => {
     if (saved.appId !== bot.appId) {
@@ -61,7 +65,7 @@ const DetailBody = ({ bot, onBack, onRemoved }: DetailBodyProps) => {
       <div ref={scrollRef} className='mobile-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain'>
         <MorphBackButton scrollRef={scrollRef} onBack={onBack} />
 
-        <div className='px-4 pb-6'>
+        <div ref={scrollContentRef} className='px-4 pb-6'>
           <header className='flex items-center gap-3 pb-4'>
             <BotAvatar name={title} avatar={status?.avatar} size='md' />
             <div className='min-w-0 flex-1'>

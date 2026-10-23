@@ -374,7 +374,7 @@
  * 三层不同半径的 backdrop-filter 叠加，不铺任何底色，
  * 内容被逐渐模糊，但仍能看出下层的轮廓。
  */
-.list-edge-blur {
+.edge-blur {
   position: absolute;
   inset-inline: 0;
   height: 96px;
@@ -382,72 +382,77 @@
   pointer-events: none;
 }
 
-.list-edge-blur--top {
+.edge-blur--top {
   top: 0;
 }
 
-.list-edge-blur--bottom {
+.edge-blur--bottom {
   bottom: 0;
 }
 
-.list-edge-blur__layer {
+/* 表单顶栏只到内容起始处，比列表的整块边缘渐变略矮。 */
+.edge-blur--header {
+  height: 84px;
+}
+
+.edge-blur__layer {
   position: absolute;
   inset-inline: 0;
   background: transparent;
 }
 
-.list-edge-blur--top .list-edge-blur__layer {
+.edge-blur--top .edge-blur__layer {
   top: 0;
 }
 
-.list-edge-blur--bottom .list-edge-blur__layer {
+.edge-blur--bottom .edge-blur__layer {
   bottom: 0;
 }
 
-.list-edge-blur__layer--strong {
+.edge-blur__layer--strong {
   height: 30px;
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
 
-.list-edge-blur__layer--medium {
+.edge-blur__layer--medium {
   height: 54px;
   -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
 }
 
-.list-edge-blur__layer--soft {
+.edge-blur__layer--soft {
   height: 84px;
   -webkit-backdrop-filter: blur(1.25px);
   backdrop-filter: blur(1.25px);
 }
 
-.list-edge-blur--top .list-edge-blur__layer--strong {
+.edge-blur--top .edge-blur__layer--strong {
   -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 100%);
   mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 100%);
 }
 
-.list-edge-blur--top .list-edge-blur__layer--medium {
+.edge-blur--top .edge-blur__layer--medium {
   -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%);
   mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%);
 }
 
-.list-edge-blur--top .list-edge-blur__layer--soft {
+.edge-blur--top .edge-blur__layer--soft {
   -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 100%);
   mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 100%);
 }
 
-.list-edge-blur--bottom .list-edge-blur__layer--strong {
+.edge-blur--bottom .edge-blur__layer--strong {
   -webkit-mask-image: linear-gradient(to top, #000 0%, #000 50%, transparent 100%);
   mask-image: linear-gradient(to top, #000 0%, #000 50%, transparent 100%);
 }
 
-.list-edge-blur--bottom .list-edge-blur__layer--medium {
+.edge-blur--bottom .edge-blur__layer--medium {
   -webkit-mask-image: linear-gradient(to top, #000 0%, #000 42%, transparent 100%);
   mask-image: linear-gradient(to top, #000 0%, #000 42%, transparent 100%);
 }
 
-.list-edge-blur--bottom .list-edge-blur__layer--soft {
+.edge-blur--bottom .edge-blur__layer--soft {
   -webkit-mask-image: linear-gradient(to top, #000 0%, #000 30%, transparent 100%);
   mask-image: linear-gradient(to top, #000 0%, #000 30%, transparent 100%);
 }
@@ -459,7 +464,7 @@
     mask-image: none;
   }
 
-  .list-edge-blur {
+  .edge-blur {
     background: linear-gradient(
       to bottom,
       color-mix(in oklab, var(--background) 90%, transparent) 0%,
@@ -467,7 +472,7 @@
     );
   }
 
-  .list-edge-blur--bottom {
+  .edge-blur--bottom {
     background: linear-gradient(to top, color-mix(in oklab, var(--background) 90%, transparent) 0%, transparent 100%);
   }
 }
@@ -481,7 +486,7 @@
     mask-image: none;
   }
 
-  .list-edge-blur {
+  .edge-blur {
     background: linear-gradient(
       to bottom,
       var(--background) 0%,
@@ -490,7 +495,7 @@
     );
   }
 
-  .list-edge-blur--bottom {
+  .edge-blur--bottom {
     background: linear-gradient(
       to top,
       var(--background) 0%,
@@ -499,7 +504,7 @@
     );
   }
 
-  .list-edge-blur__layer {
+  .edge-blur__layer {
     display: none;
   }
 }
