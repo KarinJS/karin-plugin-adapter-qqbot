@@ -1,3 +1,4 @@
+import { cn } from '@heroui/react'
 import { gsap } from 'gsap'
 import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { CANVAS_SLIDE_DURATION, CANVAS_SLIDE_EASE } from '@/lib/canvasMotion'
@@ -6,6 +7,11 @@ export interface CanvasPage {
   key: string
   label: string
   element: ReactNode
+  /**
+   * 页面自己填满画布高度，内部再分区滚动。
+   * 不填满的页面仍然由 section 承担整页滚动。
+   */
+  fill?: boolean
 }
 
 interface CanvasPagerProps {
@@ -81,7 +87,7 @@ export const CanvasPager = ({ pages, activeKey }: CanvasPagerProps) => {
             inert={index !== activeIndex}
             className='no-scrollbar h-full w-full shrink-0 overflow-y-auto overscroll-contain'
           >
-            <div className='mx-auto w-full max-w-[78rem] px-6 py-6'>{page.element}</div>
+            <div className={cn('mx-auto w-full max-w-[78rem] px-6 py-6', page.fill && 'h-full')}>{page.element}</div>
           </section>
         ))}
       </div>

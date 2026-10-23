@@ -16,6 +16,7 @@ export const BotList = ({ selectedAppId, className, showAdd = true }: BotListPro
   const { config, statuses, loading } = useConfigStore()
   const navigate = useNavigate()
   const listRef = useRef<HTMLDivElement>(null)
+  const sectionRef = useRef<HTMLElement>(null)
   const scrolledRef = useRef(false)
   const [scrolled, setScrolled] = useState(false)
 
@@ -28,8 +29,9 @@ export const BotList = ({ selectedAppId, className, showAdd = true }: BotListPro
   }
 
   useEffect(() => {
+    const section = sectionRef.current
     const list = listRef.current
-    if (!list) return
+    if (!section || !list) return
 
     /** 找到页面真正的滚动容器：嵌入画布是页面 section，独立控制台是 main。 */
     const findPageScroller = () => {
@@ -45,10 +47,11 @@ export const BotList = ({ selectedAppId, className, showAdd = true }: BotListPro
     }
 
     /**
-     * 列表只接管指针在卡片上时的滚轮。
+     * 指针在卡片上时，列表自己滚。
      *
-     * 指针停在卡片之间的空白处时，滚轮交还给页面，右侧表单继续滚动；
-     * 列表滚到两端后也把剩余滚动量交出去，避免指针停在卡片上时页面完全动不了。
+     * 指针不在卡片上（列表空白处、标题、列表下方）时，滚轮交给右侧表单，
+     * 表单滚到头了再交给整页；窄屏和独立控制台没有独立表单滚动区，
+     * 会直接落到整页滚动上。
      */
     const handleWheel = (event: WheelEvent) => {
       if (event.deltaY === 0) return
@@ -56,10 +59,20 @@ export const BotList = ({ selectedAppId, className, showAdd = true }: BotListPro
       const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY
       const target = event.target as HTMLElement | null
       const overCard = Boolean(target?.closest('[data-bot-id]'))
-      const canScroll =
-        delta < 0 ? list.scrollTop > 0 : list.scrollTop + list.clientHeight < list.scrollHeight - 1
+      const canScroll = delta < 0 ? list.scrollTop > 0 : list.scrollTop + list.clientHeight < list.scrollHeight - 1
 
       if (overCard && canScroll) return
+
+      const panel = list.closest('[data-bots-workspace]')?.querySelector<HTMLElement>('[data-bots-panel]') ?? null
+      const panelCanScroll =
+        panel !== null &&
+        (delta < 0 ? panel.scrollTop > 0 : panel.scrollTop + panel.clientHeight < panel.scrollHeight - 1)
+
+      if (panel && panelCanScroll) {
+        event.preventDefault()
+        panel.scrollTop += delta
+        return
+      }
 
       const page = findPageScroller()
       if (!page) return
@@ -68,15 +81,16 @@ export const BotList = ({ selectedAppId, className, showAdd = true }: BotListPro
       page.scrollTop += delta
     }
 
-    list.addEventListener('wheel', handleWheel, { passive: false })
-    return () => list.removeEventListener('wheel', handleWheel)
+    // 监听整列而不只是滚动区：指针停在标题、间隙或列表空白处时也要能滚动表单。
+    section.addEventListener('wheel', handleWheel, { passive: false })
+    return () => section.removeEventListener('wheel', handleWheel)
   }, [])
 
   return (
-    <section className={cn('flex min-h-0 flex-col gap-3', className)} aria-label='机器人列表'>
+    <section ref={sectionRef} className={cn('flex min-h-0 flex-col gap-3', className)} aria-label='机器人列表'>
       {/*
-        标题悬浮在列表上方，背后用带遮罩的背景模糊做渐变，不铺实心底色。
-        卡片从下面滚过时会逐渐化开，标题本身始终停在屏幕顶部。
+        标题固定在列表上方：宽屏时整列高度固定，标题不参与任何滚动；
+        窄屏整页滚动时由 sticky 把它钉在屏幕顶部。背后用带遮罩的背景模糊做渐变。
       */}
       <div className='sticky top-0 z-20 -mx-1 px-1'>
         <div className='bot-list-header flex items-center justify-between gap-3 px-1 py-3'>
@@ -94,11 +108,7 @@ export const BotList = ({ selectedAppId, className, showAdd = true }: BotListPro
       </div>
 
       <div className='relative min-h-0 flex-1'>
-        <div
-          ref={listRef}
-          onScroll={handleScroll}
-          className='no-scrollbar h-full overflow-y-auto overscroll-contain'
-        >
+        <div ref={listRef} onScroll={handleScroll} className='no-scrollbar h-full overflow-y-auto overscroll-contain'>
           {loading && config.length === 0 ? (
             <div className='flex flex-col gap-2 py-2'>
               <Skeleton className='h-16 w-full rounded-xl' />

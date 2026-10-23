@@ -39,7 +39,7 @@ export const EmbeddedDesktopShell = () => {
 
   const pages = useMemo<CanvasPage[]>(
     () => [
-      { key: 'bots', label: '机器人列表', element: <BotsWorkspace /> },
+      { key: 'bots', label: '机器人列表', element: <BotsWorkspace />, fill: true },
       { key: 'add', label: '扫码添加', element: <AddBotPage /> },
       { key: 'overview', label: '概览', element: <OverviewPage /> },
     ],

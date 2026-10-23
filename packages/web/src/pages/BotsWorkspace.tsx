@@ -84,6 +84,8 @@ export const BotsWorkspace = () => {
     if (!element) return
 
     gsap.killTweensOf(element)
+    // 换机器人时表单从顶部开始，不沿用上一个机器人的滚动位置。
+    element.scrollTop = 0
 
     if (panelFirstRef.current) {
       panelFirstRef.current = false
@@ -189,7 +191,7 @@ export const BotsWorkspace = () => {
   const empty = !loading && config.length === 0 && !selected
 
   return (
-    <div className='flex flex-col'>
+    <div className='flex flex-col xl:h-full xl:min-h-0'>
       <div ref={headerRef} className='overflow-hidden'>
         <PageHeader
           eyebrow='Bots'
@@ -212,18 +214,21 @@ export const BotsWorkspace = () => {
           }
         />
       ) : (
-        <div className='grid items-start gap-5 xl:grid-cols-[20rem_minmax(0,1fr)]'>
+        <div
+          data-bots-workspace=''
+          className='grid items-start gap-5 xl:min-h-0 xl:flex-1 xl:grid-cols-[20rem_minmax(0,1fr)] xl:grid-rows-[minmax(0,1fr)] xl:items-stretch'
+        >
           {/*
-            左列固定在屏幕高度内：标题常驻顶部，卡片在列表内部滚动。
-            右侧表单继续跟页面一起滚动，两列互不牵动。
+            左列占满工作区高度，标题固定在列顶不参与滚动，卡片在列表内部滚。
+            右侧表单自己是一个滚动容器，两列各滚各的，整页不再滚动。
           */}
-          <BotList
-            selectedAppId={bot?.appId}
-            showAdd={false}
-            className='xl:sticky xl:top-0 xl:h-[calc(100dvh-3rem)]'
-          />
+          <BotList selectedAppId={bot?.appId} showAdd={false} className='xl:h-full xl:min-h-0' />
 
-          <div ref={panelRef} className='flex min-w-0 flex-col gap-5'>
+          <div
+            ref={panelRef}
+            data-bots-panel=''
+            className='no-scrollbar flex min-w-0 flex-col gap-5 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain'
+          >
             {panel}
           </div>
         </div>
