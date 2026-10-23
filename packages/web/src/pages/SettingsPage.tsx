@@ -50,14 +50,14 @@ export const SettingsPage = () => {
             <div className='flex flex-col gap-3'>
               <div className='flex items-center justify-between gap-3'>
                 <span className='text-sm text-muted'>在线机器人</span>
-                <span className='tabular text-sm font-medium'>
+                <span className='tabular-nums text-sm font-medium'>
                   {onlineCount} / {config.length}
                 </span>
               </div>
               <Separator />
               <div className='flex items-center justify-between gap-3'>
                 <span className='text-sm text-muted'>适配器版本</span>
-                <span className='tabular text-sm font-medium'>v{version || '—'}</span>
+                <span className='tabular-nums text-sm font-medium'>v{version || '—'}</span>
               </div>
             </div>
           </SectionCard>

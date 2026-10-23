@@ -3,7 +3,8 @@ import { Plus, RadioTower } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BotAvatar } from '@/components/BotAvatar'
-import { getStatusLabel, StatusDot } from '@/components/StatusPill'
+import { EdgeBlur } from '@/components/EdgeBlur'
+import { getStatusLabel, StatusDot, STATUS_DOT_CLASS } from '@/components/StatusPill'
 import { useConfigStore } from '@/hooks/useConfigStore'
 import { useSmoothScroll } from '@/hooks/useSmoothScroll'
 import { CANVAS_SLIDE_DURATION } from '@/lib/canvasMotion'
@@ -217,18 +218,43 @@ export const BotList = ({
       >
         <div
           className={cn(
-            'bot-list-header flex items-center justify-between gap-3 px-1 py-3',
-            overlay ? 'bot-list-header--overlay xl:h-full' : 'xl:h-21'
+            'relative isolate flex items-center justify-between gap-3 px-1 py-3',
+            overlay ? 'xl:h-full' : 'xl:h-21'
           )}
         >
+          {/*
+            标题不铺实心底色，背后是一层带遮罩的背景模糊：
+            靠近标题时最强，往下逐渐消失，卡片滚过时会化开而不是被一条硬边切断。
+          */}
+          <div
+            aria-hidden='true'
+            className={cn(
+              'pointer-events-none absolute inset-x-0 top-0 -bottom-2.5 -z-10',
+              'bg-[linear-gradient(to_bottom,color-mix(in_oklab,var(--background)_84%,transparent)_0%,color-mix(in_oklab,var(--background)_52%,transparent)_62%,transparent_100%)]',
+              'backdrop-blur-[12px] backdrop-saturate-[1.4]',
+              '[mask-image:linear-gradient(to_bottom,black_0%,black_52%,transparent_100%)]',
+              '[-webkit-mask-image:linear-gradient(to_bottom,black_0%,black_52%,transparent_100%)]',
+              '[@supports_not_(backdrop-filter:blur(1px))]:bg-background',
+              '[@supports_not_(backdrop-filter:blur(1px))]:[background-image:none]',
+              '[@supports_not_(backdrop-filter:blur(1px))]:[mask-image:none]',
+              '[@supports_not_(backdrop-filter:blur(1px))]:[-webkit-mask-image:none]',
+              '[@media(prefers-reduced-transparency:reduce)]:bg-background',
+              '[@media(prefers-reduced-transparency:reduce)]:[background-image:none]',
+              '[@media(prefers-reduced-transparency:reduce)]:[backdrop-filter:none]',
+              '[@media(prefers-reduced-transparency:reduce)]:[-webkit-backdrop-filter:none]',
+              '[@media(prefers-reduced-transparency:reduce)]:[mask-image:none]',
+              '[@media(prefers-reduced-transparency:reduce)]:[-webkit-mask-image:none]',
+              overlay && 'xl:hidden'
+            )}
+          />
           <div className='flex items-baseline gap-2'>
-            <h2 className='text-heading text-base font-semibold xl:text-xl'>机器人</h2>
-            <span className='tabular text-xs text-muted'>{config.length}</span>
+            <h2 className='text-base leading-[1.15] font-semibold tracking-[-0.02em] xl:text-xl'>机器人</h2>
+            <span className='tabular-nums text-xs text-muted'>{config.length}</span>
           </div>
           <div className='flex items-center gap-3'>
             <span className='flex items-center gap-1.5 text-[11px] text-muted'>
-              <span aria-hidden='true' className='status-dot text-success' data-online='true' />
-              <span className='tabular'>{onlineCount} 在线</span>
+              <span aria-hidden='true' className={cn(STATUS_DOT_CLASS, 'text-success')} data-online='true' />
+              <span className='tabular-nums'>{onlineCount} 在线</span>
             </span>
             {showAdd ? (
               <Button size='sm' variant='secondary' onPress={() => navigate('/bots/new')}>
@@ -243,7 +269,10 @@ export const BotList = ({
       <div className='relative min-h-0 flex-1'>
         <div
           ref={listRef}
-          className={cn('no-scrollbar h-full overflow-y-auto overscroll-contain', overlay && 'xl:pt-21 xl:pb-21')}
+          className={cn(
+            '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden h-full overflow-y-auto overscroll-contain',
+            overlay && 'xl:pt-21 xl:pb-21'
+          )}
         >
           <div ref={listContentRef}>
             {loading && config.length === 0 ? (
@@ -273,7 +302,8 @@ export const BotList = ({
                   aria-hidden='true'
                   className={cn(
                     'pointer-events-none absolute inset-x-0 top-0 h-14 rounded-xl bg-default',
-                    highlightReady && 'bot-list-highlight'
+                    highlightReady &&
+                      'transition-transform duration-200 ease-[var(--ease-out)] motion-reduce:transition-none'
                   )}
                   style={{ transform: `translateY(${selectedIndex * ROW_HEIGHT}px)` }}
                 />
@@ -309,7 +339,7 @@ export const BotList = ({
                       >
                         {title}
                       </span>
-                      <span className='tabular truncate text-[11px] leading-4 text-muted'>{bot.appId}</span>
+                      <span className='tabular-nums truncate text-[11px] leading-4 text-muted'>{bot.appId}</span>
                     </span>
                     <span className='flex shrink-0 items-center gap-1.5'>
                       <StatusDot online={online} eventType={bot.event.type} />
@@ -328,16 +358,8 @@ export const BotList = ({
         */}
         {overlay ? (
           <>
-            <div aria-hidden='true' className='edge-blur edge-blur--top hidden xl:block'>
-              <div className='edge-blur__layer edge-blur__layer--strong' />
-              <div className='edge-blur__layer edge-blur__layer--medium' />
-              <div className='edge-blur__layer edge-blur__layer--soft' />
-            </div>
-            <div aria-hidden='true' className='edge-blur edge-blur--bottom hidden xl:block'>
-              <div className='edge-blur__layer edge-blur__layer--strong' />
-              <div className='edge-blur__layer edge-blur__layer--medium' />
-              <div className='edge-blur__layer edge-blur__layer--soft' />
-            </div>
+            <EdgeBlur edge='top' className='z-10 hidden xl:block' />
+            <EdgeBlur edge='bottom' className='z-10 hidden xl:block' />
           </>
         ) : null}
       </div>

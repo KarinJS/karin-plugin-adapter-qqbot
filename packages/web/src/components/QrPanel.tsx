@@ -306,7 +306,7 @@ export const QrPanel = ({ active = true }: QrPanelProps) => {
             <Spinner size='sm' aria-label='等待扫码' />
             <span>等待扫码确认</span>
           </div>
-          <span className='tabular flex items-center gap-1.5 text-xs text-muted'>
+          <span className='tabular-nums flex items-center gap-1.5 text-xs text-muted'>
             <Clock3 className='size-3.5' aria-hidden='true' />
             剩余 {formatRemaining(remaining)}
           </span>
@@ -452,7 +452,7 @@ export const QrPanel = ({ active = true }: QrPanelProps) => {
           <p className='mt-1 text-xs leading-5 text-muted'>使用手机 QQ 扫描二维码，并在打开的页面里确认授权。</p>
           <div className={cn('mt-2 flex items-center gap-2 text-xs text-muted', isTiny && 'justify-center')}>
             <Spinner size='sm' aria-label='等待扫码' />
-            <span className='tabular flex items-center gap-1.5'>
+            <span className='tabular-nums flex items-center gap-1.5'>
               <Clock3 className='size-3.5' aria-hidden='true' />
               剩余 {formatRemaining(remaining)}
             </span>
@@ -608,7 +608,7 @@ export const QrPanel = ({ active = true }: QrPanelProps) => {
               '适配器检测到配置变化，自动建立连接。',
             ].map((step, index) => (
               <li key={step} className='flex items-start gap-3'>
-                <span className='tabular flex size-6 shrink-0 items-center justify-center rounded-full border border-border text-xs'>
+                <span className='tabular-nums flex size-6 shrink-0 items-center justify-center rounded-full border border-border text-xs'>
                   {index + 1}
                 </span>
                 <span className='text-sm leading-6 text-muted'>{step}</span>

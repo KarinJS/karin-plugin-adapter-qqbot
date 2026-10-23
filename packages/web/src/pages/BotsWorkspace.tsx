@@ -581,7 +581,7 @@ export const BotsWorkspace = () => {
       <span className='flex size-12 items-center justify-center rounded-full border border-border bg-surface text-muted'>
         <Bot className='size-5' aria-hidden='true' />
       </span>
-      <h3 className='text-heading mt-4 text-base font-semibold'>选择一个机器人</h3>
+      <h3 className='mt-4 text-base leading-[1.15] font-semibold tracking-[-0.02em]'>选择一个机器人</h3>
       <p className='mt-2 max-w-sm text-sm leading-6 text-muted'>
         从左侧选择机器人查看和修改配置。保存后适配器会自动重连，不需要重启 Karin。
       </p>
@@ -645,7 +645,7 @@ export const BotsWorkspace = () => {
           <div
             ref={panelRef}
             data-bots-panel=''
-            className='no-scrollbar flex min-w-0 flex-col gap-5 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain xl:pr-6 xl:pb-6'
+            className='[scrollbar-width:none] [&::-webkit-scrollbar]:hidden flex min-w-0 flex-col gap-5 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain xl:pr-6 xl:pb-6'
           >
             <div ref={panelContentRef} className='flex min-w-0 flex-col gap-5'>
               {panel}

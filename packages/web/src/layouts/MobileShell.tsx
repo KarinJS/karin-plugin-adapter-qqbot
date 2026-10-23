@@ -2,6 +2,7 @@ import { cn } from '@heroui/react'
 import { Bot, LayoutGrid } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
 import { useLocation, useMatch, useNavigate } from 'react-router-dom'
+import { EdgeBlur } from '@/components/EdgeBlur'
 import { MobileAddBotSheet } from '@/components/mobile/MobileAddBotSheet'
 import { MobileBotSheet } from '@/components/mobile/MobileBotSheet'
 import { MobilePager, type MobilePagerItem } from '@/components/mobile/MobilePager'
@@ -59,19 +60,21 @@ const MobileShellContent = () => {
 
   return (
     <>
-      <div className='mobile-frame relative flex h-dvh flex-col overflow-hidden bg-background' inert={isDetail}>
+      <div
+        className='mobile-frame relative flex h-dvh origin-top flex-col overflow-hidden bg-background will-change-transform'
+        inert={isDetail}
+      >
         <div className='min-h-0 flex-1'>
           <MobilePager items={items} activeKey={activeKey} onChange={handlePagerChange} disabled={sheetOpen} />
         </div>
 
         {/* 和抽屉底栏同款的三层边缘模糊：只有靠近底部的内容被逐渐化开。 */}
         <div className='pointer-events-none absolute inset-x-0 bottom-0 z-40'>
-          <div aria-hidden='true' className='sheet-edge-blur--bottom mobile-bottom-blur'>
-            <div className='sheet-edge-blur__layer sheet-edge-blur__layer--strong' />
-            <div className='sheet-edge-blur__layer sheet-edge-blur__layer--medium' />
-            <div className='sheet-edge-blur__layer sheet-edge-blur__layer--soft' />
-          </div>
-          <nav className='mobile-bottom-nav pointer-events-auto relative z-10' aria-label='主导航'>
+          <EdgeBlur edge='bottom' tone='surface' className='z-0' />
+          <nav
+            className='pointer-events-auto relative z-10 px-2 pt-1 pb-[max(0.375rem,env(safe-area-inset-bottom))]'
+            aria-label='主导航'
+          >
             <div className='grid grid-cols-2'>
               {tabs.map((tab) => {
                 const Icon = tab.icon

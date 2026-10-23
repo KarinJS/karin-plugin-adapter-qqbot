@@ -87,7 +87,7 @@ export const SaveStatus = ({ state, errorMessage }: SaveStatusProps) => {
         role='status'
         aria-live='polite'
         style={{ visibility: 'hidden' }}
-        className='glass flex items-center gap-2 rounded-full border border-border/80 px-4 py-2 text-sm shadow-lg'
+        className='flex items-center gap-2 rounded-full border border-border/80 bg-background/78 px-4 py-2 text-sm shadow-lg backdrop-blur-[20px] backdrop-saturate-[1.4] [@media(prefers-reduced-transparency:reduce)]:bg-background [@media(prefers-reduced-transparency:reduce)]:[backdrop-filter:none] [@media(prefers-reduced-transparency:reduce)]:[-webkit-backdrop-filter:none]'
       >
         {shown === 'saving' ? <Spinner size='sm' aria-label='正在保存' /> : null}
         {shown === 'saved' ? <Check className='size-4 text-success' aria-hidden='true' /> : null}

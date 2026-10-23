@@ -12,7 +12,7 @@ export const EmptyState = ({ icon, title, description, action }: EmptyStateProps
     <div className='mb-4 flex size-12 items-center justify-center rounded-full border border-border bg-surface text-muted'>
       {icon}
     </div>
-    <h3 className='text-heading text-base font-semibold'>{title}</h3>
+    <h3 className='text-base leading-[1.15] font-semibold tracking-[-0.02em]'>{title}</h3>
     <p className='mt-2 max-w-sm text-sm leading-6 text-muted'>{description}</p>
     {action ? <div className='mt-5'>{action}</div> : null}
   </div>

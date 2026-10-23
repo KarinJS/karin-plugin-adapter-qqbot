@@ -48,7 +48,7 @@ const SheetBody = ({
         onRequestClose={onRequestClose}
         onExited={onExited}
         header={
-          <header className='sheet-header px-5 pb-3'>
+          <header className='touch-none px-5 pt-2 pb-3 group-data-[sheet-expanded=true]:pt-[max(0.5rem,env(safe-area-inset-top))] group-data-[resizing=true]:bg-surface/92 group-data-[snapping=true]:bg-surface/92'>
             <Drawer.Handle className='mx-auto mb-1' />
             <div className='flex items-start gap-3'>
               <BotAvatar name={title} avatar={status?.avatar} size='md' />
@@ -70,7 +70,7 @@ const SheetBody = ({
           </header>
         }
         footer={
-          <footer className='sheet-footer safe-bottom px-4 pt-3'>
+          <footer className='touch-none px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]'>
             <div className='flex items-center gap-2'>
               <Button variant='secondary' isDisabled={!dirty || saving} onPress={reset}>
                 <RotateCcw className='size-4' aria-hidden='true' />

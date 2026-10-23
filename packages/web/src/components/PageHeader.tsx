@@ -15,7 +15,7 @@ export const PageHeader = ({ eyebrow, title, description, actions, className }: 
       {eyebrow ? (
         <p className='mb-2 text-[0.6875rem] font-medium tracking-[0.16em] text-muted uppercase'>{eyebrow}</p>
       ) : null}
-      <h1 className='text-heading text-2xl font-semibold sm:text-[1.75rem]'>{title}</h1>
+      <h1 className='text-2xl leading-[1.15] font-semibold tracking-[-0.02em] sm:text-[1.75rem]'>{title}</h1>
       {description ? <p className='mt-2 max-w-2xl text-sm leading-6 text-muted'>{description}</p> : null}
     </div>
     {actions ? <div className='flex shrink-0 items-center gap-2'>{actions}</div> : null}

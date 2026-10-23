@@ -50,12 +50,14 @@ export const MorphBackButton = ({ scrollRef, onBack }: MorphBackButtonProps) => 
       <button
         ref={buttonRef}
         type='button'
-        className='morph-back pointer-events-auto flex h-10 items-center justify-center overflow-hidden rounded-full border text-sm font-medium text-foreground'
+        className='pointer-events-auto flex h-10 items-center justify-center overflow-hidden rounded-full border text-sm font-medium text-foreground [--back-p:0] w-[calc(2.5rem_+_(1_-_var(--back-p))_*_6.5rem)] px-[calc(0.5rem_+_(1_-_var(--back-p))_*_0.5rem)] border-[color-mix(in_oklab,var(--border)_calc(var(--back-p)*100%),transparent)] bg-[color-mix(in_oklab,var(--background)_calc(var(--back-p)*82%),transparent)] shadow-[0_calc(var(--back-p)*6px)_calc(var(--back-p)*18px)_rgb(0_0_0/calc(var(--back-p)*0.12))] backdrop-blur-[calc(var(--back-p)*18px)] [transition:background-color_100ms_linear,border-color_100ms_linear] motion-reduce:[transition:none] [@media(prefers-reduced-transparency:reduce)]:bg-[color-mix(in_oklab,var(--background)_calc(var(--back-p)*100%),transparent)] [@media(prefers-reduced-transparency:reduce)]:[backdrop-filter:none] [@media(prefers-reduced-transparency:reduce)]:[-webkit-backdrop-filter:none]'
         aria-label='返回机器人列表'
         onClick={onBack}
       >
         <ArrowLeft className='size-4 shrink-0' aria-hidden='true' />
-        <span className='morph-back-label overflow-hidden whitespace-nowrap'>机器人列表</span>
+        <span className='overflow-hidden whitespace-nowrap max-w-[calc((1_-_var(--back-p))_*_6rem)] ml-[calc((1_-_var(--back-p))_*_0.5rem)] opacity-[calc(1_-_var(--back-p))]'>
+          机器人列表
+        </span>
       </button>
     </div>
   )

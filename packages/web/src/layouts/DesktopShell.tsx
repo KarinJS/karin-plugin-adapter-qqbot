@@ -3,6 +3,7 @@ import { Bot, Home, QrCode, Settings } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Brand } from '@/components/Brand'
+import { STATUS_DOT_CLASS } from '@/components/StatusPill'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import type { CanvasPage } from '@/components/desktop/CanvasPager'
 import { useConfigStore } from '@/hooks/useConfigStore'
@@ -57,7 +58,7 @@ export const DesktopShell = () => {
       pages={pages}
       sidebar={
         <aside
-          className='flex w-[var(--app-sidebar-width)] shrink-0 flex-col border-r border-border/80 bg-surface/55'
+          className='flex w-[15.5rem] shrink-0 flex-col border-r border-border/80 bg-surface/55'
           aria-label='侧边栏'
         >
           <div className='px-5 py-5'>
@@ -93,11 +94,11 @@ export const DesktopShell = () => {
               <span>运行状态</span>
               <span
                 className={cn(
-                  'tabular inline-flex items-center gap-2',
+                  'tabular-nums inline-flex items-center gap-2',
                   allOnline ? 'text-success' : config.length > 0 ? 'text-warning' : 'text-muted'
                 )}
               >
-                <span className='status-dot' data-online={onlineCount > 0} aria-hidden='true' />
+                <span className={STATUS_DOT_CLASS} data-online={onlineCount > 0} aria-hidden='true' />
                 {onlineCount} / {config.length} 在线
               </span>
             </div>

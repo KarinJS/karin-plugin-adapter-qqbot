@@ -62,7 +62,10 @@ const DetailBody = ({ bot, onBack, onRemoved }: DetailBodyProps) => {
     <>
       <SaveStatus state={saveState} />
 
-      <div ref={scrollRef} className='mobile-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain'>
+      <div
+        ref={scrollRef}
+        className='[scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-h-0 flex-1 overflow-y-auto overscroll-contain'
+      >
         <MorphBackButton scrollRef={scrollRef} onBack={onBack} />
 
         <div ref={scrollContentRef} className='px-4 pb-6'>
@@ -92,7 +95,7 @@ const DetailBody = ({ bot, onBack, onRemoved }: DetailBodyProps) => {
         </div>
       </div>
 
-      <footer className='safe-bottom shrink-0 border-t border-border/60 bg-background/95 px-4 pt-3 backdrop-blur'>
+      <footer className='shrink-0 border-t border-border/60 bg-background/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur'>
         <div className='flex items-center gap-2'>
           <Button variant='secondary' isDisabled={!dirty || saving} onPress={reset}>
             <RotateCcw className='size-4' aria-hidden='true' />

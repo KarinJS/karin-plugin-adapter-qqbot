@@ -1,6 +1,7 @@
 import { gsap } from 'gsap'
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { StatusCrossfade, type EventType } from '@/components/StatusPill'
+import { EdgeBlur } from '@/components/EdgeBlur'
 import {
   dissolveBox,
   morphText,
@@ -132,17 +133,13 @@ export const BotFormHeader = ({ appId, name, online, eventType, dirty, actions }
 
   return (
     <div data-form-header='' className='xl:sticky xl:top-0 xl:z-20 xl:h-21'>
-      <div aria-hidden='true' className='edge-blur edge-blur--top edge-blur--header hidden xl:block'>
-        <div className='edge-blur__layer edge-blur__layer--strong' />
-        <div className='edge-blur__layer edge-blur__layer--medium' />
-        <div className='edge-blur__layer edge-blur__layer--soft' />
-      </div>
+      <EdgeBlur edge='top' height='header' className='z-10 hidden xl:block' />
 
       {/* 标题顶边和左侧列表标题对齐：84px 高、20px 字、顶部 30.5px。 */}
       <div className='relative z-20 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between xl:pt-[30.5px] xl:pb-2'>
         <div className='min-w-0'>
           <div className='flex flex-wrap items-center gap-x-3 gap-y-1 xl:flex-nowrap'>
-            <h2 ref={nameRef} className='text-heading min-w-0 truncate text-xl font-semibold'>
+            <h2 ref={nameRef} className='min-w-0 truncate text-xl leading-[1.15] font-semibold tracking-[-0.02em]'>
               {name}
             </h2>
             <span ref={statusRef} className='inline-flex shrink-0'>
@@ -151,7 +148,7 @@ export const BotFormHeader = ({ appId, name, online, eventType, dirty, actions }
             {dirty ? (
               <span
                 ref={badgeRef}
-                className='unsaved-badge shrink-0 rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[0.6875rem] text-warning'
+                className='shrink-0 rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[0.6875rem] text-warning transition-[opacity,scale] duration-[160ms] ease-[var(--ease-out)] starting:scale-[0.96] starting:opacity-0 motion-reduce:[transition:opacity_120ms_var(--ease-out)] motion-reduce:starting:scale-100'
               >
                 未保存
               </span>

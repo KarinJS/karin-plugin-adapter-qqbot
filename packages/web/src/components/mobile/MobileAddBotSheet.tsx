@@ -147,7 +147,7 @@ export const MobileAddBotSheet = () => {
       onExited={handleExited}
       initialRatio={1}
       header={
-        <header className='sheet-header px-5 pb-3'>
+        <header className='touch-none px-5 pt-2 pb-3 group-data-[sheet-expanded=true]:pt-[max(0.5rem,env(safe-area-inset-top))] group-data-[resizing=true]:bg-surface/92 group-data-[snapping=true]:bg-surface/92'>
           <Drawer.Handle className='mx-auto mb-1' />
           <div className='flex items-start justify-between gap-3'>
             <div className='min-w-0'>
@@ -161,7 +161,7 @@ export const MobileAddBotSheet = () => {
         </header>
       }
     >
-      <div key={sessionKey} className='safe-bottom'>
+      <div key={sessionKey} className='pb-[max(0.75rem,env(safe-area-inset-bottom))]'>
         <MobileSegmentedTabs
           ariaLabel='添加方式'
           items={[...addTabs]}

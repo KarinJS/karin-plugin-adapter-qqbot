@@ -36,7 +36,7 @@ const MobileStat = ({
     </div>
     <p
       className={cn(
-        'tabular mt-2 text-[24px] leading-none font-semibold tracking-tight',
+        'tabular-nums mt-2 text-[24px] leading-none font-semibold tracking-tight',
         tone === 'success' && 'text-success',
         tone === 'warning' && 'text-warning'
       )}
@@ -105,7 +105,7 @@ export const MobileOverviewPage = () => {
                 <Icon className='size-4' aria-hidden='true' />
                 {row.label}
               </span>
-              <span className='tabular text-[13px] font-medium'>{row.count}</span>
+              <span className='tabular-nums text-[13px] font-medium'>{row.count}</span>
             </MobileRow>
           )
         })}

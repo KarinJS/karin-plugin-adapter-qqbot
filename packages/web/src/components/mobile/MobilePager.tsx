@@ -509,14 +509,17 @@ export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePage
     <div
       ref={rootRef}
       role='group'
-      className={cn('mobile-pager relative h-full overflow-hidden', disabled && 'pointer-events-none')}
+      className={cn(
+        'relative h-full touch-pan-y overflow-hidden [@media(pointer:fine)]:cursor-grab data-[dragging=true]:cursor-grabbing data-[dragging=true]:select-none',
+        disabled && 'pointer-events-none'
+      )}
       aria-label='主导航页面'
     >
       <div ref={trackRef} className='flex h-full w-full will-change-transform'>
         {items.map((item, index) => (
           <section
             key={item.key}
-            className='mobile-panel mobile-scroll h-full w-full shrink-0 overflow-y-auto'
+            className='mobile-panel h-full w-full shrink-0 overflow-y-auto overscroll-contain px-4 pt-[max(0.75rem,env(safe-area-inset-top,0px))] pb-[calc(4rem+env(safe-area-inset-bottom,0px))] [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
             aria-label={item.label}
             aria-hidden={index !== activeIndex}
             inert={index !== activeIndex}

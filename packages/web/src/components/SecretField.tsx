@@ -35,7 +35,7 @@ export const SecretField = ({
       <Label className={compact ? 'text-xs text-muted' : undefined}>{label}</Label>
       <div className='flex items-center gap-2'>
         <Input
-          className={cn('min-w-0 flex-1', masked && 'secret-mask')}
+          className={cn('min-w-0 flex-1', masked && '[-webkit-text-security:disc] [text-security:disc]')}
           autoComplete={supportsTextSecurity ? 'off' : 'new-password'}
           spellCheck={false}
           placeholder={placeholder}

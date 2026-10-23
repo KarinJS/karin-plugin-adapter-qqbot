@@ -32,6 +32,12 @@ interface StatusDotProps {
 }
 
 /**
+ * 状态圆点的基础形状与在线 / 离线填充，颜色由外层 text-* 决定。
+ */
+export const STATUS_DOT_CLASS =
+  'size-2 shrink-0 rounded-full border border-current data-[online=true]:bg-current data-[online=true]:shadow-[0_0_0_3px_color-mix(in_oklab,currentColor_16%,transparent)] data-[offline=true]:bg-[color-mix(in_oklab,currentColor_32%,transparent)]'
+
+/**
  * 只显示状态圆点，供名册列表这类紧凑布局使用。
  */
 export const StatusDot = ({ online, eventType, pulse = false, className }: StatusDotProps) => {
@@ -40,11 +46,11 @@ export const StatusDot = ({ online, eventType, pulse = false, className }: Statu
   return (
     <span
       className={cn(
-        'status-dot',
+        STATUS_DOT_CLASS,
         state === 'online' && 'text-success',
         state === 'offline' && 'text-warning',
         state === 'disabled' && 'text-muted',
-        pulse && 'status-dot--pulse',
+        pulse && 'animate-[status-dot-pulse_200ms_var(--ease-out)] motion-reduce:animate-none',
         className
       )}
       data-online={state === 'online'}

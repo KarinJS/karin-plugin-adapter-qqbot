@@ -43,7 +43,7 @@ const StatCard = ({
     </div>
     <p
       className={cn(
-        'tabular mt-4 text-3xl font-semibold tracking-tight',
+        'tabular-nums mt-4 text-3xl font-semibold tracking-tight',
         tone === 'success' && 'text-success',
         tone === 'warning' && 'text-warning'
       )}
@@ -183,7 +183,7 @@ export const OverviewPage = () => {
                         <Icon className='size-4' aria-hidden='true' />
                         {row.label}
                       </span>
-                      <span className='tabular text-sm font-medium'>{row.count}</span>
+                      <span className='tabular-nums text-sm font-medium'>{row.count}</span>
                     </div>
                   )
                 })}

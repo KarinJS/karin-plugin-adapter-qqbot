@@ -101,7 +101,7 @@ export const CanvasPager = ({ pages, activeKey }: CanvasPagerProps) => {
             aria-label={page.label}
             aria-hidden={index !== activeIndex}
             inert={index !== activeIndex}
-            className='no-scrollbar h-full w-full shrink-0 overflow-y-auto overscroll-contain'
+            className='[scrollbar-width:none] [&::-webkit-scrollbar]:hidden h-full w-full shrink-0 overflow-y-auto overscroll-contain'
           >
             {/*
               填满型页面（机器人工作区）在宽屏下铺满画布、不留内边距，

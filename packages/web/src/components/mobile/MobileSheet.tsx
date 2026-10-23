@@ -118,7 +118,7 @@ export const MobileSheet = ({
       />
       <Drawer.Content placement='bottom'>
         <Drawer.Dialog
-          className='flex flex-col overflow-hidden border border-border/60 bg-surface shadow-overlay'
+          className='group flex flex-col overflow-hidden border border-border/60 bg-surface shadow-overlay data-[resizing=true]:cursor-grabbing data-[resizing=true]:select-none data-[resizing=true]:shadow-none data-[snapping=true]:shadow-none'
           style={mobileSheetStyle}
         >
           <SheetScaffold scrollerRef={scrollerRef} header={header} footer={footer}>

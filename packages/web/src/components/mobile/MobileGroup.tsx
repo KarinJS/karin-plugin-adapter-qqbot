@@ -1,5 +1,6 @@
 import { cn } from '@heroui/react'
 import type { ReactNode } from 'react'
+import { PRESSABLE_CLASS } from '@/lib/uiClasses'
 
 interface MobileGroupProps {
   title?: string
@@ -59,7 +60,8 @@ export const MobileActionRow = ({
     type='button'
     disabled={disabled}
     className={cn(
-      'pressable flex w-full items-center gap-3 border-b border-border/50 px-4 py-3 text-left last:border-b-0 active:bg-default/70 disabled:opacity-50',
+      PRESSABLE_CLASS,
+      'flex w-full items-center gap-3 border-b border-border/50 px-4 py-3 text-left last:border-b-0 active:bg-default/70 disabled:opacity-50',
       className
     )}
     onClick={onPress}

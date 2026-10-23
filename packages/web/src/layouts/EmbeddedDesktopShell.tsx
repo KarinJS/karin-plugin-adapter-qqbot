@@ -116,7 +116,7 @@ export const EmbeddedDesktopShell = () => {
                         aria-current={active ? 'page' : undefined}
                         data-canvas-nav={item.key}
                         className={cn(
-                          'canvas-nav-link relative z-10 flex size-11 items-center justify-center rounded-full',
+                          'relative z-10 flex size-11 items-center justify-center rounded-full [transition:color_500ms_var(--ease-quart-out),background-color_150ms_var(--ease-out)]',
                           active ? 'text-background' : 'text-muted hover:bg-default hover:text-foreground'
                         )}
                       >

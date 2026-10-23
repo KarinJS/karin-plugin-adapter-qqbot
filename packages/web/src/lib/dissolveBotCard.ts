@@ -171,8 +171,7 @@ export const dissolveBotCard = (appId: string, statusColor: string): DissolveHan
   clone.setAttribute('aria-hidden', 'true')
   clone.setAttribute('tabindex', '-1')
   clone.setAttribute('data-dissolve-clone', 'true')
-  // 原卡片上的 pressable 过渡会和 GSAP 抢 transform / opacity，克隆体不需要按压反馈。
-  clone.classList.remove('pressable')
+  // 克隆体用 inline transition:none 覆盖原卡片的按压过渡，避免和 GSAP 抢 transform / opacity。
   clone.style.cssText = [
     'position:fixed',
     `left:${rect.left}px`,

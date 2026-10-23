@@ -46,7 +46,10 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
 
   return (
     <div className='relative flex min-h-dvh flex-col bg-background'>
-      <div className='pointer-events-none absolute inset-0 app-grid opacity-70' aria-hidden='true' />
+      <div
+        className='pointer-events-none absolute inset-0 opacity-70 [background-image:linear-gradient(to_right,color-mix(in_oklab,var(--foreground)_7%,transparent)_1px,transparent_1px),linear-gradient(to_bottom,color-mix(in_oklab,var(--foreground)_7%,transparent)_1px,transparent_1px)] [background-size:44px_44px] [mask-image:radial-gradient(ellipse_80%_70%_at_30%_20%,black_0%,transparent_78%)] [-webkit-mask-image:radial-gradient(ellipse_80%_70%_at_30%_20%,black_0%,transparent_78%)]'
+        aria-hidden='true'
+      />
 
       <header className={cn('relative z-10 flex items-center justify-between px-5 sm:px-8', isShort ? 'py-2' : 'py-4')}>
         <Brand />
@@ -66,7 +69,7 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
           {isMobile && !isShort ? (
             <div>
               <p className='text-[0.6875rem] font-medium tracking-[0.16em] text-muted uppercase'>Karin Adapter</p>
-              <h1 className='text-display mt-3 text-3xl font-semibold'>QQBot 控制台</h1>
+              <h1 className='mt-3 text-3xl leading-[1.05] font-semibold tracking-[-0.03em]'>QQBot 控制台</h1>
               <p className='mt-2 text-sm leading-6 text-muted'>登录后管理机器人连接、扫码授权与消息缓存。</p>
             </div>
           ) : null}
@@ -74,7 +77,9 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
           {!isMobile ? (
             <section className='max-w-xl'>
               <p className='text-[0.6875rem] font-medium tracking-[0.18em] text-muted uppercase'>Karin Adapter</p>
-              <h1 className='text-display mt-4 text-5xl font-semibold'>把 QQ 官方机器人接到 Karin。</h1>
+              <h1 className='mt-4 text-5xl leading-[1.05] font-semibold tracking-[-0.03em]'>
+                把 QQ 官方机器人接到 Karin。
+              </h1>
               <p className='mt-5 max-w-md text-base leading-7 text-muted'>
                 一个页面管理所有机器人。扫码授权、事件通道、消息缓存，都在这里完成。
               </p>

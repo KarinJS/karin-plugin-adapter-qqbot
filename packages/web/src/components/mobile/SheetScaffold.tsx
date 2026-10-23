@@ -1,15 +1,8 @@
 import { cn } from '@heroui/react'
 import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { EdgeBlur } from '@/components/EdgeBlur'
 
 const EDGE_GAP = 8
-
-const SheetEdgeBlur = ({ edge }: { edge: 'top' | 'bottom' }) => (
-  <div aria-hidden='true' className={cn('sheet-edge-blur', `sheet-edge-blur--${edge}`)}>
-    <div className='sheet-edge-blur__layer sheet-edge-blur__layer--strong' />
-    <div className='sheet-edge-blur__layer sheet-edge-blur__layer--medium' />
-    <div className='sheet-edge-blur__layer sheet-edge-blur__layer--soft' />
-  </div>
-)
 
 interface SheetScaffoldProps {
   header: ReactNode
@@ -57,7 +50,10 @@ export const SheetScaffold = ({ header, footer, children, contentClassName, scro
     <div className='relative min-h-0 flex-1 overflow-hidden'>
       <div
         ref={scrollerRef}
-        className={cn('mobile-scroll h-full overflow-y-auto overscroll-contain px-4', contentClassName)}
+        className={cn(
+          '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden h-full overflow-y-auto overscroll-contain px-4',
+          contentClassName
+        )}
         // 纵向滚动由 useSheetDrag 通过 scrollTop 驱动，关掉原生手势，
         // 避免 iOS / 安卓在滚动开始后抢走 touch 事件。
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom, touchAction: 'none' }}
@@ -65,8 +61,14 @@ export const SheetScaffold = ({ header, footer, children, contentClassName, scro
         {children}
       </div>
 
-      <SheetEdgeBlur edge='top' />
-      {footer ? <SheetEdgeBlur edge='bottom' /> : null}
+      <EdgeBlur
+        edge='top'
+        tone='surface'
+        rounded
+        className='z-20'
+        layerClassName='group-data-[resizing=true]:hidden group-data-[snapping=true]:hidden'
+      />
+      {footer ? <EdgeBlur edge='bottom' tone='surface' className='z-20' /> : null}
 
       <div ref={headerRef} className='absolute inset-x-0 top-0 z-30'>
         {header}

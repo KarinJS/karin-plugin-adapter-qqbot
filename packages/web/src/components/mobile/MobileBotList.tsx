@@ -1,9 +1,10 @@
 import { Button, Skeleton, cn } from '@heroui/react'
 import { QrCode } from 'lucide-react'
 import { BotAvatar } from '@/components/BotAvatar'
-import { getEventLabel } from '@/components/StatusPill'
+import { getEventLabel, STATUS_DOT_CLASS } from '@/components/StatusPill'
 import { useConfigStore } from '@/hooks/useConfigStore'
 import { useMobileSheet } from '@/hooks/useMobileSheet'
+import { PRESSABLE_CLASS } from '@/lib/uiClasses'
 
 interface MobileBotListProps {
   title?: string
@@ -24,7 +25,7 @@ export const MobileBotList = ({ title, className }: MobileBotListProps) => {
       {title ? (
         <div className='flex items-center justify-between px-1'>
           <h2 className='text-[13px] font-medium text-muted'>{title}</h2>
-          <span className='tabular text-[11px] text-muted'>{config.length}</span>
+          <span className='tabular-nums text-[11px] text-muted'>{config.length}</span>
         </div>
       ) : null}
 
@@ -66,7 +67,8 @@ export const MobileBotList = ({ title, className }: MobileBotListProps) => {
               type='button'
               data-bot-id={bot.appId}
               className={cn(
-                'pressable flex w-full items-center gap-3 border-b border-border/50 px-3.5 py-3 text-left last:border-b-0 active:bg-default/70',
+                PRESSABLE_CLASS,
+                'flex w-full items-center gap-3 border-b border-border/50 px-3.5 py-3 text-left last:border-b-0 active:bg-default/70',
                 selected && 'bg-default/70'
               )}
               aria-label={`打开 ${titleText} 的配置`}
@@ -83,7 +85,7 @@ export const MobileBotList = ({ title, className }: MobileBotListProps) => {
                     )}
                   >
                     <span
-                      className='status-dot'
+                      className={STATUS_DOT_CLASS}
                       data-online={active}
                       data-offline={enabled && !active}
                       aria-hidden='true'
