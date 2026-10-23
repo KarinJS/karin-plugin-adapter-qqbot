@@ -377,37 +377,34 @@ export const QrPanel = () => {
     isPending || isCompleted ? (
       <div className='mt-3'>
         {isPending ? (
-          <div className='grid grid-cols-3 gap-2'>
-            <Button
-              fullWidth
-              variant='secondary'
-              className='flex h-14 flex-col items-center justify-center gap-1 px-1 text-[11px]'
-              onPress={start}
-              isDisabled={starting}
-            >
-              <RefreshCw className='size-4' aria-hidden='true' />
-              <span>重新生成</span>
-            </Button>
-            <Button
-              fullWidth
-              variant='secondary'
-              className='flex h-14 flex-col items-center justify-center gap-1 px-1 text-[11px]'
-              onPress={() => {
-                if (session) window.open(session.connectUrl, '_blank', 'noopener,noreferrer')
-              }}
-              isDisabled={!session}
-            >
-              <ExternalLink className='size-4' aria-hidden='true' />
-              <span>浏览器打开</span>
-            </Button>
-            <Button
-              fullWidth
-              variant='ghost'
-              className='flex h-14 flex-col items-center justify-center gap-1 px-1 text-[11px]'
-              onPress={cancel}
-            >
+          <div className='flex flex-col gap-2'>
+            <div className='grid grid-cols-2 gap-2'>
+              <Button
+                fullWidth
+                variant='secondary'
+                className='flex h-14 flex-col items-center justify-center gap-1 px-1 text-[11px]'
+                onPress={start}
+                isDisabled={starting}
+              >
+                <RefreshCw className='size-4' aria-hidden='true' />
+                <span>重新生成</span>
+              </Button>
+              <Button
+                fullWidth
+                variant='secondary'
+                className='flex h-14 flex-col items-center justify-center gap-1 px-1 text-[11px]'
+                onPress={() => {
+                  if (session) window.open(session.connectUrl, '_blank', 'noopener,noreferrer')
+                }}
+                isDisabled={!session}
+              >
+                <ExternalLink className='size-4' aria-hidden='true' />
+                <span>浏览器打开</span>
+              </Button>
+            </div>
+            <Button fullWidth variant='danger-soft' className='h-11 text-xs' onPress={cancel}>
               <X className='size-4' aria-hidden='true' />
-              <span>取消授权</span>
+              取消授权
             </Button>
           </div>
         ) : null}

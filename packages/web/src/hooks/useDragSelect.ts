@@ -14,7 +14,7 @@ const CLICK_SUPPRESS = 200
 /**
  * 横向拖拽选择。
  *
- * 手机上按住分段标签横向移动时，手指经过哪个标签就选中哪个。
+ * 手机上按住分段标签横向移动时，按手指的横向位置选最近的标签，选中始终跟随手指。
  * 只有横向位移明显大于纵向时才接管手势，纵向仍然交给抽屉的滚动逻辑。
  * 拖拽结束后会拦掉尾随的 click / press，避免把选择改回按下的那个标签。
  */
@@ -47,13 +47,28 @@ export const useDragSelect = ({ containerRef, itemSelector, onSelectIndex, disab
       lastIndex = -1
     }
 
-    const selectAt = (x: number, y: number) => {
-      const hit = document.elementFromPoint(x, y)?.closest<HTMLElement>(itemSelector)
-      if (!hit || !container.contains(hit)) return
-      if (hit.getAttribute('aria-disabled') === 'true' || hit.hasAttribute('data-disabled')) return
-
+    /**
+     * 按手指的横向位置选最近的标签，不要求手指正好落在标签矩形内。
+     * 手指在标签间隙、或者上下稍微漂移时，选中仍然跟着手指走。
+     */
+    const selectAt = (x: number) => {
       const tabs = Array.from(container.querySelectorAll<HTMLElement>(itemSelector))
-      const index = tabs.indexOf(hit)
+      if (tabs.length === 0) return
+
+      let index = -1
+      let distance = Infinity
+
+      tabs.forEach((tab, i) => {
+        if (tab.getAttribute('aria-disabled') === 'true' || tab.hasAttribute('data-disabled')) return
+
+        const rect = tab.getBoundingClientRect()
+        const next = Math.abs(x - (rect.left + rect.width / 2))
+        if (next < distance) {
+          distance = next
+          index = i
+        }
+      })
+
       if (index < 0 || index === lastIndex) return
 
       lastIndex = index
@@ -104,7 +119,7 @@ export const useDragSelect = ({ containerRef, itemSelector, onSelectIndex, disab
       }
 
       event.preventDefault()
-      selectAt(touch.clientX, touch.clientY)
+      selectAt(touch.clientX)
     }
 
     const onTouchEnd = (event: TouchEvent) => {

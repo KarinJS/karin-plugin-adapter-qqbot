@@ -220,26 +220,22 @@
 }
 
 /*
- * 手机端悬浮底部导航。
- * 内容从导航下方滚过，导航用半透明渐变 + 背景模糊托住文字。
+ * 手机端底部导航。
+ * 不改变原有布局，只把底栏的背景换成模糊渐变。
  */
-.mobile-floating-nav {
-  border: 1px solid color-mix(in oklab, var(--foreground) 8%, transparent);
-  border-radius: 22px;
+.mobile-bottom-nav {
+  border-top: 1px solid color-mix(in oklab, var(--foreground) 6%, transparent);
   background: linear-gradient(
     180deg,
-    color-mix(in oklab, var(--surface) 68%, transparent) 0%,
-    color-mix(in oklab, var(--surface) 88%, transparent) 100%
+    color-mix(in oklab, var(--surface) 55%, transparent) 0%,
+    color-mix(in oklab, var(--surface) 90%, transparent) 100%
   );
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
-  box-shadow:
-    0 1px 0 rgb(255 255 255 / 0.18) inset,
-    0 12px 32px rgb(0 0 0 / 0.16);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .mobile-floating-nav {
+  .mobile-bottom-nav {
     background: var(--surface);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -328,8 +324,7 @@
 }
 
 .mobile-panel {
-  /* 底部留出悬浮导航的高度，最后一项可以滚到导航上方。 */
-  padding: max(0.75rem, env(safe-area-inset-top, 0px)) 1rem calc(6rem + env(safe-area-inset-bottom, 0px));
+  padding: max(0.75rem, env(safe-area-inset-top, 0px)) 1rem 1.5rem;
   -webkit-overflow-scrolling: touch;
 }
 

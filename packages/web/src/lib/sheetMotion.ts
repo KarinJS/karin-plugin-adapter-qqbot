@@ -17,10 +17,17 @@ export const SHEET_EXIT_EASE = SHEET_MOTION_EASE
 /** 高度吸附的时长与曲线；与进场 / 退场完全一致。 */
 export const SHEET_SNAP_DURATION = SHEET_MOTION_DURATION
 
-/** 抽屉遮罩最终压暗到的颜色；透明度由 useSheetMotion 用同一组曲线驱动。 */
-export const SHEET_BACKDROP_COLOR = 'rgba(0, 0, 0, 0.38)'
+/** 抽屉遮罩最终压暗到的透明度。 */
+export const SHEET_BACKDROP_ALPHA = 0.38
+/** 抽屉遮罩最终压暗到的颜色；透明度由进场 / 退场和拖动复原共用。 */
+export const SHEET_BACKDROP_COLOR = `rgba(0, 0, 0, ${SHEET_BACKDROP_ALPHA})`
 /** 压暗动画的透明端点。 */
 export const SHEET_BACKDROP_COLOR_CLEAR = 'rgba(0, 0, 0, 0)'
+
+/** 抽屉打开时外壳的缩放、位移与圆角；拖到 25% 以下时按进度复原。 */
+export const SHEET_FRAME_SCALE = 0.94
+export const SHEET_FRAME_Y = 10
+export const SHEET_FRAME_RADIUS = 24
 
 /** 抽屉默认高度占可用屏幕高度的比例。 */
 export const SHEET_COLLAPSED_RATIO = 0.5

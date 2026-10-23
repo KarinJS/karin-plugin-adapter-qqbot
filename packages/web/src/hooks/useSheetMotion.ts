@@ -7,6 +7,9 @@ import {
   SHEET_ENTER_EASE,
   SHEET_EXIT_DURATION,
   SHEET_EXIT_EASE,
+  SHEET_FRAME_RADIUS,
+  SHEET_FRAME_SCALE,
+  SHEET_FRAME_Y,
 } from '@/lib/sheetMotion'
 
 interface SheetMotionOptions {
@@ -63,7 +66,7 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       gsap.set(backdrop, { backgroundColor: SHEET_BACKDROP_COLOR })
       gsap.set(dialog, { y: 0 })
-      if (frame) gsap.set(frame, { scale: 0.94, y: 10, borderRadius: 24 })
+      if (frame) gsap.set(frame, { scale: SHEET_FRAME_SCALE, y: SHEET_FRAME_Y, borderRadius: SHEET_FRAME_RADIUS })
       return
     }
 
@@ -76,9 +79,9 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }
     gsap.fromTo(dialog, { y: dialog.offsetHeight }, { y: 0, duration: SHEET_ENTER_DURATION, ease: SHEET_ENTER_EASE })
     if (frame) {
       gsap.to(frame, {
-        scale: 0.94,
-        y: 10,
-        borderRadius: 24,
+        scale: SHEET_FRAME_SCALE,
+        y: SHEET_FRAME_Y,
+        borderRadius: SHEET_FRAME_RADIUS,
         duration: SHEET_ENTER_DURATION,
         ease: SHEET_ENTER_EASE,
         overwrite: 'auto',

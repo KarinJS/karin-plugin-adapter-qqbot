@@ -1,11 +1,15 @@
 import { gsap } from 'gsap'
 import { useEffect, type RefObject } from 'react'
 import {
+  SHEET_BACKDROP_ALPHA,
   SHEET_COLLAPSED_RATIO,
   SHEET_DISMISS_THRESHOLD,
   SHEET_ENTER_EASE,
   SHEET_EXIT_EASE,
   SHEET_EXPAND_THRESHOLD,
+  SHEET_FRAME_RADIUS,
+  SHEET_FRAME_SCALE,
+  SHEET_FRAME_Y,
   SHEET_SNAP_DURATION,
 } from '@/lib/sheetMotion'
 
@@ -51,6 +55,8 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
  * 全屏时纵向手势由这里自己接管：内容先按 1:1 滚动，
  * 滚到顶部后继续向下就无缝转成收起抽屉；收起时松手低于 25% 直接退场，
  * 其余回到 collapsedRatio 指定的高度（默认半屏，添加机器人是全屏）。
+ * 可见高度低于 25% 后不再压缩抽屉，而是整体下移，底栏跟着抽屉一起滑出屏幕；
+ * 背景压暗和外壳缩放也在这段距离里跟手复原。
  * 不依赖浏览器原生滚动，避免 iOS / 安卓在滚动过程中取消 touch 事件、
  * 或者滚动到顶部后无法把抽屉接回手势的问题。
  *
@@ -74,12 +80,16 @@ export const useSheetDrag = ({
     const scroller = scrollerRef.current
     if (!dialog || !scroller || !baseHeightRef.current) return
 
+    // 背景缩放和压暗由 useSheetMotion 驱动，拖到 25% 以下时改由这里跟手复原。
+    const frame = document.querySelector<HTMLElement>('.mobile-frame')
+
     let touchId: number | null = null
     let pointerId: number | null = null
     let startX = 0
     let startY = 0
     let dragStartY = 0
     let dragStartHeight = 0
+    let dragOffsetY = 0
     let scrollStartTop = 0
     let scrollStartY = 0
     let mode: DragMode = 'none'
@@ -92,6 +102,7 @@ export const useSheetDrag = ({
     const ratio = () => (base() ? dialog.offsetHeight / base() : collapsedRatio)
     const maxScroll = () => Math.max(0, scroller.scrollHeight - scroller.clientHeight)
     const isInScroller = (target: EventTarget | null) => target instanceof Node && scroller.contains(target)
+    const motionEase = gsap.parseEase(SHEET_ENTER_EASE)
 
     const setExpanded = (expanded: boolean) => {
       dialog.dataset.sheetExpanded = expanded ? 'true' : 'false'
@@ -102,6 +113,32 @@ export const useSheetDrag = ({
 
     const isTextInput = (target: EventTarget | null) =>
       target instanceof Element && Boolean(target.closest('textarea, [contenteditable="true"]'))
+
+    /**
+     * 抽屉被拖到 25% 以下时，压暗和外壳缩放不再停在打开时的状态，
+     * 而是跟着手指一起复原：可见高度越小，背景越亮、外壳越接近原始尺寸。
+     * 进度套用与进场 / 退场相同的 power3.out 曲线。
+     */
+    const applyBackdropRestore = (visible: number) => {
+      const height = base()
+      if (!height) return
+
+      const threshold = height * SHEET_DISMISS_THRESHOLD
+      if (threshold <= 0) return
+
+      const restore = clamp((threshold - visible) / threshold, 0, 1)
+      const progress = restore <= 0 ? 0 : restore >= 1 ? 1 : motionEase(restore)
+
+      gsap.set(backdrop, { backgroundColor: `rgba(0, 0, 0, ${SHEET_BACKDROP_ALPHA * (1 - progress)})` })
+
+      if (!frame) return
+
+      gsap.set(frame, {
+        scale: SHEET_FRAME_SCALE + (1 - SHEET_FRAME_SCALE) * progress,
+        y: SHEET_FRAME_Y * (1 - progress),
+        borderRadius: SHEET_FRAME_RADIUS * (1 - progress),
+      })
+    }
 
     /**
      * 手指移动方向决定这次手势做什么：
@@ -142,10 +179,20 @@ export const useSheetDrag = ({
 
       if (nextMode === 'expand' || nextMode === 'collapse') {
         gsap.killTweensOf(dialog, 'height')
+        // 进入动画可能还没跑完；先停掉背景动画，拖动期间由 applyBackdropRestore 接管。
+        gsap.killTweensOf(backdrop)
+        if (frame) gsap.killTweensOf(frame)
         dragStartY = clientY
         dragStartHeight = dialog.offsetHeight
+        dragOffsetY = 0
         dialog.dataset.resizing = 'true'
       }
+    }
+
+    const resetOffset = () => {
+      if (dragOffsetY === 0) return
+      dragOffsetY = 0
+      gsap.set(dialog, { y: 0 })
     }
 
     const applyHeightDrag = (clientY: number) => {
@@ -153,12 +200,14 @@ export const useSheetDrag = ({
       if (!height) return
 
       // 高度始终跟随手指：向上拖（clientY 变小）变高，向下拖（clientY 变大）变矮。
-      const raw = dragStartHeight + (dragStartY - clientY)
+      const rawHeight = dragStartHeight + (dragStartY - clientY)
 
-      if (raw > height) {
+      if (rawHeight > height) {
         // 抽屉已经到顶，继续向上拖直接转成内容滚动，手势不中断。
+        resetOffset()
         dialog.style.height = `${height}px`
-        const excess = raw - height
+        applyBackdropRestore(height)
+        const excess = rawHeight - height
         mode = 'scroll'
         delete dialog.dataset.resizing
         scrollStartTop = scroller.scrollTop
@@ -170,8 +219,24 @@ export const useSheetDrag = ({
         return
       }
 
-      // 允许拖到 0：低于 25% 松手时直接退场。
-      dialog.style.height = `${clamp(raw, 0, height)}px`
+      // 拖到 0 就完全离开屏幕；继续往下拖不再增加位移，
+      // 否则退场动画的目标会比当前位置更高，抽屉会先弹回来一截。
+      const raw = clamp(rawHeight, 0, height)
+      const dismissHeight = height * SHEET_DISMISS_THRESHOLD
+
+      if (raw < dismissHeight) {
+        // 25% 以下不再继续压缩高度，而是把整个抽屉往下带：
+        // 底栏跟着抽屉一起滑出屏幕，而不是钉在屏幕底部。
+        gsap.killTweensOf(dialog, 'y')
+        dialog.style.height = `${dismissHeight}px`
+        dragOffsetY = dismissHeight - raw
+        gsap.set(dialog, { y: dragOffsetY })
+      } else {
+        resetOffset()
+        dialog.style.height = `${raw}px`
+      }
+
+      applyBackdropRestore(raw)
     }
 
     const applyScrollDrag = (clientY: number) => {
@@ -253,13 +318,17 @@ export const useSheetDrag = ({
       const height = base()
       if (!height) return
 
-      const current = dialog.offsetHeight / height
+      // 25% 以下抽屉是整体下移的，可见高度要减去位移。
+      const current = (dialog.offsetHeight - dragOffsetY) / height
 
       if (current < SHEET_DISMISS_THRESHOLD) {
         // 低于 25%：不吸附回半屏，直接从当前位置走退场动画。
         onRequestClose()
         return
       }
+
+      // 回到目标高度时抽屉必须完全落回屏幕底部。
+      dragOffsetY = 0
 
       const expand = current > SHEET_EXPAND_THRESHOLD
       const target = collapsedRatio >= 0.999 ? height : expand ? height : height * collapsedRatio
@@ -268,18 +337,21 @@ export const useSheetDrag = ({
       // 已经在目标高度上（例如正好拖到 100%），不需要再空跑一段动画。
       if (Math.abs(dialog.offsetHeight - target) < 0.5) {
         dialog.style.height = `${target}px`
+        gsap.set(dialog, { y: 0 })
         setExpanded(expanded)
         return
       }
 
       if (reduceMotion()) {
         dialog.style.height = `${target}px`
+        gsap.set(dialog, { y: 0 })
         setExpanded(expanded)
         return
       }
 
       gsap.to(dialog, {
         height: target,
+        y: 0,
         duration: SHEET_SNAP_DURATION,
         ease: expanded ? SHEET_ENTER_EASE : SHEET_EXIT_EASE,
         overwrite: 'auto',
