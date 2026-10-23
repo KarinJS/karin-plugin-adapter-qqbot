@@ -1,12 +1,13 @@
 import { Button, Skeleton, cn } from '@heroui/react'
 import { Plus, RadioTower } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BotAvatar } from '@/components/BotAvatar'
 import { getStatusLabel, StatusDot } from '@/components/StatusPill'
 import { useConfigStore } from '@/hooks/useConfigStore'
 import { useSmoothScroll } from '@/hooks/useSmoothScroll'
-import { normalizeWheelDelta, smoothScrollBy } from '@/lib/smoothScroll'
+import { CANVAS_SLIDE_DURATION } from '@/lib/canvasMotion'
+import { getSmoothScroll, normalizeWheelDelta, smoothScrollBy } from '@/lib/smoothScroll'
 
 const ROW_HEIGHT = 56
 
@@ -21,16 +22,92 @@ interface BotListProps {
   overlay?: boolean
   /** 接管卡片点击；不传时直接跳转到详情。 */
   onSelect?: (appId: string) => void
+  /**
+   * 跟随路由同步滚动：离开列表时复位，回到列表时把选中的机器人滚进视野。
+   * 概览页的列表跟着页面滚，不启用。
+   */
+  syncRouteScroll?: boolean
+  /** 列表所在页面当前是否可见；嵌入画布的页面常驻，需要显式告知。 */
+  active?: boolean
 }
 
-export const BotList = ({ selectedAppId, className, showAdd = true, overlay = false, onSelect }: BotListProps) => {
+export const BotList = ({
+  selectedAppId,
+  className,
+  showAdd = true,
+  overlay = false,
+  onSelect,
+  syncRouteScroll = false,
+  active = true,
+}: BotListProps) => {
   const { config, statuses, loading } = useConfigStore()
   const navigate = useNavigate()
   const listRef = useRef<HTMLDivElement>(null)
   const listContentRef = useRef<HTMLDivElement>(null)
   const sectionRef = useRef<HTMLElement>(null)
+  // 列表内部点击时卡片本来就在视野里，不要因为选中变化再把它滚到中间。
+  const pressedAppIdRef = useRef<string | null>(null)
   // 首帧不能播放高亮滑动，否则刷新时选中块会从第一行滑到当前行。
   const [highlightReady, setHighlightReady] = useState(false)
+
+  const selectedIndex = config.findIndex((bot) => bot.appId === selectedAppId)
+
+  const setListScrollTop = (top: number) => {
+    const list = listRef.current
+    if (!list) return
+
+    const max = Math.max(0, list.scrollHeight - list.clientHeight)
+    const next = Math.max(0, Math.min(top, max))
+    const lenis = getSmoothScroll(list)
+    if (lenis) {
+      // 列表内容刚渲染时 Lenis 的滚动上限可能还是 0，先刷新尺寸再定位。
+      lenis.resize()
+      lenis.scrollTo(next, { immediate: true })
+    } else {
+      list.scrollTop = next
+    }
+  }
+
+  const locateBot = (appId: string) => {
+    const list = listRef.current
+    if (!list) return
+
+    const row = [...list.querySelectorAll<HTMLElement>('[data-bot-id]')].find((node) => node.dataset.botId === appId)
+    if (!row) {
+      setListScrollTop(0)
+      return
+    }
+
+    // 用屏幕坐标算行在滚动内容里的位置，再把它放到列表可视区中间。
+    const listRect = list.getBoundingClientRect()
+    const rowRect = row.getBoundingClientRect()
+    const rowTop = rowRect.top - listRect.top + list.scrollTop
+    setListScrollTop(rowTop - (list.clientHeight - rowRect.height) / 2)
+  }
+
+  // 嵌入画布的页面不会因为路由切换而卸载，列表滚动位置必须自己复位和定位。
+  useLayoutEffect(() => {
+    if (!syncRouteScroll) return
+
+    if (!active) {
+      pressedAppIdRef.current = null
+      // 翻页期间列表还在屏幕上，等页面滑出画布后再复位，避免退场时看到列表跳回顶部。
+      const timer = window.setTimeout(() => setListScrollTop(0), CANVAS_SLIDE_DURATION * 1000)
+      return () => window.clearTimeout(timer)
+    }
+
+    if (!selectedAppId) {
+      setListScrollTop(0)
+      return
+    }
+
+    if (pressedAppIdRef.current === selectedAppId) {
+      pressedAppIdRef.current = null
+      return
+    }
+
+    locateBot(selectedAppId)
+  }, [syncRouteScroll, active, selectedAppId, selectedIndex])
 
   // 列表的滚轮由下面的 handleWheel 决定滚哪个容器，所以关闭 Lenis 自己的滚轮接管。
   useSmoothScroll(listRef, listContentRef, { manual: true })
@@ -120,7 +197,6 @@ export const BotList = ({ selectedAppId, className, showAdd = true, overlay = fa
     return () => section.removeEventListener('wheel', handleWheel)
   }, [])
 
-  const selectedIndex = config.findIndex((bot) => bot.appId === selectedAppId)
   const onlineCount = config.reduce(
     (count, bot) => count + (bot.event.type !== 0 && statuses[bot.appId]?.online ? 1 : 0),
     0
@@ -220,9 +296,11 @@ export const BotList = ({ selectedAppId, className, showAdd = true, overlay = fa
                       selected ? 'bg-transparent hover:bg-transparent' : 'hover:bg-default/40'
                     )}
                     aria-current={selected ? 'page' : undefined}
-                    onPress={() =>
-                      onSelect ? onSelect(bot.appId) : navigate(`/bots/${encodeURIComponent(bot.appId)}`)
-                    }
+                    onPress={() => {
+                      pressedAppIdRef.current = bot.appId
+                      if (onSelect) onSelect(bot.appId)
+                      else navigate(`/bots/${encodeURIComponent(bot.appId)}`)
+                    }}
                   >
                     <BotAvatar name={title} avatar={status?.avatar} className='size-8 text-[11px]' />
                     <span className='flex min-w-0 flex-1 flex-col'>

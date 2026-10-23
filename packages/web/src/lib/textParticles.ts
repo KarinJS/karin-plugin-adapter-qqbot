@@ -309,7 +309,8 @@ const paintMorph = (
  * 旧名字打散、新名字收拢。
  *
  * 总时长和表单翻页一致（0.5s）：旧粒子 0.32s 散开淡出，
- * 新粒子从 0.12s 开始收拢，0.5s 时落回新文字的位置。
+ * 新粒子从 0.1s 开始收拢；0.3s 时粒子已经接近最终位置，
+ * 这时真实文字淡入、粒子画布同步淡出，避免最后一帧从点阵硬切成清晰文字。
  */
 export const morphText = (previous: TextSnapshot, element: HTMLElement | null): ParticleHandle | null => {
   if (!element || prefersReducedMotion()) return null
@@ -328,7 +329,10 @@ export const morphText = (previous: TextSnapshot, element: HTMLElement | null): 
   }
 
   const previousOpacity = element.style.opacity
+  const parsedOpacity = Number.parseFloat(previousOpacity)
+  const restoredOpacity = Number.isFinite(parsedOpacity) ? parsedOpacity : 1
   element.style.opacity = '0'
+  layer.canvas.style.opacity = '1'
 
   const state = { out: 0, inn: 0 }
   const render = () => paintMorph(layer, oldParticles, newParticles, state.out, state.inn)
@@ -346,7 +350,10 @@ export const morphText = (previous: TextSnapshot, element: HTMLElement | null): 
 
   timeline = gsap.timeline({ onUpdate: render, onComplete: cleanup })
   timeline.to(state, { out: 1, duration: 0.32, ease: 'power2.out' }, 0)
-  timeline.to(state, { inn: 1, duration: 0.38, ease: 'power3.out' }, 0.12)
+  timeline.to(state, { inn: 1, duration: 0.34, ease: 'power3.out' }, 0.1)
+  // 同一段曲线、同一段时长做交叉淡化，两者的透明度之和始终是 1。
+  timeline.to(element, { opacity: restoredOpacity, duration: 0.2, ease: 'power2.out' }, 0.3)
+  timeline.to(layer.canvas, { opacity: 0, duration: 0.2, ease: 'power2.out' }, 0.3)
 
   return { cancel: cleanup }
 }

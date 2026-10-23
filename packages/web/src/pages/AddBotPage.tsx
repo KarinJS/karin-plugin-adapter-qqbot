@@ -134,11 +134,7 @@ export const AddBotPage = () => {
 
   return (
     <div className='flex flex-col gap-6'>
-      <PageHeader
-        eyebrow='Add'
-        title='添加机器人'
-        description='推荐直接扫码授权。已经拿到凭据时，也可以手动填写。'
-      />
+      <PageHeader eyebrow='Add' title='添加机器人' description='推荐直接扫码授权。已经拿到凭据时，也可以手动填写。' />
 
       <Tabs selectedKey={tab} onSelectionChange={(key) => setTab(String(key))}>
         <Tabs.ListContainer>
@@ -157,7 +153,7 @@ export const AddBotPage = () => {
         </Tabs.ListContainer>
 
         <Tabs.Panel id='qr' className='pt-5'>
-          <QrPanel />
+          <QrPanel active={pathname === '/bots/new'} />
         </Tabs.Panel>
 
         <Tabs.Panel id='manual' className='pt-5'>

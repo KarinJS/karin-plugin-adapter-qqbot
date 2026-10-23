@@ -2,7 +2,7 @@ import { Button, Skeleton, cn, toast } from '@heroui/react'
 import { gsap } from 'gsap'
 import { Bot, QrCode, Trash2 } from 'lucide-react'
 import { useLayoutEffect, useEffect, useRef, useState } from 'react'
-import { useMatch, useNavigate } from 'react-router-dom'
+import { useLocation, useMatch, useNavigate } from 'react-router-dom'
 import { BotForm } from '@/components/BotForm'
 import { BotList } from '@/components/BotList'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
@@ -37,8 +37,11 @@ const decodeAppId = (value: string | undefined) => {
  */
 export const BotsWorkspace = () => {
   const match = useMatch('/bots/:appId')
+  const { pathname } = useLocation()
   const appId = decodeAppId(match?.params.appId)
   const selected = Boolean(appId)
+  // 嵌入画布会一直挂载这个页面；只有路由停在机器人工作区时列表才应该保留滚动位置。
+  const workspaceActive = pathname === '/bots' || (pathname.startsWith('/bots/') && pathname !== '/bots/new')
   const { config, statuses, loading, remove, saving } = useConfigStore()
   const embedded = useEmbedded()
   const navigate = useNavigate()
@@ -411,6 +414,8 @@ export const BotsWorkspace = () => {
             showAdd={false}
             overlay={embedded}
             className='xl:h-full xl:min-h-0'
+            syncRouteScroll
+            active={workspaceActive}
             onSelect={handleSelect}
           />
 

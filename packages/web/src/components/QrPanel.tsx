@@ -1,6 +1,6 @@
 import { Alert, Button, Card, Spinner, cn, toast } from '@heroui/react'
 import { CheckCircle2, Clock3, ExternalLink, QrCode, RefreshCw, ShieldAlert, X } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatedHeight } from '@/components/AnimatedHeight'
 import { BotAvatar } from '@/components/BotAvatar'
@@ -8,6 +8,7 @@ import { SectionCard } from '@/components/SectionCard'
 import { useConfigStore } from '@/hooks/useConfigStore'
 import { useViewport } from '@/hooks/useViewport'
 import { ApiError, cancelLogin, fetchLoginStatus, startLogin } from '@/lib/api'
+import { CANVAS_SLIDE_DURATION } from '@/lib/canvasMotion'
 import type { LoginSnapshot, LoginStartResponse } from '@/lib/types'
 
 const formatRemaining = (seconds: number) => {
@@ -17,7 +18,15 @@ const formatRemaining = (seconds: number) => {
   return `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`
 }
 
-export const QrPanel = () => {
+interface QrPanelProps {
+  /**
+   * 所在页面当前是否可见。
+   * 嵌入画布会把添加页一直挂载着，离开时不会卸载，需要主动结束扫码会话。
+   */
+  active?: boolean
+}
+
+export const QrPanel = ({ active = true }: QrPanelProps) => {
   const { reload } = useConfigStore()
   const { isMobile, isShort, isTiny } = useViewport()
   const navigate = useNavigate()
@@ -34,23 +43,81 @@ export const QrPanel = () => {
   const [error, setError] = useState('')
   const [remaining, setRemaining] = useState(0)
 
+  const activeRef = useRef(active)
+  activeRef.current = active
+  const sessionRef = useRef(session)
+  sessionRef.current = session
+  const statusRef = useRef(status)
+  statusRef.current = status
+  // 离开页面时作废还在等待响应的 startLogin，避免旧请求把二维码又写回来。
+  const startIdRef = useRef(0)
+
+  const resetSession = useCallback(() => {
+    startIdRef.current += 1
+
+    const current = sessionRef.current
+    const latest = statusRef.current
+    if (current && (latest?.status ?? current.status) === 'pending') {
+      void cancelLogin(current.taskId).catch(() => {})
+    }
+
+    setSession(null)
+    setStatus(null)
+    setStarting(false)
+    setError('')
+    setRemaining(0)
+  }, [])
+
+  // 画布翻页期间添加页仍然可见，等它滑出屏幕后再清空，用户不会看到二维码在退场时消失。
+  // 如果离开后很快又回来，就立即清空，避免又看到上一次的扫码结果。
+  useLayoutEffect(() => {
+    if (active) {
+      if (sessionRef.current) resetSession()
+      return
+    }
+
+    const timer = window.setTimeout(resetSession, CANVAS_SLIDE_DURATION * 1000)
+    return () => window.clearTimeout(timer)
+  }, [active, resetSession])
+
+  // 组件卸载（独立控制台离开添加页、手机端关闭抽屉）时结束仍在等待的授权会话。
+  useEffect(
+    () => () => {
+      const current = sessionRef.current
+      const latest = statusRef.current
+      if (current && (latest?.status ?? current.status) === 'pending') {
+        void cancelLogin(current.taskId).catch(() => {})
+      }
+    },
+    []
+  )
+
   const start = useCallback(async () => {
-    if (session?.status === 'pending') {
+    const latest = statusRef.current
+    if (session && (latest?.status ?? session.status) === 'pending') {
       await cancelLogin(session.taskId).catch(() => {})
     }
 
+    const requestId = ++startIdRef.current
     setStarting(true)
     setError('')
 
     try {
       const data = await startLogin()
+      // 请求返回时用户可能已经离开添加页：直接结束这次会话，不要写回界面。
+      if (requestId !== startIdRef.current || !activeRef.current) {
+        void cancelLogin(data.taskId).catch(() => {})
+        return
+      }
       setSession(data)
       setStatus(data)
       setRemaining(Math.max(0, Math.ceil((data.expiresAt - Date.now()) / 1000)))
     } catch (err) {
-      setError(err instanceof Error ? err.message : '生成二维码失败')
+      if (requestId === startIdRef.current) {
+        setError(err instanceof Error ? err.message : '生成二维码失败')
+      }
     } finally {
-      setStarting(false)
+      if (requestId === startIdRef.current) setStarting(false)
     }
   }, [session])
 
