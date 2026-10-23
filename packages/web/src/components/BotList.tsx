@@ -61,28 +61,31 @@ export const BotList = ({ selectedAppId, className, showAdd = true }: BotListPro
               key={bot.appId}
               fullWidth
               data-bot-id={bot.appId}
-              variant={selected ? 'secondary' : 'ghost'}
+              variant='ghost'
               className={cn(
-                'relative h-auto justify-start gap-3 overflow-hidden rounded-none border-b border-border/60 p-3.5 text-left last:border-b-0',
-                selected ? 'bg-default' : 'hover:bg-default/50'
+                'relative isolate h-auto justify-start gap-3 overflow-hidden rounded-none border-b border-border/60 p-3.5 text-left last:border-b-0',
+                selected ? 'bg-transparent' : 'hover:bg-default/50'
               )}
               aria-current={selected ? 'page' : undefined}
               onPress={() => navigate(`/bots/${encodeURIComponent(bot.appId)}`)}
             >
-              <span
-                className={cn(
-                  'absolute inset-y-2 left-0 w-[3px] rounded-full bg-foreground transition-opacity duration-150',
-                  selected ? 'opacity-100' : 'opacity-0'
-                )}
-                aria-hidden='true'
-              />
+              {/* 选中态用内嵌的圆角块，不用左侧竖条：浅灰底 + 细描边，和列表本身保持同一层。 */}
+              {selected ? (
+                <span
+                  className='pointer-events-none absolute inset-1.5 -z-10 rounded-xl bg-default ring-1 ring-border/70 shadow-[0_1px_2px_rgb(0_0_0/0.04)]'
+                  aria-hidden='true'
+                />
+              ) : null}
               <BotAvatar name={title} avatar={status?.avatar} />
               <span className='flex min-w-0 flex-1 flex-col gap-1'>
-                <span className='truncate text-sm font-medium'>{title}</span>
+                <span className={cn('truncate text-sm', selected ? 'font-semibold' : 'font-medium')}>{title}</span>
                 <span className='truncate text-xs text-muted'>{bot.appId}</span>
                 <StatusPill online={status?.online ?? false} eventType={bot.event.type} />
               </span>
-              <ChevronRight className='size-4 shrink-0 text-muted' aria-hidden='true' />
+              <ChevronRight
+                className={cn('size-4 shrink-0 transition-colors duration-150', selected ? 'text-foreground' : 'text-muted')}
+                aria-hidden='true'
+              />
             </Button>
           )
         })}
