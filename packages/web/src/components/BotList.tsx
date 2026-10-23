@@ -60,6 +60,7 @@ export const BotList = ({ selectedAppId, className, showAdd = true }: BotListPro
             <Button
               key={bot.appId}
               fullWidth
+              data-bot-id={bot.appId}
               variant={selected ? 'secondary' : 'ghost'}
               className={cn(
                 'relative h-auto justify-start gap-3 overflow-hidden rounded-none border-b border-border/60 p-3.5 text-left last:border-b-0',

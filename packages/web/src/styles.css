@@ -344,6 +344,16 @@
   touch-action: pan-y;
 }
 
+/*
+ * iframe 画布导航：图标颜色和滑块同步移动。
+ * 颜色过渡跟滑动同一时长，避免新图标在滑块到达前先变成反色。
+ */
+.canvas-nav-link {
+  transition:
+    color 320ms var(--ease-out),
+    background-color 150ms var(--ease-out);
+}
+
 .mobile-pager[data-dragging='true'] {
   cursor: grabbing;
   -webkit-user-select: none;

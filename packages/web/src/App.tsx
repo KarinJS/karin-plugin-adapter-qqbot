@@ -10,8 +10,7 @@ import { EmbeddedDesktopShell } from '@/layouts/EmbeddedDesktopShell'
 import { MobileShell } from '@/layouts/MobileShell'
 import { authChangedEvent, hasAuth } from '@/lib/auth'
 import { AddBotPage } from '@/pages/AddBotPage'
-import { BotDetailPage } from '@/pages/BotDetailPage'
-import { BotsPage } from '@/pages/BotsPage'
+import { BotsWorkspace } from '@/pages/BotsWorkspace'
 import { LoginPage } from '@/pages/LoginPage'
 import { OverviewPage } from '@/pages/OverviewPage'
 import { SettingsPage } from '@/pages/SettingsPage'
@@ -62,9 +61,9 @@ const App = () => {
           <Route element={<AppShell />}>
             <Route index element={<DefaultRedirect />} />
             <Route path='overview' element={<OverviewPage />} />
-            <Route path='bots' element={<BotsPage />} />
+            <Route path='bots' element={<BotsWorkspace />} />
             <Route path='bots/new' element={<AddBotPage />} />
-            <Route path='bots/:appId' element={<BotDetailPage />} />
+            <Route path='bots/:appId' element={<BotsWorkspace />} />
             <Route path='settings' element={embedded ? <Navigate to='/bots' replace /> : <SettingsPage />} />
             <Route path='*' element={<DefaultRedirect />} />
           </Route>

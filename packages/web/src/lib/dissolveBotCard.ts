@@ -13,10 +13,14 @@ interface DissolveHandle {
 
 const findCard = (appId: string) => {
   const escaped = CSS.escape(appId)
+  const selector = `[data-bot-id="${escaped}"]`
+  // 画布里同时挂着多页列表，优先取当前可见那一页里的卡片。
   const activePanel = document.querySelector<HTMLElement>('.mobile-panel[aria-hidden="false"]')
+  const activePage = document.querySelector<HTMLElement>('[data-canvas-page][aria-hidden="false"]')
   return (
-    activePanel?.querySelector<HTMLElement>(`[data-bot-id="${escaped}"]`) ??
-    document.querySelector<HTMLElement>(`[data-bot-id="${escaped}"]`)
+    activePanel?.querySelector<HTMLElement>(selector) ??
+    activePage?.querySelector<HTMLElement>(selector) ??
+    document.querySelector<HTMLElement>(selector)
   )
 }
 
@@ -140,6 +144,10 @@ const createParticles = (rect: DOMRect, statusColor: string): ParticleField => {
 export const dissolveBotCard = (appId: string, statusColor: string): DissolveHandle | null => {
   const card = findCard(appId)
   if (!card) return null
+
+  // 桌面端列表可能比视口高，卡片在删除时已经滚出屏幕；先瞬移进视野再取位置，
+  // 否则截取到的 rect 是空的，粒子不会出现。
+  card.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' })
 
   const rect = card.getBoundingClientRect()
   if (rect.width < 2 || rect.height < 2) return null
