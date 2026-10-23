@@ -1,8 +1,7 @@
 import { gsap } from 'gsap'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import {
-  SHEET_BACKDROP_COLOR,
-  SHEET_BACKDROP_COLOR_CLEAR,
+  SHEET_BACKDROP_ALPHA,
   SHEET_ENTER_DURATION,
   SHEET_ENTER_EASE,
   SHEET_EXIT_DURATION,
@@ -19,17 +18,20 @@ interface SheetMotionOptions {
   onExited?: () => void
   /** 进入动画开始前执行，用来把 dialog 设到本次打开的初始高度。 */
   beforeEnter?: (dialog: HTMLElement) => void
+  /** 独立的压暗层；只动它的 opacity，避免整块遮罩背景每帧重绘。 */
+  scrimRef: RefObject<HTMLDivElement | null>
 }
 
 /**
  * 底部抽屉的进入 / 退出动画。
  *
  * 进入时抽屉以 100% 不透明度从底部滑上来，不做透明度渐变；
- * 背后的压暗用背景色的 alpha 跟随抽屉一起变化，避免连抽屉一起淡入。
+ * 背后的压暗由独立遮罩层的 opacity 跟随抽屉一起变化，
+ * 遮罩和抽屉是兄弟节点，所以淡入不会把抽屉一起淡掉。
  * 退场沿同一条路径滑回去，结束后再卸载。
  * 动画直接驱动 dialog 的 transform，不依赖 HeroUI 的 data-entering。
  */
-export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }: SheetMotionOptions) => {
+export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter, scrimRef }: SheetMotionOptions) => {
   const backdropRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(isOpen)
   const closingRef = useRef(false)
@@ -52,30 +54,34 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }
 
     const backdrop = backdropRef.current
     const dialog = backdrop?.querySelector<HTMLElement>('[data-slot="drawer-dialog"]')
+    const scrim = scrimRef.current
     if (!backdrop || !dialog) return
 
     // 外壳和抽屉用同一组 GSAP 参数、同一帧开始，缩放不会比抽屉慢半拍。
     const frame = document.querySelector<HTMLElement>('.mobile-frame')
 
     gsap.killTweensOf([backdrop, dialog])
+    if (scrim) gsap.killTweensOf(scrim)
     if (frame) gsap.killTweensOf(frame)
     gsap.set(backdrop, { opacity: 1 })
     // 先确定本次打开的高度，再读取 offsetHeight 作为滑入距离。
     beforeEnterRef.current?.(dialog)
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      gsap.set(backdrop, { backgroundColor: SHEET_BACKDROP_COLOR })
+      if (scrim) gsap.set(scrim, { opacity: SHEET_BACKDROP_ALPHA })
       gsap.set(dialog, { y: 0 })
       if (frame) gsap.set(frame, { scale: SHEET_FRAME_SCALE, y: SHEET_FRAME_Y, borderRadius: SHEET_FRAME_RADIUS })
       return
     }
 
     // 压暗和外壳缩放、抽屉滑入同时开始，使用同一组时长与曲线。
-    gsap.fromTo(
-      backdrop,
-      { backgroundColor: SHEET_BACKDROP_COLOR_CLEAR },
-      { backgroundColor: SHEET_BACKDROP_COLOR, duration: SHEET_ENTER_DURATION, ease: SHEET_ENTER_EASE }
-    )
+    if (scrim) {
+      gsap.fromTo(
+        scrim,
+        { opacity: 0 },
+        { opacity: SHEET_BACKDROP_ALPHA, duration: SHEET_ENTER_DURATION, ease: SHEET_ENTER_EASE }
+      )
+    }
     gsap.fromTo(dialog, { y: dialog.offsetHeight }, { y: 0, duration: SHEET_ENTER_DURATION, ease: SHEET_ENTER_EASE })
     if (frame) {
       gsap.to(frame, {
@@ -90,9 +96,10 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }
 
     return () => {
       gsap.killTweensOf([backdrop, dialog])
+      if (scrim) gsap.killTweensOf(scrim)
       if (frame) gsap.killTweensOf(frame)
     }
-  }, [isOpen, mounted])
+  }, [isOpen, mounted, scrimRef])
 
   useLayoutEffect(() => {
     if (isOpen || !mounted || closingRef.current) return
@@ -100,6 +107,7 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }
 
     const backdrop = backdropRef.current
     const dialog = backdrop?.querySelector<HTMLElement>('[data-slot="drawer-dialog"]')
+    const scrim = scrimRef.current
     if (!backdrop || !dialog) {
       setMounted(false)
       closingRef.current = false
@@ -110,10 +118,11 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }
     const frame = document.querySelector<HTMLElement>('.mobile-frame')
 
     gsap.killTweensOf([backdrop, dialog])
+    if (scrim) gsap.killTweensOf(scrim)
     if (frame) gsap.killTweensOf(frame)
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      gsap.set(backdrop, { backgroundColor: SHEET_BACKDROP_COLOR_CLEAR })
+      if (scrim) gsap.set(scrim, { opacity: 0 })
       if (frame) gsap.set(frame, { scale: 1, y: 0, borderRadius: 0 })
       setMounted(false)
       closingRef.current = false
@@ -121,11 +130,13 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }
       return
     }
 
-    gsap.to(backdrop, {
-      backgroundColor: SHEET_BACKDROP_COLOR_CLEAR,
-      duration: SHEET_EXIT_DURATION,
-      ease: SHEET_EXIT_EASE,
-    })
+    if (scrim) {
+      gsap.to(scrim, {
+        opacity: 0,
+        duration: SHEET_EXIT_DURATION,
+        ease: SHEET_EXIT_EASE,
+      })
+    }
     gsap.to(dialog, {
       y: dialog.offsetHeight,
       duration: SHEET_EXIT_DURATION,
@@ -149,9 +160,10 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter }
 
     return () => {
       gsap.killTweensOf([backdrop, dialog])
+      if (scrim) gsap.killTweensOf(scrim)
       if (frame) gsap.killTweensOf(frame)
     }
-  }, [isOpen, mounted])
+  }, [isOpen, mounted, scrimRef])
 
   return {
     backdropRef,

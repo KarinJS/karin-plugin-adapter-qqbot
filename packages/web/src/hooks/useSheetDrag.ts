@@ -18,6 +18,8 @@ interface SheetDragOptions {
   mounted: boolean
   onRequestClose: () => void
   backdropRef: RefObject<HTMLDivElement | null>
+  /** 遮罩压暗层；用 opacity 复原，避免每帧重绘整块背景。 */
+  scrimRef: RefObject<HTMLDivElement | null>
   scrollerRef: RefObject<HTMLDivElement | null>
   /** 打开时测量的可用高度；整个打开周期内保持不变，避免滚动时抽屉忽高忽低。 */
   baseHeightRef: RefObject<number>
@@ -58,16 +60,24 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
  * 可见高度低于 25% 后不再压缩抽屉，而是整体下移，底栏跟着抽屉一起滑出屏幕；
  * 背景压暗和外壳缩放也在这段距离里跟手复原。
  * 不依赖浏览器原生滚动，避免 iOS / 安卓在滚动过程中取消 touch 事件、
- * 或者滚动到顶部后无法把抽屉接回手势的问题。
+ * 或者滚动到顶部后无法把抽屉接回手势。
  *
  * 抽屉本身用 height 跟手；内容滚动用 scrollTop 跟手，松手后补一段惯性。
  * 滚动容器的 touch-action 在 SheetScaffold 里设为 none，浏览器不会抢走纵向手势。
+ *
+ * 性能约定：
+ * - 触摸位置先写进 ref，每帧最多落一次 DOM，避免一帧内多次写 height 触发重排；
+ * - 高度 / 滚动距离都在手势开始时量一次，拖动过程中不再读 offsetHeight、
+ *   scrollHeight、clientHeight，避免强制同步布局；
+ * - 25% 以上只更新外壳的 transform（合成层），不写背景色和圆角；
+ *   压暗改用独立遮罩层的 opacity，圆角按整数像素降频更新。
  */
 export const useSheetDrag = ({
   isOpen,
   mounted,
   onRequestClose,
   backdropRef,
+  scrimRef,
   scrollerRef,
   baseHeightRef,
   collapsedRatio = SHEET_COLLAPSED_RATIO,
@@ -76,6 +86,7 @@ export const useSheetDrag = ({
     if (!isOpen || !mounted) return
 
     const backdrop = backdropRef.current
+    const scrim = scrimRef.current
     const dialog = backdrop?.querySelector<HTMLElement>('[data-slot="drawer-dialog"]')
     const scroller = scrollerRef.current
     if (!dialog || !scroller || !baseHeightRef.current) return
@@ -92,17 +103,38 @@ export const useSheetDrag = ({
     let dragOffsetY = 0
     let scrollStartTop = 0
     let scrollStartY = 0
+    let maxScrollCache = 0
     let mode: DragMode = 'none'
     let active = false
     let suppressClickUntil = 0
     let samples: { t: number; top: number }[] = []
 
+    // 跟手高度与滚动距离只量一次，拖动期间不再读布局。
+    let visibleHeight = 0
+    let measured = false
+    let lastHeight = -1
+    let lastRestore = -1
+    let lastRadius = -1
+    let snapTween: gsap.core.Tween | null = null
+
+    // 每帧最多应用一次触摸位置；touchend 时同步冲刷最后一帧。
+    let pendingY: number | null = null
+    let frameId = 0
+
     const base = () => baseHeightRef.current
     const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const ratio = () => (base() ? dialog.offsetHeight / base() : collapsedRatio)
-    const maxScroll = () => Math.max(0, scroller.scrollHeight - scroller.clientHeight)
     const isInScroller = (target: EventTarget | null) => target instanceof Node && scroller.contains(target)
     const motionEase = gsap.parseEase(SHEET_ENTER_EASE)
+
+    const measureVisible = () => {
+      if (!measured) {
+        measured = true
+        visibleHeight = dialog.offsetHeight
+      }
+      return visibleHeight
+    }
+
+    const ratio = () => (base() ? measureVisible() / base() : collapsedRatio)
 
     const setExpanded = (expanded: boolean) => {
       dialog.dataset.sheetExpanded = expanded ? 'true' : 'false'
@@ -118,6 +150,9 @@ export const useSheetDrag = ({
      * 抽屉被拖到 25% 以下时，压暗和外壳缩放不再停在打开时的状态，
      * 而是跟着手指一起复原：可见高度越小，背景越亮、外壳越接近原始尺寸。
      * 进度套用与进场 / 退场相同的 power3.out 曲线。
+     *
+     * 压暗用独立遮罩层的 opacity，属于合成属性；外壳只写 scale / y。
+     * 圆角是重绘属性，按整数像素降频更新，避免每帧重绘整块外壳。
      */
     const applyBackdropRestore = (visible: number) => {
       const height = base()
@@ -128,16 +163,23 @@ export const useSheetDrag = ({
 
       const restore = clamp((threshold - visible) / threshold, 0, 1)
       const progress = restore <= 0 ? 0 : restore >= 1 ? 1 : motionEase(restore)
+      if (progress === lastRestore) return
+      lastRestore = progress
 
-      gsap.set(backdrop, { backgroundColor: `rgba(0, 0, 0, ${SHEET_BACKDROP_ALPHA * (1 - progress)})` })
+      if (scrim) gsap.set(scrim, { opacity: SHEET_BACKDROP_ALPHA * (1 - progress) })
 
       if (!frame) return
 
       gsap.set(frame, {
         scale: SHEET_FRAME_SCALE + (1 - SHEET_FRAME_SCALE) * progress,
         y: SHEET_FRAME_Y * (1 - progress),
-        borderRadius: SHEET_FRAME_RADIUS * (1 - progress),
       })
+
+      const radius = Math.round(SHEET_FRAME_RADIUS * (1 - progress))
+      if (radius !== lastRadius) {
+        lastRadius = radius
+        gsap.set(frame, { borderRadius: radius })
+      }
     }
 
     /**
@@ -165,14 +207,41 @@ export const useSheetDrag = ({
       return 'none'
     }
 
+    const cancelPending = () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId)
+        frameId = 0
+      }
+      pendingY = null
+    }
+
+    const setDialogHeight = (next: number) => {
+      const rounded = Math.round(next)
+      if (rounded !== lastHeight) {
+        lastHeight = rounded
+        dialog.style.height = `${rounded}px`
+      }
+      measured = true
+      return rounded
+    }
+
     const beginDrag = (clientY: number, nextMode: DragMode) => {
       mode = nextMode
       active = true
       suppressClickUntil = performance.now() + CLICK_SUPPRESS
 
+      // 上一次吸附还没结束就被重新抓住时，整段 tween 都要停掉：
+      // 只杀 height 会让 y 继续跑完并把高度写回旧目标。
+      snapTween?.kill()
+      snapTween = null
+      delete dialog.dataset.snapping
+
       if (nextMode === 'scroll') {
         scrollStartTop = scroller.scrollTop
         scrollStartY = clientY
+        maxScrollCache = Math.max(0, scroller.scrollHeight - scroller.clientHeight)
+        visibleHeight = base()
+        measured = true
         samples = [{ t: performance.now(), top: scrollStartTop }]
         return
       }
@@ -181,10 +250,14 @@ export const useSheetDrag = ({
         gsap.killTweensOf(dialog, 'height')
         // 进入动画可能还没跑完；先停掉背景动画，拖动期间由 applyBackdropRestore 接管。
         gsap.killTweensOf(backdrop)
+        if (scrim) gsap.killTweensOf(scrim)
         if (frame) gsap.killTweensOf(frame)
         dragStartY = clientY
-        dragStartHeight = dialog.offsetHeight
+        dragStartHeight = measureVisible()
+        lastHeight = Math.round(dragStartHeight)
         dragOffsetY = 0
+        lastRestore = -1
+        lastRadius = -1
         dialog.dataset.resizing = 'true'
       }
     }
@@ -205,12 +278,13 @@ export const useSheetDrag = ({
       if (rawHeight > height) {
         // 抽屉已经到顶，继续向上拖直接转成内容滚动，手势不中断。
         resetOffset()
-        dialog.style.height = `${height}px`
-        applyBackdropRestore(height)
+        visibleHeight = setDialogHeight(height)
+        applyBackdropRestore(visibleHeight)
         const excess = rawHeight - height
         mode = 'scroll'
         delete dialog.dataset.resizing
         scrollStartTop = scroller.scrollTop
+        maxScrollCache = Math.max(0, scroller.scrollHeight - scroller.clientHeight)
         scrollStartY = clientY + excess
         samples = []
         applyScrollDrag(clientY)
@@ -228,15 +302,16 @@ export const useSheetDrag = ({
         // 25% 以下不再继续压缩高度，而是把整个抽屉往下带：
         // 底栏跟着抽屉一起滑出屏幕，而不是钉在屏幕底部。
         gsap.killTweensOf(dialog, 'y')
-        dialog.style.height = `${dismissHeight}px`
-        dragOffsetY = dismissHeight - raw
+        const applied = setDialogHeight(dismissHeight)
+        dragOffsetY = applied - raw
         gsap.set(dialog, { y: dragOffsetY })
+        visibleHeight = raw
       } else {
         resetOffset()
-        dialog.style.height = `${raw}px`
+        visibleHeight = setDialogHeight(raw)
       }
 
-      applyBackdropRestore(raw)
+      applyBackdropRestore(visibleHeight)
     }
 
     const applyScrollDrag = (clientY: number) => {
@@ -247,20 +322,22 @@ export const useSheetDrag = ({
         scroller.scrollTop = 0
         mode = 'collapse'
         dialog.dataset.resizing = 'true'
-        dragStartHeight = dialog.offsetHeight
+        visibleHeight = base()
+        measured = true
+        dragStartHeight = visibleHeight
+        lastHeight = Math.round(visibleHeight)
         dragStartY = clientY + desired
         applyHeightDrag(clientY)
         return
       }
 
-      const max = maxScroll()
-      if (desired > max) {
-        scroller.scrollTop = max
+      if (desired > maxScrollCache) {
+        scroller.scrollTop = maxScrollCache
         return
       }
 
       scroller.scrollTop = desired
-      samples.push({ t: performance.now(), top: scroller.scrollTop })
+      samples.push({ t: performance.now(), top: desired })
       if (samples.length > SCROLL_SAMPLE_LIMIT) samples.shift()
     }
 
@@ -268,6 +345,30 @@ export const useSheetDrag = ({
       if (!active) return
       if (mode === 'expand' || mode === 'collapse') applyHeightDrag(clientY)
       else if (mode === 'scroll') applyScrollDrag(clientY)
+    }
+
+    const applyPending = () => {
+      frameId = 0
+      if (pendingY === null) return
+      const clientY = pendingY
+      pendingY = null
+      applyDrag(clientY)
+    }
+
+    const scheduleDrag = (clientY: number) => {
+      pendingY = clientY
+      if (frameId) return
+      frameId = requestAnimationFrame(applyPending)
+    }
+
+    const flushDrag = (clientY?: number) => {
+      if (frameId) {
+        cancelAnimationFrame(frameId)
+        frameId = 0
+      }
+      const next = clientY ?? pendingY
+      pendingY = null
+      if (next !== null && next !== undefined) applyDrag(next)
     }
 
     const finishScroll = () => {
@@ -281,7 +382,7 @@ export const useSheetDrag = ({
       const velocity = (last.top - first.top) / elapsed
       if (Math.abs(velocity) < 0.05) return
 
-      const target = clamp(scroller.scrollTop + velocity * 180, 0, maxScroll())
+      const target = clamp(scroller.scrollTop + velocity * 180, 0, maxScrollCache)
       if (Math.abs(target - scroller.scrollTop) < 1) return
 
       gsap.to(scroller, {
@@ -293,6 +394,8 @@ export const useSheetDrag = ({
     }
 
     const finish = () => {
+      cancelPending()
+
       if (!active) {
         mode = 'none'
         return
@@ -319,7 +422,7 @@ export const useSheetDrag = ({
       if (!height) return
 
       // 25% 以下抽屉是整体下移的，可见高度要减去位移。
-      const current = (dialog.offsetHeight - dragOffsetY) / height
+      const current = visibleHeight / height
 
       if (current < SHEET_DISMISS_THRESHOLD) {
         // 低于 25%：不吸附回半屏，直接从当前位置走退场动画。
@@ -335,28 +438,35 @@ export const useSheetDrag = ({
       const expanded = target >= height - 0.5
 
       // 已经在目标高度上（例如正好拖到 100%），不需要再空跑一段动画。
-      if (Math.abs(dialog.offsetHeight - target) < 0.5) {
-        dialog.style.height = `${target}px`
+      if (Math.abs(visibleHeight - target) < 0.5) {
+        visibleHeight = setDialogHeight(target)
         gsap.set(dialog, { y: 0 })
         setExpanded(expanded)
         return
       }
 
       if (reduceMotion()) {
-        dialog.style.height = `${target}px`
+        visibleHeight = setDialogHeight(target)
         gsap.set(dialog, { y: 0 })
         setExpanded(expanded)
         return
       }
 
-      gsap.to(dialog, {
+      // 吸附期间顶边仍在移动，先关掉顶部模糊和阴影；结束后恢复。
+      dialog.dataset.snapping = 'true'
+      snapTween = gsap.to(dialog, {
         height: target,
         y: 0,
         duration: SHEET_SNAP_DURATION,
         ease: expanded ? SHEET_ENTER_EASE : SHEET_EXIT_EASE,
         overwrite: 'auto',
         onComplete: () => {
+          snapTween = null
           dialog.style.height = `${target}px`
+          lastHeight = Math.round(target)
+          visibleHeight = target
+          measured = true
+          delete dialog.dataset.snapping
           // 吸附结束后再切安全区，避免拖动中途顶栏高度跳变。
           setExpanded(expanded)
         },
@@ -364,9 +474,11 @@ export const useSheetDrag = ({
     }
 
     const onTouchStart = (event: TouchEvent) => {
+      cancelPending()
       if (active) finish()
       gsap.killTweensOf(scroller)
       samples = []
+      measured = false
 
       if (event.touches.length !== 1) {
         touchId = null
@@ -389,6 +501,7 @@ export const useSheetDrag = ({
       if (touchId === null) return
 
       if (event.touches.length !== 1) {
+        cancelPending()
         if (active) finish()
         touchId = null
         return
@@ -415,7 +528,7 @@ export const useSheetDrag = ({
       }
 
       event.preventDefault()
-      applyDrag(touch.clientY)
+      scheduleDrag(touch.clientY)
     }
 
     const onTouchEnd = (event: TouchEvent) => {
@@ -424,7 +537,7 @@ export const useSheetDrag = ({
       if (active) {
         // 拖动结束后不要补发 click，避免误触按钮或提交表单。
         event.preventDefault()
-        if (touch) applyDrag(touch.clientY)
+        flushDrag(touch?.clientY)
       }
       touchId = null
       finish()
@@ -433,6 +546,7 @@ export const useSheetDrag = ({
     const onTouchCancel = () => {
       if (touchId === null) return
       touchId = null
+      cancelPending()
       finish()
     }
 
@@ -442,6 +556,8 @@ export const useSheetDrag = ({
       if (event.pointerType === 'mouse' && event.button !== 0) return
       if (isInteractive(event.target)) return
 
+      cancelPending()
+      measured = false
       pointerId = event.pointerId
       startX = event.clientX
       startY = event.clientY
@@ -478,7 +594,7 @@ export const useSheetDrag = ({
       }
 
       event.preventDefault()
-      applyDrag(event.clientY)
+      scheduleDrag(event.clientY)
     }
 
     const releasePointer = (id: number) => {
@@ -491,7 +607,7 @@ export const useSheetDrag = ({
 
     const onPointerUp = (event: PointerEvent) => {
       if (event.pointerId !== pointerId) return
-      if (active) applyDrag(event.clientY)
+      if (active) flushDrag(event.clientY)
       releasePointer(event.pointerId)
       pointerId = null
       finish()
@@ -499,6 +615,7 @@ export const useSheetDrag = ({
 
     const onPointerCancel = (event: PointerEvent) => {
       if (event.pointerId !== pointerId) return
+      cancelPending()
       releasePointer(event.pointerId)
       pointerId = null
       finish()
@@ -523,6 +640,9 @@ export const useSheetDrag = ({
     dialog.addEventListener('click', onClickCapture, true)
 
     return () => {
+      cancelPending()
+      snapTween?.kill()
+      snapTween = null
       dialog.removeEventListener('touchstart', onTouchStart)
       dialog.removeEventListener('touchmove', onTouchMove)
       dialog.removeEventListener('touchend', onTouchEnd)
@@ -533,8 +653,9 @@ export const useSheetDrag = ({
       dialog.removeEventListener('pointercancel', onPointerCancel)
       dialog.removeEventListener('click', onClickCapture, true)
       delete dialog.dataset.resizing
+      delete dialog.dataset.snapping
       gsap.killTweensOf(dialog, 'height')
       gsap.killTweensOf(scroller)
     }
-  }, [isOpen, mounted, onRequestClose, backdropRef, scrollerRef, baseHeightRef, collapsedRatio])
+  }, [isOpen, mounted, onRequestClose, backdropRef, scrimRef, scrollerRef, baseHeightRef, collapsedRatio])
 }

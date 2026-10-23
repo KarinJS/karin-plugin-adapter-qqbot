@@ -1,5 +1,4 @@
 import type { CSSProperties } from 'react'
-import { SHEET_BACKDROP_COLOR } from '@/lib/sheetMotion'
 
 /**
  * 手机端 bottom sheet 共用样式。
@@ -24,11 +23,12 @@ export const mobileSheetStyle: CSSProperties = {
 /**
  * 抽屉背后压暗遮罩。
  *
- * 遮罩本身的透明度保持 1，只让背景色的 alpha 随抽屉一起变化：
- * 如果直接动 opacity，抽屉会被一起淡入淡出。
+ * 压暗交给抽屉里的独立遮罩层（data-sheet-scrim），这里保持透明。
+ * 遮罩层只动 opacity，属于合成属性；如果直接动背景色，
+ * 拖动和进出场时每帧都要重绘整块全屏遮罩。
  */
 export const mobileSheetBackdropStyle: CSSProperties = {
-  backgroundColor: SHEET_BACKDROP_COLOR,
-  // HeroUI 遮罩自带 opacity 过渡，会和 GSAP 驱动的压暗冲突。
+  backgroundColor: 'transparent',
+  // HeroUI 遮罩自带 opacity 过渡，会和 GSAP 驱动的遮罩层冲突。
   transition: 'none',
 } as CSSProperties

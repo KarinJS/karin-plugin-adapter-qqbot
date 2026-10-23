@@ -127,18 +127,62 @@ export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePage
     let touchAxis: 'x' | 'y' | null = null
     let touchMoved = false
 
+    // 手势开始时量一次页宽，移动过程中不再读 clientWidth（读布局会强制同步重排）。
+    let dragWidth = 0
+    // 触摸位置先存起来，每帧最多写一次 transform。
+    let pendingX: number | null = null
+    let frameId = 0
+    const setTrackX = gsap.quickSetter(track, 'x', 'px')
+
+    const applyPendingX = () => {
+      frameId = 0
+      if (pendingX === null) return
+      const x = pendingX
+      pendingX = null
+      setTrackX(x)
+    }
+
+    const scheduleTrackX = (x: number) => {
+      pendingX = x
+      if (frameId) return
+      frameId = requestAnimationFrame(applyPendingX)
+    }
+
+    const flushTrackX = () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId)
+        frameId = 0
+      }
+      if (pendingX === null) return
+      const x = pendingX
+      pendingX = null
+      setTrackX(x)
+    }
+
+    const cancelTrackX = () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId)
+        frameId = 0
+      }
+      pendingX = null
+    }
+
     const resetDrag = () => {
+      cancelTrackX()
       pointerId = null
       axis = null
       moved = false
+      dragWidth = 0
       draggingRef.current = false
       root.removeAttribute('data-dragging')
     }
 
     const resetTouch = () => {
+      cancelTrackX()
       touchId = null
       touchAxis = null
       touchMoved = false
+      dragWidth = 0
       draggingRef.current = false
       root.removeAttribute('data-dragging')
     }
@@ -152,7 +196,7 @@ export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePage
     }
 
     const commitHorizontal = (start: number, end: number, releaseVelocity: number) => {
-      const pageWidth = root.clientWidth
+      const pageWidth = dragWidth || root.clientWidth
       if (!pageWidth) return
 
       const index = indexRef.current
@@ -184,6 +228,8 @@ export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePage
       const target = event.target as HTMLElement | null
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
 
+      cancelTrackX()
+      dragWidth = 0
       pointerId = event.pointerId
       startX = lastX = event.clientX
       startY = event.clientY
@@ -207,6 +253,7 @@ export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePage
           axis = 'x'
           moved = true
           draggingRef.current = true
+          dragWidth = root.clientWidth
           root.setAttribute('data-dragging', 'true')
           try {
             root.setPointerCapture(event.pointerId)
@@ -234,7 +281,7 @@ export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePage
       lastX = event.clientX
       lastTime = now
 
-      const pageWidth = root.clientWidth
+      const pageWidth = dragWidth || root.clientWidth
       if (!pageWidth) return
 
       const index = indexRef.current
@@ -242,17 +289,18 @@ export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePage
       if ((index === 0 && dx > 0) || (index === itemsRef.current.length - 1 && dx < 0)) {
         offset = dx * 0.35
       }
-      gsap.set(track, { x: -index * pageWidth + offset })
+      scheduleTrackX(-index * pageWidth + offset)
     }
 
     const finishDrag = (event: PointerEvent) => {
       if (event.pointerId !== pointerId) return
 
-      const pageWidth = root.clientWidth
+      const pageWidth = dragWidth || root.clientWidth
       const index = indexRef.current
       const releaseVelocity = performance.now() - lastTime > 100 ? 0 : velocity
 
       if (axis === 'x' && moved && pageWidth > 0) {
+        flushTrackX()
         commitHorizontal(startX, event.clientX, releaseVelocity)
       } else {
         setTrack(-index * pageWidth, true)
@@ -264,7 +312,8 @@ export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePage
 
     const cancelDrag = (event: PointerEvent) => {
       if (event.pointerId !== pointerId) return
-      setTrack(-indexRef.current * root.clientWidth, true)
+      cancelTrackX()
+      setTrack(-indexRef.current * (dragWidth || root.clientWidth), true)
       releaseCapture(event.pointerId)
       resetDrag()
     }
@@ -281,6 +330,8 @@ export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePage
       const touch = event.touches[0]
       if (!touch) return
 
+      cancelTrackX()
+      dragWidth = 0
       touchId = touch.identifier
       touchStartX = touchLastX = touch.clientX
       touchStartY = touch.clientY
@@ -292,8 +343,9 @@ export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePage
     }
 
     const cancelTouch = () => {
+      cancelTrackX()
       if (touchAxis === 'x' && touchMoved) {
-        setTrack(-indexRef.current * root.clientWidth, true)
+        setTrack(-indexRef.current * (dragWidth || root.clientWidth), true)
       }
       resetTouch()
     }
@@ -319,6 +371,7 @@ export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePage
           touchAxis = 'x'
           touchMoved = true
           draggingRef.current = true
+          dragWidth = root.clientWidth
           root.setAttribute('data-dragging', 'true')
           gsap.killTweensOf(track)
         } else if (Math.abs(dy) > Math.abs(dx) * 1.2) {
@@ -341,7 +394,7 @@ export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePage
       touchLastX = touch.clientX
       touchLastTime = now
 
-      const pageWidth = root.clientWidth
+      const pageWidth = dragWidth || root.clientWidth
       if (!pageWidth) return
 
       const index = indexRef.current
@@ -349,7 +402,7 @@ export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePage
       if ((index === 0 && dx > 0) || (index === itemsRef.current.length - 1 && dx < 0)) {
         offset = dx * 0.35
       }
-      gsap.set(track, { x: -index * pageWidth + offset })
+      scheduleTrackX(-index * pageWidth + offset)
     }
 
     const onTouchEnd = (event: TouchEvent) => {
@@ -359,9 +412,10 @@ export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePage
       const releaseVelocity = performance.now() - touchLastTime > 100 ? 0 : touchVelocity
 
       if (touchAxis === 'x' && touchMoved) {
+        flushTrackX()
         commitHorizontal(touchStartX, touch?.clientX ?? touchLastX, releaseVelocity)
       } else if (touchAxis === 'x') {
-        setTrack(-indexRef.current * root.clientWidth, true)
+        setTrack(-indexRef.current * (dragWidth || root.clientWidth), true)
       }
 
       resetTouch()
@@ -419,6 +473,7 @@ export const MobilePager = ({ items, activeKey, onChange, disabled }: MobilePage
     root.addEventListener('wheel', onWheel, { passive: false })
 
     return () => {
+      cancelTrackX()
       root.removeEventListener('pointerdown', onPointerDown)
       root.removeEventListener('pointermove', onPointerMove)
       root.removeEventListener('pointerup', finishDrag)

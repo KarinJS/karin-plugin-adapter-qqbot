@@ -311,6 +311,26 @@
   user-select: none;
 }
 
+/*
+ * 拖动高度 / 吸附时，抽屉顶边在移动，顶部模糊每帧都要重新取样，
+ * 抽屉阴影也要跟着高度重绘。这两样是这段手势里最贵的绘制工作，
+ * 先关掉，松手吸附结束后恢复；顶栏用半透明底色保证文字可读。
+ */
+[data-slot='drawer-dialog'][data-resizing='true'] .sheet-edge-blur--top .sheet-edge-blur__layer,
+[data-slot='drawer-dialog'][data-snapping='true'] .sheet-edge-blur--top .sheet-edge-blur__layer {
+  display: none;
+}
+
+[data-slot='drawer-dialog'][data-resizing='true'] .sheet-header,
+[data-slot='drawer-dialog'][data-snapping='true'] .sheet-header {
+  background: color-mix(in oklab, var(--surface) 92%, transparent);
+}
+
+[data-slot='drawer-dialog'][data-resizing='true'],
+[data-slot='drawer-dialog'][data-snapping='true'] {
+  box-shadow: none;
+}
+
 .no-scrollbar {
   scrollbar-width: none;
 }

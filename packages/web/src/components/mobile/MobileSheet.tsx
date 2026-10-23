@@ -38,6 +38,7 @@ export const MobileSheet = ({
   collapsedRatio = SHEET_COLLAPSED_RATIO,
 }: MobileSheetProps) => {
   const scrollerRef = useRef<HTMLDivElement>(null)
+  const scrimRef = useRef<HTMLDivElement>(null)
   const baseHeightRef = useRef(0)
 
   const prepareHeight = useCallback(
@@ -68,6 +69,7 @@ export const MobileSheet = ({
     onRequestClose,
     onExited: handleExited,
     beforeEnter: prepareHeight,
+    scrimRef,
   })
 
   useSheetDrag({
@@ -75,6 +77,7 @@ export const MobileSheet = ({
     mounted,
     onRequestClose,
     backdropRef,
+    scrimRef,
     scrollerRef,
     baseHeightRef,
     collapsedRatio,
@@ -105,6 +108,14 @@ export const MobileSheet = ({
       isKeyboardDismissDisabled
       style={mobileSheetBackdropStyle}
     >
+      {/* 压暗层和抽屉是兄弟节点：只动 opacity 就能淡入淡出，不会把抽屉一起淡掉。 */}
+      <div
+        ref={scrimRef}
+        aria-hidden='true'
+        data-sheet-scrim=''
+        className='pointer-events-none fixed inset-0 bg-black'
+        style={{ opacity: 0 }}
+      />
       <Drawer.Content placement='bottom'>
         <Drawer.Dialog
           className='flex flex-col overflow-hidden border border-border/60 bg-surface shadow-overlay'
