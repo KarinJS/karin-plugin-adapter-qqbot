@@ -21,7 +21,7 @@ const formatRemaining = (seconds: number) => {
 interface QrPanelProps {
   /**
    * 所在页面当前是否可见。
-   * 嵌入画布会把添加页一直挂载着，离开时不会卸载，需要主动结束扫码会话。
+   * 画布会把添加页一直挂载着，离开时不会卸载，需要主动结束扫码会话。
    */
   active?: boolean
 }
@@ -80,7 +80,7 @@ export const QrPanel = ({ active = true }: QrPanelProps) => {
     return () => window.clearTimeout(timer)
   }, [active, resetSession])
 
-  // 组件卸载（独立控制台离开添加页、手机端关闭抽屉）时结束仍在等待的授权会话。
+  // 组件卸载（手机端关闭抽屉）时结束仍在等待的授权会话。
   useEffect(
     () => () => {
       const current = sessionRef.current

@@ -1,12 +1,16 @@
-import { Button, cn } from '@heroui/react'
-import { Bot, Home, Plus, QrCode, Settings } from 'lucide-react'
-import { useRef } from 'react'
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { cn } from '@heroui/react'
+import { Bot, Home, QrCode, Settings } from 'lucide-react'
+import { useMemo } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { Brand } from '@/components/Brand'
-import { PageTransition } from '@/components/PageTransition'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import type { CanvasPage } from '@/components/desktop/CanvasPager'
 import { useConfigStore } from '@/hooks/useConfigStore'
-import { useSmoothScroll } from '@/hooks/useSmoothScroll'
+import { DesktopCanvasShell } from '@/layouts/DesktopCanvasShell'
+import { AddBotPage } from '@/pages/AddBotPage'
+import { BotsWorkspace } from '@/pages/BotsWorkspace'
+import { OverviewPage } from '@/pages/OverviewPage'
+import { SettingsPage } from '@/pages/SettingsPage'
 
 const navItems = [
   { to: '/overview', label: '概览', icon: Home, key: 'overview' },
@@ -22,100 +26,86 @@ const getActiveKey = (pathname: string) => {
   return 'overview'
 }
 
-const sectionLabels: Record<string, string> = {
-  overview: '概览',
-  bots: '机器人',
-  add: '扫码添加',
-  settings: '设置',
-}
-
+/**
+ * 独立打开时的桌面外壳。
+ *
+ * 内容区和嵌入 Karin 时完全共用：同样是一张常驻的纵向画布，
+ * 列表、表单、扫码和概览使用同一套翻页动画；区别只在左侧：
+ * 这里保留完整侧边栏，嵌入时换成图标栏。
+ */
 export const DesktopShell = () => {
   const { pathname } = useLocation()
-  const navigate = useNavigate()
   const { config, statuses, version } = useConfigStore()
   const activeKey = getActiveKey(pathname)
   const onlineCount = config.filter((bot) => statuses[bot.appId]?.online).length
   const allOnline = config.length > 0 && onlineCount === config.length
-  const mainRef = useRef<HTMLElement>(null)
-  const mainContentRef = useRef<HTMLDivElement>(null)
 
-  useSmoothScroll(mainRef, mainContentRef)
+  // 画布顺序和侧边栏导航保持一致，翻页方向才符合点击位置。
+  const pages = useMemo<CanvasPage[]>(
+    () => [
+      { key: 'overview', label: '概览', element: <OverviewPage /> },
+      { key: 'bots', label: '机器人列表', element: <BotsWorkspace />, fill: true },
+      { key: 'add', label: '扫码添加', element: <AddBotPage /> },
+      { key: 'settings', label: '设置', element: <SettingsPage /> },
+    ],
+    []
+  )
 
   return (
-    <div className='flex h-dvh overflow-hidden bg-background'>
-      <aside
-        className='flex w-[var(--app-sidebar-width)] shrink-0 flex-col border-r border-border/80 bg-surface/55'
-        aria-label='侧边栏'
-      >
-        <div className='px-5 py-5'>
-          <Brand />
-        </div>
+    <DesktopCanvasShell
+      activeKey={activeKey}
+      pages={pages}
+      sidebar={
+        <aside
+          className='flex w-[var(--app-sidebar-width)] shrink-0 flex-col border-r border-border/80 bg-surface/55'
+          aria-label='侧边栏'
+        >
+          <div className='px-5 py-5'>
+            <Brand />
+          </div>
 
-        <nav className='flex flex-1 flex-col gap-1 px-3 py-2' aria-label='主导航'>
-          {navItems.map((item) => {
-            const Icon = item.icon
-            const active = activeKey === item.key
+          <nav className='flex flex-1 flex-col gap-1 px-3 py-2' aria-label='主导航'>
+            {navItems.map((item) => {
+              const Icon = item.icon
+              const active = activeKey === item.key
 
-            return (
-              <Link
-                key={item.key}
-                to={item.to}
-                aria-current={active ? 'page' : undefined}
+              return (
+                <Link
+                  key={item.key}
+                  to={item.to}
+                  aria-current={active ? 'page' : undefined}
+                  className={cn(
+                    'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors duration-150',
+                    active
+                      ? 'bg-default font-medium text-foreground'
+                      : 'text-muted hover:bg-default/60 hover:text-foreground'
+                  )}
+                >
+                  <Icon className='size-4 shrink-0' aria-hidden='true' />
+                  <span className='truncate'>{item.label}</span>
+                </Link>
+              )
+            })}
+          </nav>
+
+          <div className='flex flex-col gap-4 border-t border-border/60 px-5 py-5'>
+            <div className='flex items-center justify-between text-xs text-muted'>
+              <span>运行状态</span>
+              <span
                 className={cn(
-                  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors duration-150',
-                  active
-                    ? 'bg-default font-medium text-foreground'
-                    : 'text-muted hover:bg-default/60 hover:text-foreground'
+                  'tabular inline-flex items-center gap-2',
+                  allOnline ? 'text-success' : config.length > 0 ? 'text-warning' : 'text-muted'
                 )}
               >
-                <Icon className='size-4 shrink-0' aria-hidden='true' />
-                <span className='truncate'>{item.label}</span>
-              </Link>
-            )
-          })}
-        </nav>
-
-        <div className='flex flex-col gap-4 border-t border-border/60 px-5 py-5'>
-          <div className='flex items-center justify-between text-xs text-muted'>
-            <span>运行状态</span>
-            <span
-              className={cn(
-                'tabular inline-flex items-center gap-2',
-                allOnline ? 'text-success' : config.length > 0 ? 'text-warning' : 'text-muted'
-              )}
-            >
-              <span className='status-dot' data-online={onlineCount > 0} aria-hidden='true' />
-              {onlineCount} / {config.length} 在线
-            </span>
+                <span className='status-dot' data-online={onlineCount > 0} aria-hidden='true' />
+                {onlineCount} / {config.length} 在线
+              </span>
+            </div>
+            <ThemeToggle withLabel />
+            <p className='text-[0.6875rem] text-muted'>v{version || '—'}</p>
           </div>
-          <ThemeToggle withLabel />
-          <p className='text-[0.6875rem] text-muted'>v{version || '—'}</p>
-        </div>
-      </aside>
-
-      <div className='flex min-w-0 flex-1 flex-col'>
-        <header className='flex h-14 shrink-0 items-center justify-between border-b border-border/60 px-8'>
-          <div className='flex items-center gap-2 text-sm'>
-            <span className='text-muted'>控制台</span>
-            <span className='text-muted/60'>/</span>
-            <span className='font-medium'>{sectionLabels[activeKey]}</span>
-          </div>
-          {pathname === '/bots/new' ? null : (
-            <Button size='sm' variant='secondary' onPress={() => navigate('/bots/new')}>
-              <Plus className='size-4' aria-hidden='true' />
-              添加机器人
-            </Button>
-          )}
-        </header>
-
-        <main ref={mainRef} className='flex-1 overflow-y-auto'>
-          <div ref={mainContentRef} className='mx-auto w-full max-w-[78rem] px-8 py-7'>
-            <PageTransition sectionKey={activeKey}>
-              <Outlet />
-            </PageTransition>
-          </div>
-        </main>
-      </div>
-    </div>
+        </aside>
+      }
+    />
   )
 }

@@ -3,8 +3,9 @@ import { gsap } from 'gsap'
 import { Bot, LayoutGrid, QrCode } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { CanvasPager, type CanvasPage } from '@/components/desktop/CanvasPager'
+import type { CanvasPage } from '@/components/desktop/CanvasPager'
 import { CANVAS_SLIDE_DURATION, CANVAS_SLIDE_EASE } from '@/lib/canvasMotion'
+import { DesktopCanvasShell } from '@/layouts/DesktopCanvasShell'
 import { AddBotPage } from '@/pages/AddBotPage'
 import { BotsWorkspace } from '@/pages/BotsWorkspace'
 import { OverviewPage } from '@/pages/OverviewPage'
@@ -46,9 +47,9 @@ export const EmbeddedDesktopShell = () => {
     []
   )
 
-  // 画布外壳不渲染路由出口，根路径要自己补一次跳转，让地址栏和当前页保持一致。
+  // 画布外壳不渲染路由出口，根路径和嵌入模式没有的设置页要自己补跳转。
   useEffect(() => {
-    if (pathname === '/') navigate('/bots', { replace: true })
+    if (pathname === '/' || pathname === '/settings') navigate('/bots', { replace: true })
   }, [navigate, pathname])
 
   useLayoutEffect(() => {
@@ -77,62 +78,62 @@ export const EmbeddedDesktopShell = () => {
   }, [activeKey])
 
   return (
-    <div className='flex h-dvh overflow-hidden bg-background'>
-      <aside className='flex w-[4.5rem] shrink-0 items-center justify-center py-3' aria-label='侧边栏'>
-        <nav
-          className='flex h-full max-h-[calc(100dvh-1.5rem)] w-14 flex-col items-center justify-center rounded-full border border-border/70 bg-surface/80 p-1.5 shadow-sm backdrop-blur'
-          aria-label='主导航'
-        >
-          <div ref={navListRef} className='relative flex w-11 flex-col items-center gap-1.5'>
-            <span
-              ref={pillRef}
-              aria-hidden='true'
-              className='pointer-events-none absolute top-0 left-0 size-11 rounded-full bg-foreground'
-            />
+    <DesktopCanvasShell
+      activeKey={activeKey}
+      pages={pages}
+      sidebar={
+        <aside className='flex w-[4.5rem] shrink-0 items-center justify-center py-3' aria-label='侧边栏'>
+          <nav
+            className='flex h-full max-h-[calc(100dvh-1.5rem)] w-14 flex-col items-center justify-center rounded-full border border-border/70 bg-surface/80 p-1.5 shadow-sm backdrop-blur'
+            aria-label='主导航'
+          >
+            <div ref={navListRef} className='relative flex w-11 flex-col items-center gap-1.5'>
+              <span
+                ref={pillRef}
+                aria-hidden='true'
+                className='pointer-events-none absolute top-0 left-0 size-11 rounded-full bg-foreground'
+              />
 
-            {navItems.map((item) => {
-              const Icon = item.icon
-              const active = activeKey === item.key
+              {navItems.map((item) => {
+                const Icon = item.icon
+                const active = activeKey === item.key
 
-              return (
-                <Tooltip key={item.key} delay={120}>
-                  <Tooltip.Trigger
-                    aria-current={active ? 'page' : undefined}
-                    aria-label={item.label}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Enter' && event.key !== ' ') return
-                      event.preventDefault()
-                      navigate(item.to)
-                    }}
-                  >
-                    <Link
-                      to={item.to}
-                      tabIndex={-1}
-                      aria-label={item.label}
+                return (
+                  <Tooltip key={item.key} delay={120}>
+                    <Tooltip.Trigger
                       aria-current={active ? 'page' : undefined}
-                      data-canvas-nav={item.key}
-                      className={cn(
-                        'canvas-nav-link relative z-10 flex size-11 items-center justify-center rounded-full',
-                        active ? 'text-background' : 'text-muted hover:bg-default hover:text-foreground'
-                      )}
+                      aria-label={item.label}
+                      onKeyDown={(event) => {
+                        if (event.key !== 'Enter' && event.key !== ' ') return
+                        event.preventDefault()
+                        navigate(item.to)
+                      }}
                     >
-                      <Icon className='size-5' aria-hidden='true' />
-                    </Link>
-                  </Tooltip.Trigger>
-                  <Tooltip.Content placement='right' showArrow>
-                    <Tooltip.Arrow />
-                    {item.label}
-                  </Tooltip.Content>
-                </Tooltip>
-              )
-            })}
-          </div>
-        </nav>
-      </aside>
-
-      <main className='min-w-0 flex-1'>
-        <CanvasPager pages={pages} activeKey={activeKey} />
-      </main>
-    </div>
+                      <Link
+                        to={item.to}
+                        tabIndex={-1}
+                        aria-label={item.label}
+                        aria-current={active ? 'page' : undefined}
+                        data-canvas-nav={item.key}
+                        className={cn(
+                          'canvas-nav-link relative z-10 flex size-11 items-center justify-center rounded-full',
+                          active ? 'text-background' : 'text-muted hover:bg-default hover:text-foreground'
+                        )}
+                      >
+                        <Icon className='size-5' aria-hidden='true' />
+                      </Link>
+                    </Tooltip.Trigger>
+                    <Tooltip.Content placement='right' showArrow>
+                      <Tooltip.Arrow />
+                      {item.label}
+                    </Tooltip.Content>
+                  </Tooltip>
+                )
+              })}
+            </div>
+          </nav>
+        </aside>
+      }
+    />
   )
 }

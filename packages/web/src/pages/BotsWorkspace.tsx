@@ -1,4 +1,4 @@
-import { Button, Skeleton, cn, toast } from '@heroui/react'
+import { Button, Skeleton, toast } from '@heroui/react'
 import { gsap } from 'gsap'
 import { Bot, QrCode, Trash2 } from 'lucide-react'
 import { useCallback, useLayoutEffect, useEffect, useRef, useState } from 'react'
@@ -10,7 +10,6 @@ import { EmptyState } from '@/components/EmptyState'
 import { PageHeader } from '@/components/PageHeader'
 import { SectionCard } from '@/components/SectionCard'
 import { useConfigStore } from '@/hooks/useConfigStore'
-import { useEmbedded } from '@/hooks/useEmbedded'
 import { useSmoothScroll } from '@/hooks/useSmoothScroll'
 import { dissolveBotCard } from '@/lib/dissolveBotCard'
 import { SHEET_MOTION_DURATION, SHEET_MOTION_EASE } from '@/lib/sheetMotion'
@@ -176,10 +175,9 @@ export const BotsWorkspace = () => {
   const { pathname } = useLocation()
   const appId = decodeAppId(match?.params.appId)
   const selected = Boolean(appId)
-  // 嵌入画布会一直挂载这个页面；只有路由停在机器人工作区时列表才应该保留滚动位置。
+  // 画布会一直挂载这个页面；只有路由停在机器人工作区时列表才应该保留滚动位置。
   const workspaceActive = pathname === '/bots' || (pathname.startsWith('/bots/') && pathname !== '/bots/new')
   const { config, statuses, loading, remove, saving } = useConfigStore()
-  const embedded = useEmbedded()
   const navigate = useNavigate()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [removing, setRemoving] = useState(false)
@@ -598,20 +596,20 @@ export const BotsWorkspace = () => {
   return (
     <div className='flex flex-col xl:h-full xl:min-h-0'>
       {/*
-        嵌入画布的宽屏工作区不需要再放一遍「机器人」大标题：
+        画布的宽屏工作区不需要再放一遍「机器人」大标题：
         列表自己的标题已经说明了内容，去掉后列表才能占满整屏、卡片从屏幕顶部滚出。
       */}
-      <div ref={headerRef} className={cn('overflow-hidden', embedded && 'xl:hidden')}>
+      <div ref={headerRef} className='overflow-hidden xl:hidden'>
         <PageHeader
           eyebrow='Bots'
           title='机器人'
           description='每个机器人独立配置事件通道、场景开关和消息缓存。'
-          className={cn('pb-6', embedded && 'xl:px-6 xl:pt-6')}
+          className='pb-6'
         />
       </div>
 
       {empty ? (
-        <div className={cn(embedded && 'xl:px-6 xl:pb-6')}>
+        <div className='xl:px-6 xl:pb-6'>
           <EmptyState
             icon={<QrCode className='size-5' aria-hidden='true' />}
             title='还没有机器人'
@@ -637,7 +635,7 @@ export const BotsWorkspace = () => {
           <BotList
             selectedAppId={bot?.appId}
             showAdd={false}
-            overlay={embedded}
+            overlay
             className='xl:h-full xl:min-h-0'
             syncRouteScroll
             active={workspaceActive}
@@ -647,10 +645,7 @@ export const BotsWorkspace = () => {
           <div
             ref={panelRef}
             data-bots-panel=''
-            className={cn(
-              'no-scrollbar flex min-w-0 flex-col gap-5 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain',
-              embedded && 'xl:pr-6 xl:pb-6'
-            )}
+            className='no-scrollbar flex min-w-0 flex-col gap-5 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain xl:pr-6 xl:pb-6'
           >
             <div ref={panelContentRef} className='flex min-w-0 flex-col gap-5'>
               {panel}

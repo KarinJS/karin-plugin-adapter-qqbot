@@ -27,7 +27,7 @@ interface BotListProps {
    * 概览页的列表跟着页面滚，不启用。
    */
   syncRouteScroll?: boolean
-  /** 列表所在页面当前是否可见；嵌入画布的页面常驻，需要显式告知。 */
+  /** 列表所在页面当前是否可见；画布页面常驻，需要显式告知。 */
   active?: boolean
 }
 
@@ -85,7 +85,7 @@ export const BotList = ({
     setListScrollTop(rowTop - (list.clientHeight - rowRect.height) / 2)
   }
 
-  // 嵌入画布的页面不会因为路由切换而卸载，列表滚动位置必须自己复位和定位。
+  // 画布页面不会因为路由切换而卸载，列表滚动位置必须自己复位和定位。
   useLayoutEffect(() => {
     if (!syncRouteScroll) return
 
@@ -128,7 +128,7 @@ export const BotList = ({
     const list = listRef.current
     if (!section || !list) return
 
-    /** 找到页面真正的滚动容器：嵌入画布是页面 section，独立控制台是 main。 */
+    /** 找到页面真正的滚动容器：画布页面是 section。 */
     const findPageScroller = () => {
       let node = list.parentElement
       while (node) {
@@ -154,7 +154,7 @@ export const BotList = ({
      * 指针在卡片上时，列表自己滚。
      *
      * 指针不在卡片上（列表空白处、标题、列表下方）时，滚轮交给右侧表单，
-     * 表单滚到头了再交给整页；窄屏和独立控制台没有独立表单滚动区，
+     * 表单滚到头了再交给整页；窄屏没有独立表单滚动区，
      * 会直接落到整页滚动上。
      */
     const handleWheel = (event: WheelEvent) => {

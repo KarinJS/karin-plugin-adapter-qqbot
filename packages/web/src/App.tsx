@@ -9,11 +9,7 @@ import { DesktopShell } from '@/layouts/DesktopShell'
 import { EmbeddedDesktopShell } from '@/layouts/EmbeddedDesktopShell'
 import { MobileShell } from '@/layouts/MobileShell'
 import { authChangedEvent, hasAuth } from '@/lib/auth'
-import { AddBotPage } from '@/pages/AddBotPage'
-import { BotsWorkspace } from '@/pages/BotsWorkspace'
 import { LoginPage } from '@/pages/LoginPage'
-import { OverviewPage } from '@/pages/OverviewPage'
-import { SettingsPage } from '@/pages/SettingsPage'
 
 const AppShell = () => {
   const { isMobile } = useViewport()
@@ -32,7 +28,6 @@ const DefaultRedirect = () => {
 const App = () => {
   const [authenticated, setAuthenticated] = useState(hasAuth)
   const { isMobile } = useViewport()
-  const embedded = useEmbedded()
 
   // 主题只在 App 里初始化一次，嵌入模式没有主题切换入口时也能跟随 Karin。
   useTheme()
@@ -60,11 +55,15 @@ const App = () => {
         <Routes>
           <Route element={<AppShell />}>
             <Route index element={<DefaultRedirect />} />
-            <Route path='overview' element={<OverviewPage />} />
-            <Route path='bots' element={<BotsWorkspace />} />
-            <Route path='bots/new' element={<AddBotPage />} />
-            <Route path='bots/:appId' element={<BotsWorkspace />} />
-            <Route path='settings' element={embedded ? <Navigate to='/bots' replace /> : <SettingsPage />} />
+            {/*
+              页面由各外壳自己按路径渲染并常驻在画布上，这里只负责匹配地址；
+              未匹配的地址交给 DefaultRedirect。
+            */}
+            <Route path='overview' element={null} />
+            <Route path='bots' element={null} />
+            <Route path='bots/new' element={null} />
+            <Route path='bots/:appId' element={null} />
+            <Route path='settings' element={null} />
             <Route path='*' element={<DefaultRedirect />} />
           </Route>
         </Routes>
