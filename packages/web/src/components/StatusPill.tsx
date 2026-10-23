@@ -10,6 +10,44 @@ const eventLabels: Record<EventType, string> = {
 
 export const getEventLabel = (type: EventType) => eventLabels[type]
 
+export const getStatusState = (online: boolean, eventType: EventType) => {
+  if (eventType === 0) return 'disabled'
+  return online ? 'online' : 'offline'
+}
+
+export const getStatusLabel = (online: boolean, eventType: EventType) => {
+  const state = getStatusState(online, eventType)
+  return state === 'disabled' ? eventLabels[0] : state === 'online' ? '在线' : '离线'
+}
+
+interface StatusDotProps {
+  online: boolean
+  eventType: EventType
+  className?: string
+}
+
+/**
+ * 只显示状态圆点，供名册列表这类紧凑布局使用。
+ */
+export const StatusDot = ({ online, eventType, className }: StatusDotProps) => {
+  const state = getStatusState(online, eventType)
+
+  return (
+    <span
+      className={cn(
+        'status-dot',
+        state === 'online' && 'text-success',
+        state === 'offline' && 'text-warning',
+        state === 'disabled' && 'text-muted',
+        className
+      )}
+      data-online={state === 'online'}
+      data-offline={state === 'offline'}
+      aria-hidden='true'
+    />
+  )
+}
+
 interface StatusPillProps {
   online: boolean
   eventType: EventType
@@ -21,8 +59,8 @@ interface StatusPillProps {
  */
 export const StatusPill = ({ online, eventType, className }: StatusPillProps) => {
   const active = eventType !== 0
-  const state = !active ? 'disabled' : online ? 'online' : 'offline'
-  const label = state === 'disabled' ? eventLabels[0] : state === 'online' ? '在线' : '离线'
+  const state = getStatusState(online, eventType)
+  const label = getStatusLabel(online, eventType)
 
   return (
     <span
@@ -34,12 +72,7 @@ export const StatusPill = ({ online, eventType, className }: StatusPillProps) =>
         className
       )}
     >
-      <span
-        className='status-dot'
-        data-online={state === 'online'}
-        data-offline={state === 'offline'}
-        aria-hidden='true'
-      />
+      <StatusDot online={online} eventType={eventType} />
       <span>{label}</span>
       {active ? <span className='text-muted'>· {eventLabels[eventType]}</span> : null}
     </span>

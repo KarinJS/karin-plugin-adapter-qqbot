@@ -53,7 +53,6 @@ export const BotsWorkspace = () => {
   const switchRef = useRef<{ up: boolean } | null>(null)
   const previousAppIdRef = useRef<string | null>(appId || null)
   const cloneRef = useRef<HTMLElement | null>(null)
-  const transitioningRef = useRef(false)
   // 布局 effect 只跟 appId 走，用 ref 读最新列表顺序，避免列表更新时重放动画。
   const configRef = useRef(config)
   configRef.current = config
@@ -115,7 +114,10 @@ export const BotsWorkspace = () => {
     previousAppIdRef.current = appId || null
 
     if (reduceMotion() || !content) {
-      transitioningRef.current = false
+      if (content) {
+        gsap.killTweensOf(content)
+        gsap.set(content, { clearProps: 'transform' })
+      }
       return
     }
 
@@ -131,9 +133,6 @@ export const BotsWorkspace = () => {
           duration: SHEET_MOTION_DURATION,
           ease: SHEET_MOTION_EASE,
           clearProps: 'transform',
-          onComplete: () => {
-            transitioningRef.current = false
-          },
         }
       )
       return
@@ -156,7 +155,6 @@ export const BotsWorkspace = () => {
         clearProps: 'transform',
       }
     )
-    transitioningRef.current = false
   }, [appId])
 
   // 卸载时清掉还在退场的快照，避免 fixed 副本留在页面上。
@@ -177,9 +175,17 @@ export const BotsWorkspace = () => {
    * 先给当前面板拍一张快照（保留滚动位置、输入值和顶部模糊），让它按列表方向
    * 整块滑出屏幕；路由立即切到目标机器人，新表单从反方向滑入。
    * 中间经过的机器人不会依次播放，一次点击只走一段。
+   * 翻页途中再次点击时直接撤掉旧快照，从当前画面重新开始，不阻塞操作。
    */
   const handleSelect = (nextAppId: string) => {
-    if (!nextAppId || nextAppId === appId || transitioningRef.current) return
+    if (!nextAppId || nextAppId === appId) return
+
+    const previousClone = cloneRef.current
+    if (previousClone) {
+      gsap.killTweensOf(previousClone)
+      previousClone.remove()
+      cloneRef.current = null
+    }
 
     const panel = panelRef.current
     const content = panelContentRef.current
@@ -231,7 +237,6 @@ export const BotsWorkspace = () => {
     clone.scrollTop = panel.scrollTop
 
     cloneRef.current = clone
-    transitioningRef.current = true
     switchRef.current = { up }
     gsap.killTweensOf(clone)
     gsap.to(clone, {
@@ -383,7 +388,7 @@ export const BotsWorkspace = () => {
               embedded && 'xl:pr-6 xl:pb-6'
             )}
           >
-            <div ref={panelContentRef} className={cn('flex min-w-0 flex-col gap-5', embedded && 'xl:pt-6')}>
+            <div ref={panelContentRef} className='flex min-w-0 flex-col gap-5'>
               {panel}
             </div>
           </div>

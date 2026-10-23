@@ -1,12 +1,14 @@
 import { Button, Skeleton, cn } from '@heroui/react'
-import { ChevronRight, Plus, RadioTower } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { Plus, RadioTower } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BotAvatar } from '@/components/BotAvatar'
-import { StatusPill } from '@/components/StatusPill'
+import { getStatusLabel, StatusDot } from '@/components/StatusPill'
 import { useConfigStore } from '@/hooks/useConfigStore'
 import { useSmoothScroll } from '@/hooks/useSmoothScroll'
 import { normalizeWheelDelta, smoothScrollBy } from '@/lib/smoothScroll'
+
+const ROW_HEIGHT = 56
 
 interface BotListProps {
   selectedAppId?: string
@@ -27,9 +29,22 @@ export const BotList = ({ selectedAppId, className, showAdd = true, overlay = fa
   const listRef = useRef<HTMLDivElement>(null)
   const listContentRef = useRef<HTMLDivElement>(null)
   const sectionRef = useRef<HTMLElement>(null)
+  // 首帧不能播放高亮滑动，否则刷新时选中块会从第一行滑到当前行。
+  const [highlightReady, setHighlightReady] = useState(false)
 
   // 列表的滚轮由下面的 handleWheel 决定滚哪个容器，所以关闭 Lenis 自己的滚轮接管。
   useSmoothScroll(listRef, listContentRef, { manual: true })
+
+  useEffect(() => {
+    let inner = 0
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setHighlightReady(true))
+    })
+    return () => {
+      cancelAnimationFrame(outer)
+      cancelAnimationFrame(inner)
+    }
+  }, [])
 
   useEffect(() => {
     const section = sectionRef.current
@@ -105,11 +120,18 @@ export const BotList = ({ selectedAppId, className, showAdd = true, overlay = fa
     return () => section.removeEventListener('wheel', handleWheel)
   }, [])
 
+  const selectedIndex = config.findIndex((bot) => bot.appId === selectedAppId)
+  const onlineCount = config.reduce(
+    (count, bot) => count + (bot.event.type !== 0 && statuses[bot.appId]?.online ? 1 : 0),
+    0
+  )
+
   return (
     <section ref={sectionRef} className={cn('relative flex min-h-0 flex-col gap-3', className)} aria-label='机器人列表'>
       {/*
         宽屏时标题浮在滚动区上方，卡片从底部进入、向上滚过标题后从顶部消失；
         窄屏整页滚动时由 sticky 把标题钉在屏幕顶部。
+        宽屏下标题带固定 84px 高，和右侧表单标题共用同一条基线。
       */}
       <div
         className={cn(
@@ -120,19 +142,25 @@ export const BotList = ({ selectedAppId, className, showAdd = true, overlay = fa
         <div
           className={cn(
             'bot-list-header flex items-center justify-between gap-3 px-1 py-3',
-            overlay && 'bot-list-header--overlay xl:h-full'
+            overlay ? 'bot-list-header--overlay xl:h-full' : 'xl:h-21'
           )}
         >
           <div className='flex items-baseline gap-2'>
-            <h2 className='text-heading text-base font-semibold'>机器人</h2>
+            <h2 className='text-heading text-base font-semibold xl:text-xl'>机器人</h2>
             <span className='tabular text-xs text-muted'>{config.length}</span>
           </div>
-          {showAdd ? (
-            <Button size='sm' variant='secondary' onPress={() => navigate('/bots/new')}>
-              <Plus className='size-4' aria-hidden='true' />
-              添加
-            </Button>
-          ) : null}
+          <div className='flex items-center gap-3'>
+            <span className='flex items-center gap-1.5 text-[11px] text-muted'>
+              <span aria-hidden='true' className='status-dot text-success' data-online='true' />
+              <span className='tabular'>{onlineCount} 在线</span>
+            </span>
+            {showAdd ? (
+              <Button size='sm' variant='secondary' onPress={() => navigate('/bots/new')}>
+                <Plus className='size-4' aria-hidden='true' />
+                添加
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -143,10 +171,10 @@ export const BotList = ({ selectedAppId, className, showAdd = true, overlay = fa
         >
           <div ref={listContentRef}>
             {loading && config.length === 0 ? (
-              <div className='flex flex-col gap-2 py-2'>
-                <Skeleton className='h-16 w-full rounded-xl' />
-                <Skeleton className='h-16 w-full rounded-xl' />
-                <Skeleton className='h-16 w-full rounded-xl' />
+              <div className='flex flex-col gap-2 px-2 py-2'>
+                <Skeleton className='h-14 w-full rounded-xl' />
+                <Skeleton className='h-14 w-full rounded-xl' />
+                <Skeleton className='h-14 w-full rounded-xl' />
               </div>
             ) : null}
 
@@ -162,49 +190,57 @@ export const BotList = ({ selectedAppId, className, showAdd = true, overlay = fa
               </div>
             ) : null}
 
-            {config.map((bot) => {
-              const status = statuses[bot.appId]
-              const selected = selectedAppId === bot.appId
-              const title = status?.name || bot.appId
-
-              return (
-                <Button
-                  key={bot.appId}
-                  fullWidth
-                  data-bot-id={bot.appId}
-                  variant='ghost'
+            <div className='relative px-2'>
+              {/* 选中底色是一块在行间滑动的浅色块，行本身保持透明。 */}
+              {selectedIndex >= 0 ? (
+                <div
+                  aria-hidden='true'
                   className={cn(
-                    'relative isolate h-auto justify-start gap-3 overflow-hidden rounded-none border-b border-border/60 p-3.5 text-left last:border-b-0',
-                    selected ? 'bg-transparent' : 'hover:bg-default/50'
+                    'pointer-events-none absolute inset-x-0 top-0 h-14 rounded-xl bg-default',
+                    highlightReady && 'bot-list-highlight'
                   )}
-                  aria-current={selected ? 'page' : undefined}
-                  onPress={() =>
-                    onSelect ? onSelect(bot.appId) : navigate(`/bots/${encodeURIComponent(bot.appId)}`)
-                  }
-                >
-                  {/* 选中态用内嵌的圆角块，不用左侧竖条：浅灰底 + 细描边，和列表本身保持同一层。 */}
-                  {selected ? (
-                    <span
-                      className='pointer-events-none absolute inset-1.5 -z-10 rounded-xl bg-default ring-1 ring-border/70 shadow-[0_1px_2px_rgb(0_0_0/0.04)]'
-                      aria-hidden='true'
-                    />
-                  ) : null}
-                  <BotAvatar name={title} avatar={status?.avatar} />
-                  <span className='flex min-w-0 flex-1 flex-col gap-1'>
-                    <span className={cn('truncate text-sm', selected ? 'font-semibold' : 'font-medium')}>{title}</span>
-                    <span className='truncate text-xs text-muted'>{bot.appId}</span>
-                    <StatusPill online={status?.online ?? false} eventType={bot.event.type} />
-                  </span>
-                  <ChevronRight
+                  style={{ transform: `translateY(${selectedIndex * ROW_HEIGHT}px)` }}
+                />
+              ) : null}
+
+              {config.map((bot) => {
+                const status = statuses[bot.appId]
+                const selected = selectedAppId === bot.appId
+                const title = status?.name || bot.appId
+                const online = status?.online ?? false
+
+                return (
+                  <Button
+                    key={bot.appId}
+                    fullWidth
+                    data-bot-id={bot.appId}
+                    variant='ghost'
                     className={cn(
-                      'size-4 shrink-0 transition-colors duration-150',
-                      selected ? 'text-foreground' : 'text-muted'
+                      'relative z-10 h-14 justify-start gap-3 rounded-xl px-3 text-left',
+                      selected ? 'bg-transparent hover:bg-transparent' : 'hover:bg-default/40'
                     )}
-                    aria-hidden='true'
-                  />
-                </Button>
-              )
-            })}
+                    aria-current={selected ? 'page' : undefined}
+                    onPress={() =>
+                      onSelect ? onSelect(bot.appId) : navigate(`/bots/${encodeURIComponent(bot.appId)}`)
+                    }
+                  >
+                    <BotAvatar name={title} avatar={status?.avatar} className='size-8 text-[11px]' />
+                    <span className='flex min-w-0 flex-1 flex-col'>
+                      <span
+                        className={cn('truncate text-[13px] leading-5', selected ? 'font-semibold' : 'font-medium')}
+                      >
+                        {title}
+                      </span>
+                      <span className='tabular truncate text-[11px] leading-4 text-muted'>{bot.appId}</span>
+                    </span>
+                    <span className='flex shrink-0 items-center gap-1.5'>
+                      <StatusDot online={online} eventType={bot.event.type} />
+                      <span className='sr-only'>{getStatusLabel(online, bot.event.type)}</span>
+                    </span>
+                  </Button>
+                )
+              })}
+            </div>
           </div>
         </div>
 

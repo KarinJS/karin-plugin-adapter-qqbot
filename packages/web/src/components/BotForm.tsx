@@ -62,14 +62,15 @@ export const BotForm = ({ bot, onSaved }: BotFormProps) => {
         宽屏时表单标题和操作悬浮在滚动区顶部，卡片从下面滚过并化开；
         窄屏整页滚动，保持原来的静态布局。
       */}
-      <div data-form-header='' className='xl:sticky xl:top-0 xl:z-20'>
+      <div data-form-header='' className='xl:sticky xl:top-0 xl:z-20 xl:h-21'>
         <div aria-hidden='true' className='edge-blur edge-blur--top edge-blur--header hidden xl:block'>
           <div className='edge-blur__layer edge-blur__layer--strong' />
           <div className='edge-blur__layer edge-blur__layer--medium' />
           <div className='edge-blur__layer edge-blur__layer--soft' />
         </div>
 
-        <div className='relative z-20 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between xl:py-3'>
+        {/* 标题顶边和左侧列表标题对齐：84px 高、20px 字、顶部 30.5px。 */}
+        <div className='relative z-20 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between xl:pt-[30.5px] xl:pb-2'>
           <div className='min-w-0'>
             <div className='flex flex-wrap items-center gap-x-3 gap-y-1'>
               <h2 className='text-heading truncate text-xl font-semibold'>{status?.name || bot.appId}</h2>

@@ -369,6 +369,17 @@
   }
 }
 
+/* 名册的选中底色在行间滑动，首帧不加过渡，避免刷新时从顶部滑到选中行。 */
+.bot-list-highlight {
+  transition: transform 200ms var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bot-list-highlight {
+    transition: none;
+  }
+}
+
 /*
  * 列表上下边缘的渐进模糊，和手机端抽屉共用同一套做法：
  * 三层不同半径的 backdrop-filter 叠加，不铺任何底色，
@@ -428,26 +439,23 @@
 }
 
 /*
- * 顶部浮层的模糊区要覆盖整条标题带：
- * 三层都加高到 84px，靠近顶部保持满强度，再向下渐隐。
- * 底部边缘没有悬浮内容，仍保持原来的短渐变。
+ * 顶部和底部都沿用手机端抽屉的同一组参数：
+ * 三层高度 30 / 54 / 84，遮罩 50% / 42% / 30%。
+ * 靠近边缘只做轻微模糊，内容轮廓仍然清晰。
  */
 .edge-blur--top .edge-blur__layer--strong {
-  height: 84px;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 70%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 70%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 100%);
 }
 
 .edge-blur--top .edge-blur__layer--medium {
-  height: 84px;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 60%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 60%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%);
 }
 
 .edge-blur--top .edge-blur__layer--soft {
-  height: 84px;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 100%);
 }
 
 .edge-blur--bottom .edge-blur__layer--strong {
