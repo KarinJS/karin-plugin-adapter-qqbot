@@ -362,34 +362,94 @@
   mask-image: linear-gradient(to bottom, #000 0%, #000 52%, transparent 100%);
 }
 
-/*
- * 列表上下边缘的渐隐。
- * 卡片从底部进入、向上滚过标题后从顶部消失，两端都用带遮罩的背景模糊压住：
- * 越靠近边缘越不透明，往列表内部逐渐化开，不会出现硬切。
- */
-.list-top-blur,
-.list-bottom-blur {
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  backdrop-filter: blur(14px) saturate(140%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 52%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 52%, transparent 100%);
-  background: linear-gradient(
-    to bottom,
-    color-mix(in oklab, var(--background) 92%, transparent) 0%,
-    color-mix(in oklab, var(--background) 72%, transparent) 52%,
-    transparent 100%
-  );
+/* 宽屏浮层模式下，标题只靠下方的三层边缘模糊，不再自己铺底色。 */
+@media (min-width: 80rem) {
+  .bot-list-header--overlay::before {
+    display: none;
+  }
 }
 
-.list-bottom-blur {
-  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 52%, transparent 100%);
-  mask-image: linear-gradient(to top, #000 0%, #000 52%, transparent 100%);
-  background: linear-gradient(
-    to top,
-    color-mix(in oklab, var(--background) 92%, transparent) 0%,
-    color-mix(in oklab, var(--background) 72%, transparent) 52%,
-    transparent 100%
-  );
+/*
+ * 列表上下边缘的渐进模糊，和手机端抽屉共用同一套做法：
+ * 三层不同半径的 backdrop-filter 叠加，不铺任何底色，
+ * 内容被逐渐模糊，但仍能看出下层的轮廓。
+ */
+.list-edge-blur {
+  position: absolute;
+  inset-inline: 0;
+  height: 96px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.list-edge-blur--top {
+  top: 0;
+}
+
+.list-edge-blur--bottom {
+  bottom: 0;
+}
+
+.list-edge-blur__layer {
+  position: absolute;
+  inset-inline: 0;
+  background: transparent;
+}
+
+.list-edge-blur--top .list-edge-blur__layer {
+  top: 0;
+}
+
+.list-edge-blur--bottom .list-edge-blur__layer {
+  bottom: 0;
+}
+
+.list-edge-blur__layer--strong {
+  height: 30px;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.list-edge-blur__layer--medium {
+  height: 54px;
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.list-edge-blur__layer--soft {
+  height: 84px;
+  -webkit-backdrop-filter: blur(1.25px);
+  backdrop-filter: blur(1.25px);
+}
+
+.list-edge-blur--top .list-edge-blur__layer--strong {
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 50%, transparent 100%);
+}
+
+.list-edge-blur--top .list-edge-blur__layer--medium {
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%);
+}
+
+.list-edge-blur--top .list-edge-blur__layer--soft {
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 100%);
+}
+
+.list-edge-blur--bottom .list-edge-blur__layer--strong {
+  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 50%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 0%, #000 50%, transparent 100%);
+}
+
+.list-edge-blur--bottom .list-edge-blur__layer--medium {
+  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 42%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 0%, #000 42%, transparent 100%);
+}
+
+.list-edge-blur--bottom .list-edge-blur__layer--soft {
+  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 30%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 0%, #000 30%, transparent 100%);
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -397,6 +457,18 @@
     background: var(--background);
     -webkit-mask-image: none;
     mask-image: none;
+  }
+
+  .list-edge-blur {
+    background: linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--background) 90%, transparent) 0%,
+      transparent 100%
+    );
+  }
+
+  .list-edge-blur--bottom {
+    background: linear-gradient(to top, color-mix(in oklab, var(--background) 90%, transparent) 0%, transparent 100%);
   }
 }
 
@@ -409,10 +481,26 @@
     mask-image: none;
   }
 
-  .list-top-blur,
-  .list-bottom-blur {
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
+  .list-edge-blur {
+    background: linear-gradient(
+      to bottom,
+      var(--background) 0%,
+      color-mix(in oklab, var(--background) 72%, transparent) 55%,
+      transparent 100%
+    );
+  }
+
+  .list-edge-blur--bottom {
+    background: linear-gradient(
+      to top,
+      var(--background) 0%,
+      color-mix(in oklab, var(--background) 72%, transparent) 55%,
+      transparent 100%
+    );
+  }
+
+  .list-edge-blur__layer {
+    display: none;
   }
 }
 

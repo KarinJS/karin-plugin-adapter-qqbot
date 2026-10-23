@@ -87,7 +87,18 @@ export const CanvasPager = ({ pages, activeKey }: CanvasPagerProps) => {
             inert={index !== activeIndex}
             className='no-scrollbar h-full w-full shrink-0 overflow-y-auto overscroll-contain'
           >
-            <div className={cn('mx-auto w-full max-w-[78rem] px-6 py-6', page.fill && 'h-full')}>{page.element}</div>
+            {/*
+              填满型页面（机器人工作区）在宽屏下铺满画布、不留内边距，
+              列表的滚动边界就是屏幕边缘；窄屏仍保留常规页边距。
+            */}
+            <div
+              className={cn(
+                'mx-auto w-full max-w-[78rem] px-6 py-6',
+                page.fill && 'h-full xl:mx-0 xl:max-w-none xl:p-0'
+              )}
+            >
+              {page.element}
+            </div>
           </section>
         ))}
       </div>

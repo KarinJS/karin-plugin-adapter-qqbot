@@ -88,9 +88,14 @@ export const BotList = ({ selectedAppId, className, showAdd = true, overlay = fa
         窄屏整页滚动时由 sticky 把标题钉在屏幕顶部。
       */}
       <div
-        className={cn('sticky top-0 z-20 -mx-1 px-1', overlay && 'xl:absolute xl:inset-x-0 xl:top-0 xl:mx-0 xl:px-0')}
+        className={cn('sticky top-0 z-20 -mx-1 px-1', overlay && 'xl:absolute xl:inset-x-0 xl:top-0 xl:mx-0 xl:px-4')}
       >
-        <div className='bot-list-header flex items-center justify-between gap-3 px-1 py-3'>
+        <div
+          className={cn(
+            'bot-list-header flex items-center justify-between gap-3 px-1 py-3',
+            overlay && 'bot-list-header--overlay'
+          )}
+        >
           <div className='flex items-baseline gap-2'>
             <h2 className='text-heading text-base font-semibold'>机器人</h2>
             <span className='tabular text-xs text-muted'>{config.length}</span>
@@ -107,7 +112,7 @@ export const BotList = ({ selectedAppId, className, showAdd = true, overlay = fa
       <div className='relative min-h-0 flex-1'>
         <div
           ref={listRef}
-          className={cn('no-scrollbar h-full overflow-y-auto overscroll-contain', overlay && 'xl:pt-20 xl:pb-20')}
+          className={cn('no-scrollbar h-full overflow-y-auto overscroll-contain', overlay && 'xl:pt-21 xl:pb-21')}
         >
           {loading && config.length === 0 ? (
             <div className='flex flex-col gap-2 py-2'>
@@ -173,19 +178,21 @@ export const BotList = ({ selectedAppId, className, showAdd = true, overlay = fa
         </div>
 
         {/*
-          上下两端都用带遮罩的背景模糊：卡片从底部渐入、滚过标题后从顶部渐出。
-          只在固定高度的列表里出现，概览页和窄屏没有固定边缘。
+          上下边缘和手机端抽屉共用一套渐进模糊：三层不同半径的模糊叠加，
+          不铺底色，卡片被模糊后仍能看出轮廓。
         */}
         {overlay ? (
           <>
-            <div
-              aria-hidden='true'
-              className='list-top-blur pointer-events-none absolute inset-x-0 top-0 z-10 hidden h-20 xl:block'
-            />
-            <div
-              aria-hidden='true'
-              className='list-bottom-blur pointer-events-none absolute inset-x-0 bottom-0 z-10 hidden h-20 xl:block'
-            />
+            <div aria-hidden='true' className='list-edge-blur list-edge-blur--top hidden xl:block'>
+              <div className='list-edge-blur__layer list-edge-blur__layer--strong' />
+              <div className='list-edge-blur__layer list-edge-blur__layer--medium' />
+              <div className='list-edge-blur__layer list-edge-blur__layer--soft' />
+            </div>
+            <div aria-hidden='true' className='list-edge-blur list-edge-blur--bottom hidden xl:block'>
+              <div className='list-edge-blur__layer list-edge-blur__layer--strong' />
+              <div className='list-edge-blur__layer list-edge-blur__layer--medium' />
+              <div className='list-edge-blur__layer list-edge-blur__layer--soft' />
+            </div>
           </>
         ) : null}
       </div>

@@ -1,4 +1,4 @@
-import { Button, Skeleton, toast } from '@heroui/react'
+import { Button, Skeleton, cn, toast } from '@heroui/react'
 import { gsap } from 'gsap'
 import { Bot, QrCode, Trash2 } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
@@ -199,22 +199,24 @@ export const BotsWorkspace = () => {
           eyebrow='Bots'
           title='机器人'
           description='每个机器人独立配置事件通道、场景开关和消息缓存。'
-          className='pb-6'
+          className={cn('pb-6', embedded && 'xl:px-6 xl:pt-6')}
         />
       </div>
 
       {empty ? (
-        <EmptyState
-          icon={<QrCode className='size-5' aria-hidden='true' />}
-          title='还没有机器人'
-          description='扫码授权后会自动创建配置。也可以进入添加页面手动填写 AppID 和 AppSecret。'
-          action={
-            <Button onPress={() => navigate('/bots/new')}>
-              <QrCode className='size-4' aria-hidden='true' />
-              添加第一个机器人
-            </Button>
-          }
-        />
+        <div className={cn(embedded && 'xl:px-6 xl:pb-6')}>
+          <EmptyState
+            icon={<QrCode className='size-5' aria-hidden='true' />}
+            title='还没有机器人'
+            description='扫码授权后会自动创建配置。也可以进入添加页面手动填写 AppID 和 AppSecret。'
+            action={
+              <Button onPress={() => navigate('/bots/new')}>
+                <QrCode className='size-4' aria-hidden='true' />
+                添加第一个机器人
+              </Button>
+            }
+          />
+        </div>
       ) : (
         <div
           data-bots-workspace=''
@@ -229,7 +231,10 @@ export const BotsWorkspace = () => {
           <div
             ref={panelRef}
             data-bots-panel=''
-            className='no-scrollbar flex min-w-0 flex-col gap-5 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain'
+            className={cn(
+              'no-scrollbar flex min-w-0 flex-col gap-5 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain',
+              embedded && 'xl:py-6 xl:pr-6'
+            )}
           >
             {panel}
           </div>
