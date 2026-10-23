@@ -1,5 +1,6 @@
 import fs from 'node:fs'
-import { watch, karinPathBase, requireFileSync, common, logger } from 'node-karin'
+import { isDeepStrictEqual } from 'node:util'
+import { watch, karinPathBase, requireFileSync, logger } from 'node-karin'
 import { pluginDirName } from '@/utils/plugin'
 import type { Config, MessageCacheLevel, QQBotConfig } from '@/types/config'
 
@@ -8,6 +9,17 @@ export { pkg, pluginDirName } from '@/utils/plugin'
 let cache: Config | undefined
 const cacheMap: Record<string, QQBotConfig> = {}
 
+/**
+ * 运行时已经应用的配置快照。
+ *
+ * `config()` 返回的是内存缓存，调用方（例如扫码登录）可能原地修改它，
+ * 因此不能拿缓存本身当作 diff 的基准，必须单独保存一份快照。
+ */
+let appliedConfig: Config | undefined
+
+/** 串行应用配置差异，避免连续保存时销毁 / 重建交错。 */
+let applyQueue: Promise<void> = Promise.resolve()
+
 /** 延迟注入，避免与 core/index.ts 循环依赖 */
 let _createBot: ((cfg: QQBotConfig) => Promise<void>) | undefined
 let _destroyBot: ((appId: string) => void) | undefined
@@ -15,6 +27,14 @@ let _destroyBot: ((appId: string) => void) | undefined
 export const bindHandlers = (createBot: (cfg: QQBotConfig) => Promise<void>, destroyBot: (appId: string) => void) => {
   _createBot = createBot
   _destroyBot = destroyBot
+}
+
+const cloneConfig = (data: Config): Config => structuredClone(data)
+
+/** 取运行时快照；首次调用时用当前缓存或磁盘配置初始化。 */
+const getAppliedConfig = (): Config => {
+  if (!appliedConfig) appliedConfig = cloneConfig(cache ?? readConfigFile())
+  return appliedConfig
 }
 
 /** 配置目录：${karinPathBase}/@karinjs-adapter-qqbot/config */
@@ -41,6 +61,7 @@ export const config = (): Config => {
   const user = requireFileSync<Config>(configPath)
   const result = formatConfig(user)
   syncCache(result)
+  appliedConfig ??= cloneConfig(result)
   return result
 }
 
@@ -61,13 +82,95 @@ export const readConfigFile = (): Config => {
 export const getConfig = (appid: string) => cacheMap[appid]
 
 /**
- * 写入配置
+ * 判断两个机器人配置是否完全一致。
  */
-export const writeConfig = (data: Config) => {
+const isSameBotConfig = (prev: QQBotConfig, next: QQBotConfig): boolean => {
+  return isDeepStrictEqual(prev, next)
+}
+
+/**
+ * 销毁单个机器人；单个失败不能影响同一批里的其他机器人。
+ */
+const destroy = (appId: string): void => {
+  try {
+    _destroyBot?.(appId)
+  } catch (error) {
+    logger.error(`[QQ Official Bot][配置监听] 销毁机器人失败 ${appId}:`, error)
+  }
+}
+
+/**
+ * 应用一批配置差异。
+ *
+ * 以 appId 为单位比较，只销毁 / 重建真正变化的机器人；
+ * 未变化的机器人保持现有连接不动。
+ */
+const applyConfigDiff = async (previous: Config, next: Config): Promise<void> => {
+  const previousMap = new Map(previous.map((item) => [item.appId, item]))
+  const nextMap = new Map(next.map((item) => [item.appId, item]))
+  const creates: QQBotConfig[] = []
+
+  previousMap.forEach((_bot, appId) => {
+    if (nextMap.has(appId)) return
+    logger.info(`[QQ Official Bot][配置监听] 移除机器人: ${appId}`)
+    destroy(appId)
+  })
+
+  nextMap.forEach((bot, appId) => {
+    const prev = previousMap.get(appId)
+    if (!prev) {
+      logger.info(`[QQ Official Bot][配置监听] 新增机器人: ${appId}`)
+    } else {
+      if (isSameBotConfig(prev, bot)) return
+      logger.info(`[QQ Official Bot][配置监听] 配置已变更: ${appId}，重新初始化`)
+      destroy(appId)
+    }
+    if (bot.event.type !== 0) creates.push(bot)
+  })
+
+  if (creates.length === 0) return
+
+  await Promise.all(
+    creates.map(async (bot) => {
+      try {
+        await _createBot?.(bot)
+      } catch (error) {
+        logger.error(`[QQ Official Bot][配置监听] 初始化机器人失败 ${bot.appId}:`, error)
+      }
+    })
+  )
+}
+
+/**
+ * 把一份新配置应用到运行时。
+ *
+ * 先固定旧快照，再同步更新缓存；随后串行执行差异。这样文件监听即使
+ * 在写盘后触发，也会因为快照已经是最新配置而直接跳过，不会重复重建。
+ */
+export const applyConfigChange = async (data: Config): Promise<void> => {
+  const previous = getAppliedConfig()
+  const normalized = cloneConfig(formatConfig(data))
+  syncCache(normalized)
+  appliedConfig = cloneConfig(normalized)
+
+  const task = applyQueue.then(() => applyConfigDiff(previous, normalized))
+  applyQueue = task.catch(() => {})
+  await task
+}
+
+/**
+ * 写入配置并立即应用差异。
+ *
+ * Web 保存、扫码登录和文件监听最终都走这里；写盘后不再依赖
+ * `requireFileSync` 的旧缓存判断变化，避免 Web 保存后不重连。
+ */
+export const writeConfig = (data: Config): Promise<void> => {
+  /** 先固定旧快照，避免写盘后首次读取把新配置当成旧配置。 */
+  getAppliedConfig()
   fs.mkdirSync(dirConfig, { recursive: true })
   const normalized = formatConfig(data)
   fs.writeFileSync(configPath, JSON.stringify(normalized, null, 2))
-  syncCache(normalized)
+  return applyConfigChange(normalized)
 }
 
 /**
@@ -154,34 +257,15 @@ export const getDefaultConfig = (): Config => [
 ]
 
 /**
- * 监听配置文件，比较前后差异决定重建 / 销毁 bot
+ * 监听配置文件，应用外部修改。
+ *
+ * 这里不再使用 `watch` 回调里的旧值：node-karin 的 `requireFileSync`
+ * 可能已被 Web 接口强制刷新过，旧值会和新值相同。统一以运行时快照为准。
  */
 setTimeout(() => {
-  watch<Config>(`${dirConfig}/config.json`, (old, now) => {
-    const oldConfig = formatConfig(old)
-    const nowConfig = formatConfig(now)
-    syncCache(nowConfig)
-
-    const diff = common.diffArray(oldConfig, nowConfig)
-
-    diff.removed.forEach((v) => _destroyBot?.(v.appId))
-
-    if (diff.added.length > 0) {
-      const ids = new Set(diff.added.map((v) => v.appId))
-      nowConfig.forEach((v) => {
-        if (!ids.has(v.appId)) return
-        if (v.event.type === 0) return
-        _createBot?.(v)
-      })
-    }
-
-    diff.common.forEach((curr) => {
-      const prev = oldConfig.find((c) => c.appId === curr.appId)
-      if (!prev) return
-      if (JSON.stringify(prev) === JSON.stringify(curr)) return
-      logger.info(`[QQ Official Bot][配置监听] 配置已变更: ${curr.appId}，重新初始化`)
-      _destroyBot?.(prev.appId)
-      if (curr.event.type !== 0) _createBot?.(curr)
+  watch<Config>(`${dirConfig}/config.json`, (_old, now) => {
+    void applyConfigChange(now).catch((error) => {
+      logger.error('[QQ Official Bot][配置监听] 应用配置失败:', error)
     })
   })
 }, 2000)

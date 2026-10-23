@@ -168,6 +168,16 @@ const readBodyConfig = (req: Request): unknown => {
   return body
 }
 
+const saveConfig = async (req: Request, res: Response) => {
+  try {
+    const config = parseConfig(readBodyConfig(req))
+    await writeConfig(config)
+    success(res, { config: readConfigFile() })
+  } catch (error) {
+    handleError(res, error)
+  }
+}
+
 /**
  * 注册插件自己的配置与运行状态接口。
  *
@@ -187,13 +197,7 @@ export const registerConfigRoutes = () => {
   })
 
   router.post('/qqbot/config', (req, res) => {
-    try {
-      const config = parseConfig(readBodyConfig(req))
-      writeConfig(config)
-      success(res, { config: readConfigFile() })
-    } catch (error) {
-      handleError(res, error)
-    }
+    void saveConfig(req, res)
   })
 
   router.get('/qqbot/status', (_req, res) => {

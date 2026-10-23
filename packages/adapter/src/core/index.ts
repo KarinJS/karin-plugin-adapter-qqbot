@@ -33,13 +33,13 @@ export const initQQBotAdapter = async () => {
  */
 const initState = new Map<string, { hash: string; promise: Promise<void> }>()
 
-const hashConfig = (bot: QQBotConfig): string =>
-  JSON.stringify({
-    appId: bot.appId,
-    secret: bot.secret,
-    event: bot.event,
-    messageCache: bot.messageCache,
-  })
+/**
+ * 用于并发去重的配置指纹。
+ *
+ * 必须覆盖整个机器人配置：正则、场景开关等字段虽然不参与连接握手，
+ * 但会进入 AdapterQQBot 实例；只比较部分字段会让"重建"错误地复用旧连接。
+ */
+const hashConfig = (bot: QQBotConfig): string => JSON.stringify(bot)
 
 /**
  * 创建单个 Bot 实例

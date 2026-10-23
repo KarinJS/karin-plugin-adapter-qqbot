@@ -70,7 +70,7 @@ const finish = (session: WebLoginSession, status: WebLoginStatus, message?: stri
  *
  * 已存在的 appId 只替换 secret，保留用户的其他配置；新 appId 使用默认模板。
  */
-const persistBot = (appId: string, secret: string): boolean => {
+const persistBot = async (appId: string, secret: string): Promise<boolean> => {
   const list = readConfigFile()
   const index = list.findIndex((item) => item.appId === appId)
 
@@ -80,7 +80,7 @@ const persistBot = (appId: string, secret: string): boolean => {
     list.push({ ...getDefaultConfig()[0], appId, secret })
   }
 
-  writeConfig(list)
+  await writeConfig(list)
   return index >= 0
 }
 
@@ -123,7 +123,7 @@ const poll = async (session: WebLoginSession) => {
 
     if (result.status === BindStatus.COMPLETED) {
       const secret = decryptSecret(result.encryptedSecret, session.key)
-      const updated = persistBot(result.appId, secret)
+      const updated = await persistBot(result.appId, secret)
       const profile = await fetchBotProfile(result.appId, secret)
       session.appId = result.appId
       session.name = profile?.name
