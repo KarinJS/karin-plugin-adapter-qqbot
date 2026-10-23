@@ -44,8 +44,14 @@ export const useBotEditor = (bot: BotConfig): BotEditor => {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const timerRef = useRef<number | undefined>(undefined)
+  // 路由切换后的一帧里 draft 还是上一个机器人的，先按新机器人计算，
+  // 避免表单和「未保存」标记闪一下旧数据。
+  const draftSourceRef = useRef(bot.appId)
+  const draftMatchesBot = draftSourceRef.current === bot.appId
+  const currentDraft = draftMatchesBot ? draft : cloneBot(bot)
 
   useEffect(() => {
+    draftSourceRef.current = bot.appId
     setDraft(cloneBot(bot))
     setErrors({})
   }, [bot])
@@ -61,14 +67,16 @@ export const useBotEditor = (bot: BotConfig): BotEditor => {
   }
 
   const otherAppIds = config.filter((item) => item.appId !== bot.appId).map((item) => item.appId)
-  const dirty = stableStringify(draft) !== stableStringify(bot)
+  const dirty = stableStringify(currentDraft) !== stableStringify(bot)
 
   const patch = (next: Partial<BotConfig>) => {
-    setDraft((current) => ({ ...current, ...next }))
+    setDraft((current) => ({ ...(draftMatchesBot ? current : cloneBot(bot)), ...next }))
+    draftSourceRef.current = bot.appId
     clearError()
   }
 
   const reset = () => {
+    draftSourceRef.current = bot.appId
     setDraft(cloneBot(bot))
     setErrors({})
     clearError()
@@ -94,15 +102,17 @@ export const useBotEditor = (bot: BotConfig): BotEditor => {
   const submit = async (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault()
 
-    const nextErrors = validate(draft)
+    const nextErrors = validate(currentDraft)
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return null
 
     const normalized: BotConfig = {
-      ...draft,
-      appId: draft.appId.trim(),
-      secret: draft.secret.trim(),
-      regex: draft.regex.map((rule) => ({ reg: rule.reg.trim(), rep: rule.rep })).filter((rule) => rule.reg.length > 0),
+      ...currentDraft,
+      appId: currentDraft.appId.trim(),
+      secret: currentDraft.secret.trim(),
+      regex: currentDraft.regex
+        .map((rule) => ({ reg: rule.reg.trim(), rep: rule.rep }))
+        .filter((rule) => rule.reg.length > 0),
     }
 
     const nextConfig = config.map((item) => (item.appId === bot.appId ? normalized : item))
@@ -121,7 +131,7 @@ export const useBotEditor = (bot: BotConfig): BotEditor => {
   }
 
   return {
-    draft,
+    draft: currentDraft,
     errors,
     dirty,
     saving,

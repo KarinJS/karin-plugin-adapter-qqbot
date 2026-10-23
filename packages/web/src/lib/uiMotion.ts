@@ -6,3 +6,10 @@
  */
 export const UI_MOTION_DURATION = 0.5
 export const UI_MOTION_EASE = 'power3.out'
+
+/** 和 Tailwind 的 xl 对齐：固定顶栏、粒子效果只在这个宽度以上启用。 */
+export const DESKTOP_MOTION_QUERY = '(min-width: 80rem)'
+
+export const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+export const isDesktopMotion = () => window.matchMedia(DESKTOP_MOTION_QUERY).matches

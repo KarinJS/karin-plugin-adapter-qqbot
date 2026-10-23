@@ -755,6 +755,60 @@
   background: color-mix(in oklab, currentColor 32%, transparent);
 }
 
+/* 在线状态真正变化时圆点轻弹一下，作为状态组交叉淡化的落点。 */
+.status-dot--pulse {
+  animation: status-dot-pulse 200ms var(--ease-out);
+}
+
+@keyframes status-dot-pulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/*
+ * 未保存标记的入场交给 CSS：只改 opacity / scale，不和顶栏 GSAP 的
+ * translateX 抢 transform；减少动态效果时只保留淡入。
+ */
+.unsaved-badge {
+  opacity: 1;
+  scale: 1;
+  transition:
+    opacity 160ms var(--ease-out),
+    scale 160ms var(--ease-out);
+}
+
+@starting-style {
+  .unsaved-badge {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-dot--pulse {
+    animation: none;
+  }
+
+  .unsaved-badge {
+    transition: opacity 120ms var(--ease-out);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @starting-style {
+    .unsaved-badge {
+      scale: 1;
+    }
+  }
+}
+
 /* AppSecret 用 text 输入配合遮罩，避免浏览器把它识别成登录密码。 */
 .secret-mask {
   -webkit-text-security: disc;

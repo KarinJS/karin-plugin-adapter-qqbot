@@ -2,13 +2,13 @@ import { Alert, Button, Description, FieldError, Input, Label, ListBox, Select, 
 import { RotateCcw, Save } from 'lucide-react'
 import { useId, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BotFormHeader } from '@/components/BotFormHeader'
 import { EventTypePicker } from '@/components/EventTypePicker'
 import { MessageCacheFields } from '@/components/MessageCacheFields'
 import { RegexEditor } from '@/components/RegexEditor'
 import { SaveStatus } from '@/components/SaveStatus'
 import { SecretField } from '@/components/SecretField'
 import { SectionCard } from '@/components/SectionCard'
-import { StatusPill } from '@/components/StatusPill'
 import { useBotEditor } from '@/hooks/useBotEditor'
 import { useConfigStore } from '@/hooks/useConfigStore'
 import type { BotConfig } from '@/lib/types'
@@ -59,35 +59,19 @@ export const BotForm = ({ bot, onSaved }: BotFormProps) => {
       <SaveStatus state={saveState} />
 
       {/*
-        宽屏时表单标题和操作悬浮在滚动区顶部，卡片从下面滚过并化开；
+        宽屏时表单顶栏固定在滚动区顶部，只有下面的内容参与翻页和滚动；
         窄屏整页滚动，保持原来的静态布局。
       */}
-      <div data-form-header='' className='xl:sticky xl:top-0 xl:z-20 xl:h-21'>
-        <div aria-hidden='true' className='edge-blur edge-blur--top edge-blur--header hidden xl:block'>
-          <div className='edge-blur__layer edge-blur__layer--strong' />
-          <div className='edge-blur__layer edge-blur__layer--medium' />
-          <div className='edge-blur__layer edge-blur__layer--soft' />
-        </div>
+      <BotFormHeader
+        appId={bot.appId}
+        name={status?.name || bot.appId}
+        online={status?.online ?? false}
+        eventType={bot.event.type}
+        dirty={dirty}
+        actions={actions}
+      />
 
-        {/* 标题顶边和左侧列表标题对齐：84px 高、20px 字、顶部 30.5px。 */}
-        <div className='relative z-20 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between xl:pt-[30.5px] xl:pb-2'>
-          <div className='min-w-0'>
-            <div className='flex flex-wrap items-center gap-x-3 gap-y-1'>
-              <h2 className='text-heading truncate text-xl font-semibold'>{status?.name || bot.appId}</h2>
-              <StatusPill online={status?.online ?? false} eventType={bot.event.type} />
-              {dirty ? (
-                <span className='rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[0.6875rem] text-warning'>
-                  未保存
-                </span>
-              ) : null}
-            </div>
-            <p className='mt-1 text-xs text-muted'>{bot.appId} · 保存后适配器会销毁旧连接并重新初始化</p>
-          </div>
-          {actions}
-        </div>
-      </div>
-
-      <div className='flex flex-col gap-5'>
+      <div data-form-body='' className='flex flex-col gap-5'>
         {error ? (
           <Alert status='danger'>
             <Alert.Indicator />

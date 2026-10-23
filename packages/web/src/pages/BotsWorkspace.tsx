@@ -15,6 +15,7 @@ import { useSmoothScroll } from '@/hooks/useSmoothScroll'
 import { dissolveBotCard } from '@/lib/dissolveBotCard'
 import { SHEET_MOTION_DURATION, SHEET_MOTION_EASE } from '@/lib/sheetMotion'
 import { getSmoothScroll, resizeSmoothScroll } from '@/lib/smoothScroll'
+import { isDesktopMotion, prefersReducedMotion } from '@/lib/uiMotion'
 
 const HEADER_COLLAPSE_DURATION = 0.26
 
@@ -26,8 +27,6 @@ const decodeAppId = (value: string | undefined) => {
     return value
   }
 }
-
-const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /**
  * 桌面端机器人工作区。
@@ -46,6 +45,7 @@ export const BotsWorkspace = () => {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [removing, setRemoving] = useState(false)
   const headerRef = useRef<HTMLDivElement>(null)
+  const workspaceRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const panelContentRef = useRef<HTMLDivElement>(null)
   const headerFirstRef = useRef(true)
@@ -73,7 +73,7 @@ export const BotsWorkspace = () => {
       return
     }
 
-    if (reduceMotion()) {
+    if (prefersReducedMotion()) {
       gsap.set(element, { height: collapsed ? 0 : 'auto', autoAlpha: collapsed ? 0 : 1, y: 0 })
       return
     }
@@ -106,28 +106,42 @@ export const BotsWorkspace = () => {
     if (panelFirstRef.current) {
       panelFirstRef.current = false
       previousAppIdRef.current = appId || null
-      gsap.set(element, { autoAlpha: 1, y: 0 })
+      // 不要给面板写 transform：面板一旦成为层叠上下文，内部固定顶栏的 z-index
+      // 就会被关在里面，翻页快照反而盖住顶栏。
+      gsap.set(element, { autoAlpha: 1 })
+      element.style.transform = ''
       return
     }
 
     const previousAppId = previousAppIdRef.current
     previousAppIdRef.current = appId || null
 
-    if (reduceMotion() || !content) {
-      if (content) {
-        gsap.killTweensOf(content)
-        gsap.set(content, { clearProps: 'transform' })
+    // 宽屏顶栏固定，只移动顶栏下面的表单内容和底部卡片；窄屏仍然整块翻页。
+    const body = element.querySelector<HTMLElement>('[data-form-body]')
+    const footer = element.querySelector<HTMLElement>('[data-form-footer]')
+    const parts = [body, footer].filter((node): node is HTMLElement => Boolean(node))
+    const target = isDesktopMotion() && parts.length > 0 ? parts : content
+
+    if (prefersReducedMotion() || !target) {
+      if (target) {
+        gsap.killTweensOf(target)
+        gsap.set(target, { clearProps: 'transform' })
       }
       return
     }
 
+    const distance = element.clientHeight
+    // 内容顶边要贴着屏幕边缘入场：顶栏占掉的高度不参与这段位移。
+    const panelTop = element.getBoundingClientRect().top
+    const bodyOffset = body ? body.getBoundingClientRect().top - panelTop : 0
+    const startY = (up: boolean) => (up ? distance - bodyOffset : -bodyOffset)
+
     if (pending) {
-      // 旧表单的快照已经在 handleSelect 里滑出屏幕，新表单从相反方向滑进来。
-      const distance = element.clientHeight
-      gsap.killTweensOf(content)
+      // 旧表单的快照已经在 handleSelect 里滑出屏幕，新内容从相反方向滑进来。
+      gsap.killTweensOf(target)
       gsap.fromTo(
-        content,
-        { y: pending.up ? distance : -distance },
+        target,
+        { y: startY(pending.up) },
         {
           y: 0,
           duration: SHEET_MOTION_DURATION,
@@ -143,11 +157,10 @@ export const BotsWorkspace = () => {
     const fromIndex = configRef.current.findIndex((item) => item.appId === previousAppId)
     const toIndex = configRef.current.findIndex((item) => item.appId === appId)
     const up = fromIndex === -1 || toIndex === -1 ? true : toIndex > fromIndex
-    const distance = element.clientHeight
-    gsap.killTweensOf(content)
+    gsap.killTweensOf(target)
     gsap.fromTo(
-      content,
-      { y: up ? distance : -distance },
+      target,
+      { y: startY(up) },
       {
         y: 0,
         duration: SHEET_MOTION_DURATION,
@@ -172,10 +185,10 @@ export const BotsWorkspace = () => {
   /**
    * 列表点击换机器人。
    *
-   * 先给当前面板拍一张快照（保留滚动位置、输入值和顶部模糊），让它按列表方向
-   * 整块滑出屏幕；路由立即切到目标机器人，新表单从反方向滑入。
-   * 中间经过的机器人不会依次播放，一次点击只走一段。
-   * 翻页途中再次点击时直接撤掉旧快照，从当前画面重新开始，不阻塞操作。
+   * 宽屏下顶栏固定不动，先给顶栏下面的内容拍一张快照，让它按列表方向滑出屏幕，
+   * 路由立即切到目标机器人，新内容从反方向滑入；快照里把顶栏换成等高占位，
+   * 这样翻页的只有表单内容，不会每个机器人各带一份顶栏。
+   * 窄屏保持原来的整块面板翻页。翻页途中再次点击直接撤掉旧快照，从当前画面重新开始。
    */
   const handleSelect = (nextAppId: string) => {
     if (!nextAppId || nextAppId === appId) return
@@ -189,32 +202,52 @@ export const BotsWorkspace = () => {
 
     const panel = panelRef.current
     const content = panelContentRef.current
+    const workspace = workspaceRef.current
     const fromIndex = config.findIndex((item) => item.appId === appId)
     const toIndex = config.findIndex((item) => item.appId === nextAppId)
-    // 列表里往下点（索引变大）时旧表单向上滑出、新表单从底部进入，反方向同理。
+    // 列表里往下点（索引变大）时旧内容向上滑出、新内容从底部进入，反方向同理。
     const up = fromIndex === -1 || toIndex === -1 ? true : toIndex > fromIndex
+    const desktopMotion = isDesktopMotion()
 
-    if (!panel || !content || reduceMotion()) {
+    if (!panel || !content || !workspace || prefersReducedMotion()) {
       navigate(`/bots/${encodeURIComponent(nextAppId)}`)
       return
     }
 
     const rect = panel.getBoundingClientRect()
+    // 宽屏快照固定在画布轨道上，而不是跟着面板的滚动区走：
+    // 否则快照滑到工作区外面会把整页的 scrollHeight 撑大。
+    const track = workspace.closest<HTMLElement>('.will-change-transform')
+    const trackRect = track?.getBoundingClientRect() ?? null
+    // 快照里顶栏的高度要在原面板上量，克隆节点脱离文档后量不到。
+    const headerHeight = panel.querySelector<HTMLElement>('[data-form-header]')?.getBoundingClientRect().height ?? 0
     const clone = panel.cloneNode(true) as HTMLElement
     clone.removeAttribute('data-bots-panel')
     clone.setAttribute('data-bots-snapshot', '')
     clone.setAttribute('inert', '')
     clone.setAttribute('aria-hidden', 'true')
+    // 宽屏快照放进工作区，和固定顶栏共享同一个层叠上下文，z-index 低于顶栏；
+    // 窄屏仍然固定在视口上，整块面板滑出。
     clone.style.position = 'fixed'
-    clone.style.left = `${rect.left}px`
-    clone.style.top = `${rect.top}px`
+    clone.style.left = `${desktopMotion && trackRect ? rect.left - trackRect.left : rect.left}px`
+    clone.style.top = `${desktopMotion && trackRect ? rect.top - trackRect.top : rect.top}px`
     clone.style.width = `${rect.width}px`
     clone.style.height = `${rect.height}px`
     clone.style.margin = '0'
-    clone.style.zIndex = '45'
+    clone.style.zIndex = desktopMotion ? '10' : '45'
     clone.style.overflowY = 'auto'
     clone.style.pointerEvents = 'none'
     clone.style.background = 'var(--background)'
+
+    if (desktopMotion) {
+      const cloneHeader = clone.querySelector<HTMLElement>('[data-form-header]')
+      if (cloneHeader) {
+        const spacer = document.createElement('div')
+        spacer.setAttribute('aria-hidden', 'true')
+        spacer.style.height = `${headerHeight}px`
+        cloneHeader.replaceWith(spacer)
+      }
+    }
 
     // cloneNode 不复制输入框的实时值，手动同步，退场时不会闪回旧数据。
     const sourceFields = panel.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
@@ -233,7 +266,7 @@ export const BotsWorkspace = () => {
       field.value = source.value
     })
 
-    document.body.appendChild(clone)
+    ;(desktopMotion ? workspace : document.body).appendChild(clone)
     clone.scrollTop = panel.scrollTop
 
     cloneRef.current = clone
@@ -282,7 +315,7 @@ export const BotsWorkspace = () => {
           }
         })()
       },
-      reduceMotion() ? 0 : 160
+      prefersReducedMotion() ? 0 : 160
     )
   }
 
@@ -296,9 +329,9 @@ export const BotsWorkspace = () => {
   ) : null
 
   const panel = bot ? (
-    <div key={bot.appId} className='flex min-w-0 flex-col gap-5'>
+    <div className='flex min-w-0 flex-col gap-5'>
       <BotForm bot={bot} />
-      {dangerZone}
+      {dangerZone ? <div data-form-footer=''>{dangerZone}</div> : null}
     </div>
   ) : selected && loading ? (
     <div className='flex flex-col gap-4'>
@@ -365,8 +398,9 @@ export const BotsWorkspace = () => {
         </div>
       ) : (
         <div
+          ref={workspaceRef}
           data-bots-workspace=''
-          className='grid items-start gap-5 xl:min-h-0 xl:flex-1 xl:grid-cols-[20rem_minmax(0,1fr)] xl:grid-rows-[minmax(0,1fr)] xl:items-stretch'
+          className='relative grid items-start gap-5 xl:min-h-0 xl:flex-1 xl:grid-cols-[20rem_minmax(0,1fr)] xl:grid-rows-[minmax(0,1fr)] xl:items-stretch'
         >
           {/*
             左列占满工作区高度，标题固定在列顶不参与滚动，卡片在列表内部滚。
