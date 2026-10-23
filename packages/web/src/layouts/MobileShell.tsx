@@ -64,9 +64,14 @@ const MobileShellContent = () => {
           <MobilePager items={items} activeKey={activeKey} onChange={handlePagerChange} disabled={sheetOpen} />
         </div>
 
-        {/* 整条底栏覆盖在内容上，内容从它下方滚过，模糊渐变才看得见。 */}
+        {/* 和抽屉底栏同款的三层边缘模糊：只有靠近底部的内容被逐渐化开。 */}
         <div className='pointer-events-none absolute inset-x-0 bottom-0 z-40'>
-          <nav className='mobile-bottom-nav pointer-events-auto' aria-label='主导航'>
+          <div aria-hidden='true' className='sheet-edge-blur--bottom mobile-bottom-blur'>
+            <div className='sheet-edge-blur__layer sheet-edge-blur__layer--strong' />
+            <div className='sheet-edge-blur__layer sheet-edge-blur__layer--medium' />
+            <div className='sheet-edge-blur__layer sheet-edge-blur__layer--soft' />
+          </div>
+          <nav className='mobile-bottom-nav pointer-events-auto relative z-10' aria-label='主导航'>
             <div className='grid grid-cols-2'>
               {tabs.map((tab) => {
                 const Icon = tab.icon

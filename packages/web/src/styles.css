@@ -221,26 +221,37 @@
 
 /*
  * 手机端底部导航。
- * 整条底栏覆盖在内容上，内容从下方滚过；背景用半透明渐变 + 模糊。
- * 不再有圆角、外边距和投影，避免看起来像悬浮 dock。
+ * 背景不铺色、不描边，直接用和抽屉底栏相同的三层边缘模糊：
+ * 只有靠近屏幕底部的内容会逐渐化开，导航本身保持透明。
  */
+.mobile-bottom-blur {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 96px;
+  z-index: 0;
+  pointer-events: none;
+}
+
 .mobile-bottom-nav {
-  border-top: 1px solid color-mix(in oklab, var(--foreground) 6%, transparent);
   padding: 0.25rem 0.5rem max(0.375rem, env(safe-area-inset-bottom));
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--surface) 38%, transparent) 0%,
-    color-mix(in oklab, var(--surface-secondary) 88%, transparent) 100%
-  );
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  backdrop-filter: blur(20px) saturate(160%);
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .mobile-bottom-nav {
+  .mobile-bottom-blur {
+    height: 100%;
     background: var(--surface);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
+  }
+
+  .mobile-bottom-blur .sheet-edge-blur__layer {
+    display: none;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .mobile-bottom-blur {
+    height: 100%;
+    background: color-mix(in oklab, var(--surface) 92%, transparent);
   }
 }
 
