@@ -79,7 +79,7 @@ export const CanvasPager = ({ pages, activeKey }: CanvasPagerProps) => {
             aria-label={page.label}
             aria-hidden={index !== activeIndex}
             inert={index !== activeIndex}
-            className='h-full w-full shrink-0 overflow-y-auto overscroll-contain'
+            className='no-scrollbar h-full w-full shrink-0 overflow-y-auto overscroll-contain'
           >
             <div className='mx-auto w-full max-w-[78rem] px-6 py-6'>{page.element}</div>
           </section>

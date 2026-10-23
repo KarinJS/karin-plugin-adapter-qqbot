@@ -336,13 +336,30 @@
 /*
  * 机器人列表的悬浮标题。
  *
- * 页面滚动时标题停在屏幕顶部，列表从下面经过。半透明底色把标题文字托住，
- * 背景模糊让经过的卡片化开；下沿再接一段带遮罩的模糊，避免内容被标题边缘硬切。
+ * 标题本身不铺实心底色，背后是一层带遮罩的背景模糊：
+ * 靠近标题时最强，往下逐渐消失，卡片滚过时会化开而不是被一条硬边切断。
  */
 .bot-list-header {
-  background: color-mix(in oklab, var(--background) 82%, transparent);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  backdrop-filter: blur(16px) saturate(140%);
+  position: relative;
+  isolation: isolate;
+}
+
+.bot-list-header::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 -10px;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--background) 84%, transparent) 0%,
+    color-mix(in oklab, var(--background) 52%, transparent) 62%,
+    transparent 100%
+  );
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 52%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 52%, transparent 100%);
 }
 
 .list-edge-blur {
@@ -358,16 +375,20 @@
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .bot-list-header {
+  .bot-list-header::before {
     background: var(--background);
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .bot-list-header {
+  .bot-list-header::before {
     background: var(--background);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 
   .list-edge-blur {

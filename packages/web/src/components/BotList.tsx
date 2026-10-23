@@ -1,6 +1,6 @@
 import { Button, Skeleton, cn } from '@heroui/react'
 import { ChevronRight, Plus, RadioTower } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BotAvatar } from '@/components/BotAvatar'
 import { StatusPill } from '@/components/StatusPill'
@@ -27,12 +27,56 @@ export const BotList = ({ selectedAppId, className, showAdd = true }: BotListPro
     setScrolled(next)
   }
 
+  useEffect(() => {
+    const list = listRef.current
+    if (!list) return
+
+    /** 找到页面真正的滚动容器：嵌入画布是页面 section，独立控制台是 main。 */
+    const findPageScroller = () => {
+      let node = list.parentElement
+      while (node) {
+        if (node.scrollHeight > node.clientHeight + 1) {
+          const overflowY = window.getComputedStyle(node).overflowY
+          if (overflowY === 'auto' || overflowY === 'scroll') return node
+        }
+        node = node.parentElement
+      }
+      return null
+    }
+
+    /**
+     * 列表只接管指针在卡片上时的滚轮。
+     *
+     * 指针停在卡片之间的空白处时，滚轮交还给页面，右侧表单继续滚动；
+     * 列表滚到两端后也把剩余滚动量交出去，避免指针停在卡片上时页面完全动不了。
+     */
+    const handleWheel = (event: WheelEvent) => {
+      if (event.deltaY === 0) return
+
+      const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY
+      const target = event.target as HTMLElement | null
+      const overCard = Boolean(target?.closest('[data-bot-id]'))
+      const canScroll =
+        delta < 0 ? list.scrollTop > 0 : list.scrollTop + list.clientHeight < list.scrollHeight - 1
+
+      if (overCard && canScroll) return
+
+      const page = findPageScroller()
+      if (!page) return
+
+      event.preventDefault()
+      page.scrollTop += delta
+    }
+
+    list.addEventListener('wheel', handleWheel, { passive: false })
+    return () => list.removeEventListener('wheel', handleWheel)
+  }, [])
+
   return (
     <section className={cn('flex min-h-0 flex-col gap-3', className)} aria-label='机器人列表'>
       {/*
-        标题跟着页面一起滚动，但停在屏幕顶部。
-        半透明底色 + 背景模糊让下面的卡片经过时仍然可读，下沿再接一段渐隐模糊，
-        和手机端抽屉边缘的处理保持同一套语言。
+        标题悬浮在列表上方，背后用带遮罩的背景模糊做渐变，不铺实心底色。
+        卡片从下面滚过时会逐渐化开，标题本身始终停在屏幕顶部。
       */}
       <div className='sticky top-0 z-20 -mx-1 px-1'>
         <div className='bot-list-header flex items-center justify-between gap-3 px-1 py-3'>
@@ -47,17 +91,16 @@ export const BotList = ({ selectedAppId, className, showAdd = true }: BotListPro
             </Button>
           ) : null}
         </div>
-        <div aria-hidden='true' className='list-edge-blur pointer-events-none absolute inset-x-0 top-full h-6' />
       </div>
 
       <div className='relative min-h-0 flex-1'>
         <div
           ref={listRef}
           onScroll={handleScroll}
-          className='h-full overflow-y-auto overscroll-contain rounded-2xl border border-border/80 bg-surface'
+          className='no-scrollbar h-full overflow-y-auto overscroll-contain'
         >
           {loading && config.length === 0 ? (
-            <div className='flex flex-col gap-2 p-3'>
+            <div className='flex flex-col gap-2 py-2'>
               <Skeleton className='h-16 w-full rounded-xl' />
               <Skeleton className='h-16 w-full rounded-xl' />
               <Skeleton className='h-16 w-full rounded-xl' />
@@ -119,11 +162,11 @@ export const BotList = ({ selectedAppId, className, showAdd = true }: BotListPro
           })}
         </div>
 
-        {/* 卡片在列表内部滚动时，顶部同样渐隐，避免第一张卡被圆角硬切。 */}
+        {/* 卡片在列表内部滚动时，顶部同样渐隐，避免第一张卡被硬切。 */}
         <div
           aria-hidden='true'
           className={cn(
-            'list-edge-blur pointer-events-none absolute inset-x-0 top-0 h-8 rounded-t-2xl transition-opacity duration-200',
+            'list-edge-blur pointer-events-none absolute inset-x-0 top-0 h-8 transition-opacity duration-200',
             scrolled ? 'opacity-100' : 'opacity-0'
           )}
         />
