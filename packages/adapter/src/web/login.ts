@@ -12,6 +12,17 @@ const failure = (res: Response, status: number, message: string) => {
   res.status(status).json({ success: false, message })
 }
 
+/**
+ * 扫码状态每次请求都必须拿到最新值。
+ *
+ * 反向代理或浏览器一旦缓存了 pending 响应，前端会永远停在“等待扫码确认”，
+ * 所以这几个接口都显式禁用缓存。
+ */
+const noStore = (res: Response) => {
+  res.setHeader('Cache-Control', 'no-store, max-age=0')
+  res.setHeader('Pragma', 'no-cache')
+}
+
 const readTaskId = (value: unknown): string => {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -23,6 +34,7 @@ const readTaskId = (value: unknown): string => {
  */
 export const registerLoginRoutes = () => {
   router.post('/qqbot/login/start', async (_req, res) => {
+    noStore(res)
     try {
       const session = await startLogin()
       const connectUrl = buildConnectUrl(session.taskId)
@@ -43,6 +55,7 @@ export const registerLoginRoutes = () => {
   })
 
   router.get('/qqbot/login/status', (req: Request, res) => {
+    noStore(res)
     const taskId = readTaskId(req.query.taskId)
     if (!taskId) {
       failure(res, 400, '缺少 taskId')
@@ -59,6 +72,7 @@ export const registerLoginRoutes = () => {
   })
 
   router.post('/qqbot/login/cancel', (req, res) => {
+    noStore(res)
     const body = req.body as { taskId?: unknown } | undefined
     const taskId = readTaskId(body?.taskId)
     if (!taskId) {

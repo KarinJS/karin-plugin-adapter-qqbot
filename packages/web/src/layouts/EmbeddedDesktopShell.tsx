@@ -1,7 +1,7 @@
 import { Tooltip, cn } from '@heroui/react'
 import { gsap } from 'gsap'
 import { Bot, LayoutGrid, QrCode } from 'lucide-react'
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { CanvasPager, type CanvasPage } from '@/components/desktop/CanvasPager'
 import { CANVAS_SLIDE_DURATION, CANVAS_SLIDE_EASE } from '@/lib/canvasMotion'
@@ -17,9 +17,9 @@ const navItems = [
 
 const getActiveKey = (pathname: string) => {
   if (pathname === '/bots/new') return 'add'
-  if (pathname.startsWith('/bots')) return 'bots'
   if (pathname.startsWith('/overview')) return 'overview'
-  return 'overview'
+  // 首页重定向发生在挂载之后，这里先按机器人列表落位，避免先闪一下概览再翻页。
+  return 'bots'
 }
 
 /**
@@ -45,6 +45,11 @@ export const EmbeddedDesktopShell = () => {
     ],
     []
   )
+
+  // 画布外壳不渲染路由出口，根路径要自己补一次跳转，让地址栏和当前页保持一致。
+  useEffect(() => {
+    if (pathname === '/') navigate('/bots', { replace: true })
+  }, [navigate, pathname])
 
   useLayoutEffect(() => {
     const list = navListRef.current

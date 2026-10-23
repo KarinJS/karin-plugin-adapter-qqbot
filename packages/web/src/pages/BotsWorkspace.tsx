@@ -213,7 +213,15 @@ export const BotsWorkspace = () => {
         />
       ) : (
         <div className='grid items-start gap-5 xl:grid-cols-[20rem_minmax(0,1fr)]'>
-          <BotList selectedAppId={bot?.appId} showAdd={false} className='xl:sticky xl:top-0' />
+          {/*
+            左列固定在屏幕高度内：标题常驻顶部，卡片在列表内部滚动。
+            右侧表单继续跟页面一起滚动，两列互不牵动。
+          */}
+          <BotList
+            selectedAppId={bot?.appId}
+            showAdd={false}
+            className='xl:sticky xl:top-0 xl:h-[calc(100dvh-3rem)]'
+          />
 
           <div ref={panelRef} className='flex min-w-0 flex-col gap-5'>
             {panel}

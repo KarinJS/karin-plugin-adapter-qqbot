@@ -66,38 +66,85 @@ export const QrPanel = () => {
     if (!session || status?.status !== 'pending') return
 
     let cancelled = false
+    let timer: number | undefined
+    let inFlight = false
+    let finished = false
+    let failures = 0
+
+    const schedule = (delay: number) => {
+      if (cancelled || finished) return
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        void poll()
+      }, delay)
+    }
 
     const poll = async () => {
+      if (cancelled || inFlight || finished) return
+      inFlight = true
+
       try {
         const next = await fetchLoginStatus(session.taskId)
         if (cancelled) return
 
+        const recovered = failures > 0
+        failures = 0
+        if (recovered) setError('')
         setStatus(next)
 
         if (next.status === 'completed') {
+          finished = true
           await reload()
           const label = next.name ? `${next.name}（${next.appId}）` : next.appId
           toast.success('授权成功', {
             description: next.updated ? `已更新 ${label} 的 AppSecret` : `已添加机器人 ${label}`,
           })
-        } else if (next.status === 'expired' || next.status === 'failed') {
-          setError(next.message || '授权未完成，请重新生成二维码')
+          return
         }
+
+        if (next.status === 'expired' || next.status === 'failed') {
+          finished = true
+          setError(next.message || '授权未完成，请重新生成二维码')
+          return
+        }
+
+        schedule(1500)
       } catch (err) {
         if (cancelled) return
+
         if (err instanceof ApiError && err.status === 404) {
+          finished = true
           setError('授权会话已结束，请重新生成二维码')
+          return
         }
+
+        // 单次网络抖动不打扰用户；连续失败才提示，避免界面一直停在等待扫码。
+        failures += 1
+        if (failures >= 4) {
+          setError(err instanceof Error ? err.message : '查询授权状态失败')
+        }
+        schedule(1500)
+      } finally {
+        inFlight = false
       }
     }
 
-    const timer = setInterval(() => {
-      void poll()
-    }, 1500)
+    const pollWhenVisible = () => {
+      if (document.visibilityState === 'visible') void poll()
+    }
+
+    // 扫码时页面通常不在前台，回到页面立刻补一次，不等下一次定时器。
+    document.addEventListener('visibilitychange', pollWhenVisible)
+    window.addEventListener('focus', pollWhenVisible)
+
+    // 生成二维码后立刻查一次；之后用递归定时器，避免请求重叠时旧响应覆盖新状态。
+    void poll()
 
     return () => {
       cancelled = true
-      clearInterval(timer)
+      window.clearTimeout(timer)
+      document.removeEventListener('visibilitychange', pollWhenVisible)
+      window.removeEventListener('focus', pollWhenVisible)
     }
   }, [reload, session, status?.status])
 

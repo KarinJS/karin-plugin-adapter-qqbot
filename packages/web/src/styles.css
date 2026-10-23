@@ -333,6 +333,48 @@
   box-shadow: none;
 }
 
+/*
+ * 机器人列表的悬浮标题。
+ *
+ * 页面滚动时标题停在屏幕顶部，列表从下面经过。半透明底色把标题文字托住，
+ * 背景模糊让经过的卡片化开；下沿再接一段带遮罩的模糊，避免内容被标题边缘硬切。
+ */
+.bot-list-header {
+  background: color-mix(in oklab, var(--background) 82%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+}
+
+.list-edge-blur {
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--background) 58%, transparent),
+    transparent
+  );
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .bot-list-header {
+    background: var(--background);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .bot-list-header {
+    background: var(--background);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .list-edge-blur {
+    display: none;
+  }
+}
+
 .no-scrollbar {
   scrollbar-width: none;
 }

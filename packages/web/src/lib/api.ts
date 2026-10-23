@@ -78,7 +78,7 @@ export const startLogin = () =>
   })
 
 export const fetchLoginStatus = (taskId: string) =>
-  request<LoginSnapshot>(`/login/status?taskId=${encodeURIComponent(taskId)}`)
+  request<LoginSnapshot>(`/login/status?taskId=${encodeURIComponent(taskId)}`, { cache: 'no-store' })
 
 export const cancelLogin = (taskId: string) =>
   request<{ taskId: string; status: string }>('/login/cancel', {
