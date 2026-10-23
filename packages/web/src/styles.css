@@ -9,6 +9,8 @@
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  /* GSAP power3.out 的 CSS 等价曲线，抽屉和画布翻页共用。 */
+  --ease-quart-out: cubic-bezier(0.165, 0.84, 0.44, 1);
 
   --font-sans:
     -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
@@ -346,11 +348,11 @@
 
 /*
  * iframe 画布导航：图标颜色和滑块同步移动。
- * 颜色过渡跟滑动同一时长，避免新图标在滑块到达前先变成反色。
+ * 颜色过渡跟滑动同一时长、同一曲线，避免新图标在滑块到达前先变成反色。
  */
 .canvas-nav-link {
   transition:
-    color 320ms var(--ease-out),
+    color 500ms var(--ease-quart-out),
     background-color 150ms var(--ease-out);
 }
 

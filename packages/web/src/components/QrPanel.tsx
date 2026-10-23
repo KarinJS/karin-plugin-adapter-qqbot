@@ -2,6 +2,7 @@ import { Alert, Button, Card, Spinner, cn, toast } from '@heroui/react'
 import { CheckCircle2, Clock3, ExternalLink, QrCode, RefreshCw, ShieldAlert, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { AnimatedHeight } from '@/components/AnimatedHeight'
 import { BotAvatar } from '@/components/BotAvatar'
 import { SectionCard } from '@/components/SectionCard'
 import { useConfigStore } from '@/hooks/useConfigStore'
@@ -226,7 +227,7 @@ export const QrPanel = () => {
             <RefreshCw className='size-4' aria-hidden='true' />
             重新生成
           </Button>
-          <Button fullWidth variant='ghost' onPress={cancel}>
+          <Button fullWidth variant='danger-soft' onPress={cancel}>
             取消授权
           </Button>
           {session ? (
@@ -431,22 +432,24 @@ export const QrPanel = () => {
     return (
       <div className='flex flex-col gap-3'>
         <div className='rounded-2xl border border-border/60 bg-surface p-3.5'>
-          <div className={cn('flex gap-3.5', isTiny ? 'flex-col items-center' : 'items-center')}>
-            {compactVisual}
-            {compactStatus}
-          </div>
+          <AnimatedHeight>
+            <div className={cn('flex gap-3.5', isTiny ? 'flex-col items-center' : 'items-center')}>
+              {compactVisual}
+              {compactStatus}
+            </div>
 
-          {error ? (
-            <Alert status='danger' className='mt-3'>
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>授权未完成</Alert.Title>
-                <Alert.Description>{error}</Alert.Description>
-              </Alert.Content>
-            </Alert>
-          ) : null}
+            {error ? (
+              <Alert status='danger' className='mt-3'>
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Alert.Title>授权未完成</Alert.Title>
+                  <Alert.Description>{error}</Alert.Description>
+                </Alert.Content>
+              </Alert>
+            ) : null}
 
-          {compactControls}
+            {compactControls}
+          </AnimatedHeight>
         </div>
 
         <div className='flex items-start gap-2.5 rounded-xl border border-warning/30 bg-warning/10 p-3'>
@@ -462,18 +465,22 @@ export const QrPanel = () => {
   return (
     <div className='grid grid-cols-[minmax(0,26rem)_minmax(0,1fr)] items-start gap-5'>
       <Card className='border border-border/80 bg-surface shadow-none'>
-        <Card.Content className='flex flex-col gap-5 p-5'>
-          {qrArea}
-          {error ? (
-            <Alert status='danger'>
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>授权未完成</Alert.Title>
-                <Alert.Description>{error}</Alert.Description>
-              </Alert.Content>
-            </Alert>
-          ) : null}
-          {controls}
+        <Card.Content className='p-5'>
+          <AnimatedHeight>
+            <div className='flex flex-col gap-5'>
+              {qrArea}
+              {error ? (
+                <Alert status='danger'>
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>授权未完成</Alert.Title>
+                    <Alert.Description>{error}</Alert.Description>
+                  </Alert.Content>
+                </Alert>
+              ) : null}
+              {controls}
+            </div>
+          </AnimatedHeight>
         </Card.Content>
       </Card>
 

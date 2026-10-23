@@ -37,7 +37,7 @@ export const EventTypePicker = ({ value, onChange, isDisabled }: EventTypePicker
     isDetached
     isDisabled={isDisabled}
     selectedKeys={[String(value)]}
-    className='grid gap-3 sm:grid-cols-3'
+    className='grid items-stretch gap-3 sm:grid-cols-3'
     onSelectionChange={(keys) => {
       const [next] = Array.from(keys)
       const parsed = Number(next)

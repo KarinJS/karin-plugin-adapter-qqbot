@@ -1,7 +1,7 @@
 import { Button, Card, Description, FieldError, Input, Label, Tabs, TextField, toast } from '@heroui/react'
 import { KeyRound, QrCode, Save } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLayoutEffect, useState, type FormEvent } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { EventTypePicker, type EventType } from '@/components/EventTypePicker'
 import { PageHeader } from '@/components/PageHeader'
 import { QrPanel } from '@/components/QrPanel'
@@ -123,33 +123,47 @@ const ManualAddForm = () => {
   )
 }
 
-export const AddBotPage = () => (
-  <div className='flex flex-col gap-6'>
-    <PageHeader eyebrow='Add' title='添加机器人' description='推荐直接扫码授权。已经拿到凭据时，也可以手动填写。' />
+export const AddBotPage = () => {
+  const { pathname } = useLocation()
+  const [tab, setTab] = useState('qr')
 
-    <Tabs defaultSelectedKey='qr'>
-      <Tabs.ListContainer>
-        <Tabs.List aria-label='添加方式'>
-          <Tabs.Tab id='qr'>
-            <QrCode className='size-4' aria-hidden='true' />
-            扫码授权
-            <Tabs.Indicator />
-          </Tabs.Tab>
-          <Tabs.Tab id='manual'>
-            <Tabs.Separator />
-            手动填写
-            <Tabs.Indicator />
-          </Tabs.Tab>
-        </Tabs.List>
-      </Tabs.ListContainer>
+  // 画布会一直挂载添加页，从概览等页面再次进入时把标签页重置回扫码授权。
+  useLayoutEffect(() => {
+    if (pathname === '/bots/new') setTab('qr')
+  }, [pathname])
 
-      <Tabs.Panel id='qr' className='pt-5'>
-        <QrPanel />
-      </Tabs.Panel>
+  return (
+    <div className='flex flex-col gap-6'>
+      <PageHeader
+        eyebrow='Add'
+        title='添加机器人'
+        description='推荐直接扫码授权。已经拿到凭据时，也可以手动填写。'
+      />
 
-      <Tabs.Panel id='manual' className='pt-5'>
-        <ManualAddForm />
-      </Tabs.Panel>
-    </Tabs>
-  </div>
-)
+      <Tabs selectedKey={tab} onSelectionChange={(key) => setTab(String(key))}>
+        <Tabs.ListContainer>
+          <Tabs.List aria-label='添加方式'>
+            <Tabs.Tab id='qr'>
+              <QrCode className='size-4' aria-hidden='true' />
+              扫码授权
+              <Tabs.Indicator />
+            </Tabs.Tab>
+            <Tabs.Tab id='manual'>
+              <Tabs.Separator />
+              手动填写
+              <Tabs.Indicator />
+            </Tabs.Tab>
+          </Tabs.List>
+        </Tabs.ListContainer>
+
+        <Tabs.Panel id='qr' className='pt-5'>
+          <QrPanel />
+        </Tabs.Panel>
+
+        <Tabs.Panel id='manual' className='pt-5'>
+          <ManualAddForm />
+        </Tabs.Panel>
+      </Tabs>
+    </div>
+  )
+}

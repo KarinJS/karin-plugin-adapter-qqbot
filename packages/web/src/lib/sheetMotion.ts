@@ -1,3 +1,5 @@
+import { UI_MOTION_DURATION, UI_MOTION_EASE } from '@/lib/uiMotion'
+
 /**
  * 底部抽屉的动画参数。
  *
@@ -5,9 +7,9 @@
  * 0.5s power3.out，对应 CSS cubic-bezier(0.165, 0.84, 0.44, 1)。
  * 背景外壳的缩放也使用同一组时长与曲线。
  */
-export const SHEET_MOTION_DURATION = 0.5
+export const SHEET_MOTION_DURATION = UI_MOTION_DURATION
 /** 对应 CSS cubic-bezier(0.165, 0.84, 0.44, 1)，即 easeOutQuart。 */
-export const SHEET_MOTION_EASE = 'power3.out'
+export const SHEET_MOTION_EASE = UI_MOTION_EASE
 
 export const SHEET_ENTER_DURATION = SHEET_MOTION_DURATION
 export const SHEET_EXIT_DURATION = SHEET_MOTION_DURATION
