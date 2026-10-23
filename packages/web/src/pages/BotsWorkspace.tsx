@@ -1,7 +1,7 @@
 import { Button, Skeleton, cn, toast } from '@heroui/react'
 import { gsap } from 'gsap'
 import { Bot, QrCode, Trash2 } from 'lucide-react'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useEffect, useRef, useState } from 'react'
 import { useMatch, useNavigate } from 'react-router-dom'
 import { BotForm } from '@/components/BotForm'
 import { BotList } from '@/components/BotList'
@@ -13,11 +13,10 @@ import { useConfigStore } from '@/hooks/useConfigStore'
 import { useEmbedded } from '@/hooks/useEmbedded'
 import { useSmoothScroll } from '@/hooks/useSmoothScroll'
 import { dissolveBotCard } from '@/lib/dissolveBotCard'
+import { SHEET_MOTION_DURATION, SHEET_MOTION_EASE } from '@/lib/sheetMotion'
 import { getSmoothScroll, resizeSmoothScroll } from '@/lib/smoothScroll'
 
 const HEADER_COLLAPSE_DURATION = 0.26
-const PANEL_ENTER_DURATION = 0.22
-const PANEL_ENTER_EASE = 'power3.out'
 
 const decodeAppId = (value: string | undefined) => {
   if (!value || value === 'new') return ''
@@ -51,6 +50,13 @@ export const BotsWorkspace = () => {
   const panelContentRef = useRef<HTMLDivElement>(null)
   const headerFirstRef = useRef(true)
   const panelFirstRef = useRef(true)
+  const switchRef = useRef<{ up: boolean } | null>(null)
+  const previousAppIdRef = useRef<string | null>(appId || null)
+  const cloneRef = useRef<HTMLElement | null>(null)
+  const transitioningRef = useRef(false)
+  // 布局 effect 只跟 appId 走，用 ref 读最新列表顺序，避免列表更新时重放动画。
+  const configRef = useRef(config)
+  configRef.current = config
 
   const bot = config.find((item) => item.appId === appId)
   const status = bot ? statuses[bot.appId] : undefined
@@ -88,6 +94,10 @@ export const BotsWorkspace = () => {
     const element = panelRef.current
     if (!element) return
 
+    const content = panelContentRef.current
+    const pending = switchRef.current
+    switchRef.current = null
+
     gsap.killTweensOf(element)
     // 换机器人时表单从顶部开始，不沿用上一个机器人的滚动位置。
     element.scrollTop = 0
@@ -96,27 +106,146 @@ export const BotsWorkspace = () => {
 
     if (panelFirstRef.current) {
       panelFirstRef.current = false
+      previousAppIdRef.current = appId || null
       gsap.set(element, { autoAlpha: 1, y: 0 })
       return
     }
 
-    if (reduceMotion()) {
-      gsap.set(element, { autoAlpha: 1, y: 0 })
+    const previousAppId = previousAppIdRef.current
+    previousAppIdRef.current = appId || null
+
+    if (reduceMotion() || !content) {
+      transitioningRef.current = false
       return
     }
 
+    if (pending) {
+      // 旧表单的快照已经在 handleSelect 里滑出屏幕，新表单从相反方向滑进来。
+      const distance = element.clientHeight
+      gsap.killTweensOf(content)
+      gsap.fromTo(
+        content,
+        { y: pending.up ? distance : -distance },
+        {
+          y: 0,
+          duration: SHEET_MOTION_DURATION,
+          ease: SHEET_MOTION_EASE,
+          clearProps: 'transform',
+          onComplete: () => {
+            transitioningRef.current = false
+          },
+        }
+      )
+      return
+    }
+
+    // 非列表点击引起的路由变化（前进 / 后退、移除后回到列表）没有旧内容可快照，
+    // 只让新内容按列表顺序从对应方向进入。
+    const fromIndex = configRef.current.findIndex((item) => item.appId === previousAppId)
+    const toIndex = configRef.current.findIndex((item) => item.appId === appId)
+    const up = fromIndex === -1 || toIndex === -1 ? true : toIndex > fromIndex
+    const distance = element.clientHeight
+    gsap.killTweensOf(content)
     gsap.fromTo(
-      element,
-      { autoAlpha: 0, y: 8 },
+      content,
+      { y: up ? distance : -distance },
       {
-        autoAlpha: 1,
         y: 0,
-        duration: PANEL_ENTER_DURATION,
-        ease: PANEL_ENTER_EASE,
-        clearProps: 'transform,visibility,opacity',
+        duration: SHEET_MOTION_DURATION,
+        ease: SHEET_MOTION_EASE,
+        clearProps: 'transform',
       }
     )
+    transitioningRef.current = false
   }, [appId])
+
+  // 卸载时清掉还在退场的快照，避免 fixed 副本留在页面上。
+  useEffect(
+    () => () => {
+      const clone = cloneRef.current
+      if (!clone) return
+      gsap.killTweensOf(clone)
+      clone.remove()
+      cloneRef.current = null
+    },
+    []
+  )
+
+  /**
+   * 列表点击换机器人。
+   *
+   * 先给当前面板拍一张快照（保留滚动位置、输入值和顶部模糊），让它按列表方向
+   * 整块滑出屏幕；路由立即切到目标机器人，新表单从反方向滑入。
+   * 中间经过的机器人不会依次播放，一次点击只走一段。
+   */
+  const handleSelect = (nextAppId: string) => {
+    if (!nextAppId || nextAppId === appId || transitioningRef.current) return
+
+    const panel = panelRef.current
+    const content = panelContentRef.current
+    const fromIndex = config.findIndex((item) => item.appId === appId)
+    const toIndex = config.findIndex((item) => item.appId === nextAppId)
+    // 列表里往下点（索引变大）时旧表单向上滑出、新表单从底部进入，反方向同理。
+    const up = fromIndex === -1 || toIndex === -1 ? true : toIndex > fromIndex
+
+    if (!panel || !content || reduceMotion()) {
+      navigate(`/bots/${encodeURIComponent(nextAppId)}`)
+      return
+    }
+
+    const rect = panel.getBoundingClientRect()
+    const clone = panel.cloneNode(true) as HTMLElement
+    clone.removeAttribute('data-bots-panel')
+    clone.setAttribute('data-bots-snapshot', '')
+    clone.setAttribute('inert', '')
+    clone.setAttribute('aria-hidden', 'true')
+    clone.style.position = 'fixed'
+    clone.style.left = `${rect.left}px`
+    clone.style.top = `${rect.top}px`
+    clone.style.width = `${rect.width}px`
+    clone.style.height = `${rect.height}px`
+    clone.style.margin = '0'
+    clone.style.zIndex = '45'
+    clone.style.overflowY = 'auto'
+    clone.style.pointerEvents = 'none'
+    clone.style.background = 'var(--background)'
+
+    // cloneNode 不复制输入框的实时值，手动同步，退场时不会闪回旧数据。
+    const sourceFields = panel.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+      'input, textarea, select'
+    )
+    const cloneFields = clone.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+      'input, textarea, select'
+    )
+    cloneFields.forEach((field, index) => {
+      const source = sourceFields[index]
+      if (!source) return
+      if (field instanceof HTMLInputElement && (field.type === 'checkbox' || field.type === 'radio')) {
+        if (source instanceof HTMLInputElement) field.checked = source.checked
+        return
+      }
+      field.value = source.value
+    })
+
+    document.body.appendChild(clone)
+    clone.scrollTop = panel.scrollTop
+
+    cloneRef.current = clone
+    transitioningRef.current = true
+    switchRef.current = { up }
+    gsap.killTweensOf(clone)
+    gsap.to(clone, {
+      y: up ? -rect.height : rect.height,
+      duration: SHEET_MOTION_DURATION,
+      ease: SHEET_MOTION_EASE,
+      onComplete: () => {
+        clone.remove()
+        if (cloneRef.current === clone) cloneRef.current = null
+      },
+    })
+
+    navigate(`/bots/${encodeURIComponent(nextAppId)}`)
+  }
 
   const handleRemove = () => {
     if (!bot || removing) return
@@ -238,7 +367,13 @@ export const BotsWorkspace = () => {
             左列占满工作区高度，标题固定在列顶不参与滚动，卡片在列表内部滚。
             右侧表单自己是一个滚动容器，两列各滚各的，整页不再滚动。
           */}
-          <BotList selectedAppId={bot?.appId} showAdd={false} overlay={embedded} className='xl:h-full xl:min-h-0' />
+          <BotList
+            selectedAppId={bot?.appId}
+            showAdd={false}
+            overlay={embedded}
+            className='xl:h-full xl:min-h-0'
+            onSelect={handleSelect}
+          />
 
           <div
             ref={panelRef}

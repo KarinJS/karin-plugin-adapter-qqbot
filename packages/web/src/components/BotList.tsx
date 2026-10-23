@@ -17,9 +17,11 @@ interface BotListProps {
    * 概览页的列表仍然跟着页面滚，不启用。
    */
   overlay?: boolean
+  /** 接管卡片点击；不传时直接跳转到详情。 */
+  onSelect?: (appId: string) => void
 }
 
-export const BotList = ({ selectedAppId, className, showAdd = true, overlay = false }: BotListProps) => {
+export const BotList = ({ selectedAppId, className, showAdd = true, overlay = false, onSelect }: BotListProps) => {
   const { config, statuses, loading } = useConfigStore()
   const navigate = useNavigate()
   const listRef = useRef<HTMLDivElement>(null)
@@ -176,7 +178,9 @@ export const BotList = ({ selectedAppId, className, showAdd = true, overlay = fa
                     selected ? 'bg-transparent' : 'hover:bg-default/50'
                   )}
                   aria-current={selected ? 'page' : undefined}
-                  onPress={() => navigate(`/bots/${encodeURIComponent(bot.appId)}`)}
+                  onPress={() =>
+                    onSelect ? onSelect(bot.appId) : navigate(`/bots/${encodeURIComponent(bot.appId)}`)
+                  }
                 >
                   {/* 选中态用内嵌的圆角块，不用左侧竖条：浅灰底 + 细描边，和列表本身保持同一层。 */}
                   {selected ? (
