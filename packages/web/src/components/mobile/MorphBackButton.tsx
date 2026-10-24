@@ -22,10 +22,14 @@ export const MorphBackButton = ({ scrollRef, onBack }: MorphBackButtonProps) => 
     if (!scroller || !button) return
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let lastProgress = -1
 
     const update = () => {
       frameRef.current = 0
       const progress = reduceMotion ? (scroller.scrollTop > 8 ? 1 : 0) : Math.min(1, scroller.scrollTop / 44)
+      // 滚过 44px 后进度一直是 1；每帧重复写自定义属性会白白触发样式重算。
+      if (progress === lastProgress) return
+      lastProgress = progress
       button.style.setProperty('--back-p', progress.toFixed(3))
     }
 
