@@ -1,0 +1,221 @@
+@import 'tailwindcss';
+@import '@heroui/styles';
+
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  /* GSAP power3.out 的 CSS 等价曲线，抽屉和画布翻页共用。 */
+  --ease-quart-out: cubic-bezier(0.165, 0.84, 0.44, 1);
+
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    sans-serif;
+}
+
+/*
+ * 黑白灰主题：HeroUI 的语义变量全部改成零彩度，状态只用形状和文字区分。
+ * 红/绿只保留给破坏性操作和错误提示，而且同样压到接近中性色。
+ */
+:root,
+[data-theme='light'],
+.light {
+  --background: oklch(0.976 0 0);
+  --foreground: oklch(0.205 0 0);
+  --surface: oklch(1 0 0);
+  --surface-foreground: var(--foreground);
+  --surface-secondary: oklch(0.962 0 0);
+  --surface-secondary-foreground: var(--foreground);
+  --surface-tertiary: oklch(0.938 0 0);
+  --surface-tertiary-foreground: var(--foreground);
+  --overlay: oklch(1 0 0);
+  --overlay-foreground: var(--foreground);
+  --muted: oklch(0.505 0 0);
+  --default: oklch(0.945 0 0);
+  --default-foreground: var(--foreground);
+  --default-soft-foreground: var(--muted);
+  --field-background: oklch(0.968 0 0);
+  --field-foreground: var(--foreground);
+  --field-placeholder: var(--muted);
+  --field-border: color-mix(in oklab, var(--foreground) 12%, transparent);
+  --field-border-width: 1px;
+  --field-focus: var(--field-background);
+  --field-shadow: 0 0 0 0 transparent inset;
+  --accent: oklch(0.22 0 0);
+  --accent-foreground: oklch(0.99 0 0);
+  --success: oklch(0.56 0.16 150);
+  --success-foreground: oklch(0.99 0 0);
+  --warning: oklch(0.62 0.14 70);
+  --warning-foreground: oklch(0.18 0 0);
+  --danger: oklch(0.55 0.2 25);
+  --danger-foreground: oklch(0.99 0 0);
+  --segment: oklch(0.91 0 0);
+  --segment-foreground: var(--foreground);
+  --border: oklch(0.9 0 0);
+  --separator: oklch(0.92 0 0);
+  --focus: oklch(0.35 0 0);
+  --link: oklch(0.25 0 0);
+  --backdrop: rgb(0 0 0 / 0.32);
+  --background-inverse: var(--foreground);
+  --surface-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 10px 30px rgb(0 0 0 / 0.04);
+  --overlay-shadow: 0 18px 50px rgb(0 0 0 / 0.14);
+  --radius: 0.75rem;
+  --field-radius: 0.75rem;
+}
+
+[data-theme='dark'],
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.95 0 0);
+  --surface: oklch(0.19 0 0);
+  --surface-foreground: var(--foreground);
+  --surface-secondary: oklch(0.225 0 0);
+  --surface-secondary-foreground: var(--foreground);
+  --surface-tertiary: oklch(0.25 0 0);
+  --surface-tertiary-foreground: var(--foreground);
+  --overlay: oklch(0.205 0 0);
+  --overlay-foreground: var(--foreground);
+  --muted: oklch(0.68 0 0);
+  --default: oklch(0.255 0 0);
+  --default-foreground: oklch(0.96 0 0);
+  --default-soft-foreground: var(--muted);
+  --field-background: oklch(0.19 0 0);
+  --field-foreground: var(--foreground);
+  --field-placeholder: var(--muted);
+  --field-border: color-mix(in oklab, var(--foreground) 14%, transparent);
+  --field-border-width: 1px;
+  --field-focus: var(--field-background);
+  --field-shadow: 0 0 0 0 transparent inset;
+  --accent: oklch(0.95 0 0);
+  --accent-foreground: oklch(0.15 0 0);
+  --success: oklch(0.78 0.16 150);
+  --success-foreground: oklch(0.15 0 0);
+  --warning: oklch(0.82 0.15 80);
+  --warning-foreground: oklch(0.15 0 0);
+  --danger: oklch(0.72 0.19 25);
+  --danger-foreground: oklch(0.15 0 0);
+  --segment: oklch(0.35 0 0);
+  --segment-foreground: var(--foreground);
+  --border: oklch(0.3 0 0);
+  --separator: oklch(0.27 0 0);
+  --focus: oklch(0.75 0 0);
+  --link: oklch(0.93 0 0);
+  --backdrop: rgb(0 0 0 / 0.62);
+  --background-inverse: var(--foreground);
+  --surface-shadow: 0 0 0 1px rgb(255 255 255 / 0.03) inset;
+  --overlay-shadow: 0 20px 60px rgb(0 0 0 / 0.55);
+  --radius: 0.75rem;
+  --field-radius: 0.75rem;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  html {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;
+  }
+
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    overscroll-behavior: none;
+  }
+
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  @media (pointer: fine) {
+    input,
+    textarea,
+    select {
+      font-size: inherit;
+    }
+  }
+
+  button,
+  a,
+  [role='button'] {
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  ::selection {
+    background: var(--foreground);
+    color: var(--background);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  button,
+  [role='button'] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--foreground) 22%, transparent) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--foreground) 20%, transparent);
+    border-radius: 999px;
+  }
+}
+
+/* 在线状态真正变化时圆点轻弹一下，作为状态组交叉淡化的落点。 */
+@keyframes status-dot-pulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root,
+  [data-theme='light'],
+  .light {
+    --border: oklch(0.55 0 0);
+    --muted: oklch(0.35 0 0);
+  }
+
+  [data-theme='dark'],
+  .dark {
+    --border: oklch(0.7 0 0);
+    --muted: oklch(0.82 0 0);
+  }
+}

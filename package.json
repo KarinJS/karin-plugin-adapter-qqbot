@@ -12,6 +12,7 @@
     "prepare": "husky",
     "build": "pnpm --filter @karinjs/adapter-qqbot build",
     "dev": "pnpm --filter @karinjs/adapter-qqbot dev",
+    "dev:web": "pnpm --filter @karinjs/adapter-qqbot-web dev",
     "docs:dev": "pnpm --filter @karinjs/adapter-qqbot-docs dev",
     "docs:build": "pnpm --filter @karinjs/adapter-qqbot-docs build",
     "docs:start": "pnpm --filter @karinjs/adapter-qqbot-docs start",

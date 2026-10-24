@@ -1,0 +1,131 @@
+import { Drawer } from '@heroui/react'
+import { useCallback, useEffect, useRef, type ReactNode } from 'react'
+import { SheetScaffold } from '@/components/mobile/SheetScaffold'
+import { mobileSheetBackdropStyle, mobileSheetStyle } from '@/components/mobile/mobileStyles'
+import { useSheetDrag } from '@/hooks/useSheetDrag'
+import { useSheetMotion } from '@/hooks/useSheetMotion'
+import { SHEET_COLLAPSED_RATIO } from '@/lib/sheetMotion'
+
+interface MobileSheetProps {
+  isOpen: boolean
+  onRequestClose: () => void
+  onExited?: () => void
+  header: ReactNode
+  footer?: ReactNode
+  children: ReactNode
+  /** 打开时的初始高度比例，默认半屏。 */
+  initialRatio?: number
+  /** 松手回弹的目标高度比例，默认半屏；设为 1 时只有全屏和退场。 */
+  collapsedRatio?: number
+}
+
+/**
+ * 手机端底部抽屉的共用外壳。
+ *
+ * 打开时默认只占可用高度的 50%（initialRatio 可覆盖），向上拖动带出剩余高度；
+ * 超过 75% 吸附到全屏，低于 25% 松手直接退场，其余回到 collapsedRatio 指定的高度。
+ * 全屏后继续向上拖会接着滚动表单，内容到顶后向下拖会收起抽屉。
+ * 抽屉高度在整个打开周期内用打开瞬间测量的像素值，不跟随 dvh / 地址栏变化。
+ */
+export const MobileSheet = ({
+  isOpen,
+  onRequestClose,
+  onExited,
+  header,
+  footer,
+  children,
+  initialRatio = SHEET_COLLAPSED_RATIO,
+  collapsedRatio = SHEET_COLLAPSED_RATIO,
+}: MobileSheetProps) => {
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const scrimRef = useRef<HTMLDivElement>(null)
+  const baseHeightRef = useRef(0)
+
+  const prepareHeight = useCallback(
+    (dialog: HTMLElement) => {
+      const content = dialog.closest<HTMLElement>('[data-slot="drawer-content"]')
+      const viewport = window.visualViewport?.height ?? window.innerHeight
+      const base = Math.max(1, content?.clientHeight || viewport)
+      const ratio = Math.min(1, Math.max(0, initialRatio))
+      const height = Math.max(1, Math.round(base * ratio))
+
+      baseHeightRef.current = base
+      dialog.style.height = `${height}px`
+      dialog.style.maxHeight = `${base}px`
+      // 直接以全屏打开时，顶栏一开始就要让开刘海。
+      if (ratio >= 0.999) dialog.dataset.sheetExpanded = 'true'
+      else delete dialog.dataset.sheetExpanded
+    },
+    [initialRatio]
+  )
+
+  const handleExited = useCallback(() => {
+    baseHeightRef.current = 0
+    onExited?.()
+  }, [onExited])
+
+  const { backdropRef, mounted, handleOpenChange } = useSheetMotion({
+    isOpen,
+    onRequestClose,
+    onExited: handleExited,
+    beforeEnter: prepareHeight,
+    scrimRef,
+  })
+
+  useSheetDrag({
+    isOpen,
+    mounted,
+    onRequestClose,
+    backdropRef,
+    scrimRef,
+    scrollerRef,
+    baseHeightRef,
+    collapsedRatio,
+  })
+
+  // HeroUI 的 outside dismiss 会把 Select 的 portal 弹层当成“抽屉外部”，
+  // 在 iOS 上打开下拉框时偶发关闭整个抽屉；这里关掉内置 dismiss，只保留点遮罩关闭。
+  useEffect(() => {
+    if (!mounted) return
+
+    const backdrop = backdropRef.current
+    if (!backdrop) return
+
+    const handleClick = (event: MouseEvent) => {
+      if (event.target === backdrop) onRequestClose()
+    }
+
+    backdrop.addEventListener('click', handleClick)
+    return () => backdrop.removeEventListener('click', handleClick)
+  }, [mounted, onRequestClose, backdropRef])
+
+  return (
+    <Drawer.Backdrop
+      ref={backdropRef}
+      isOpen={mounted}
+      onOpenChange={handleOpenChange}
+      isDismissable={false}
+      isKeyboardDismissDisabled
+      style={mobileSheetBackdropStyle}
+    >
+      {/* 压暗层和抽屉是兄弟节点：只动 opacity 就能淡入淡出，不会把抽屉一起淡掉。 */}
+      <div
+        ref={scrimRef}
+        aria-hidden='true'
+        data-sheet-scrim=''
+        className='pointer-events-none fixed inset-0 bg-black'
+        style={{ opacity: 0 }}
+      />
+      <Drawer.Content placement='bottom'>
+        <Drawer.Dialog
+          className='group flex flex-col overflow-hidden border border-border/60 bg-surface shadow-overlay data-[resizing=true]:cursor-grabbing data-[resizing=true]:select-none data-[resizing=true]:shadow-none data-[snapping=true]:shadow-none'
+          style={mobileSheetStyle}
+        >
+          <SheetScaffold scrollerRef={scrollerRef} header={header} footer={footer}>
+            {children}
+          </SheetScaffold>
+        </Drawer.Dialog>
+      </Drawer.Content>
+    </Drawer.Backdrop>
+  )
+}
