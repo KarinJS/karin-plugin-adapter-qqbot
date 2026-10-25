@@ -1,4 +1,10 @@
-import { getBot, router } from 'node-karin'
+import {
+  createBadRequestResponse,
+  createServerErrorResponse,
+  createSuccessResponse,
+  getBot,
+  router,
+} from 'node-karin'
 import type { Request, Response } from 'node-karin/express'
 import { getDefaultConfig, formatConfig, pkg, readConfigFile, writeConfig } from '@/utils/config'
 import type { Config, MessageCacheLevel, QQBotConfig } from '@/types/config'
@@ -146,20 +152,12 @@ const parseConfig = (input: unknown): Config => {
   return formatConfig(config)
 }
 
-const success = (res: Response, data: unknown) => {
-  res.json({ success: true, data })
-}
-
-const failure = (res: Response, status: number, message: string) => {
-  res.status(status).json({ success: false, message })
-}
-
 const handleError = (res: Response, error: unknown) => {
   if (error instanceof ValidationError) {
-    failure(res, 400, error.message)
+    createBadRequestResponse(res, error.message)
     return
   }
-  failure(res, 500, error instanceof Error ? error.message : '服务器内部错误')
+  createServerErrorResponse(res, error instanceof Error ? error.message : '服务器内部错误')
 }
 
 const readBodyConfig = (req: Request): unknown => {
@@ -172,7 +170,7 @@ const saveConfig = async (req: Request, res: Response) => {
   try {
     const config = parseConfig(readBodyConfig(req))
     await writeConfig(config)
-    success(res, { config: readConfigFile() })
+    createSuccessResponse(res, { config: readConfigFile() })
   } catch (error) {
     handleError(res, error)
   }
@@ -186,7 +184,7 @@ const saveConfig = async (req: Request, res: Response) => {
 export const registerConfigRoutes = () => {
   router.get('/qqbot/config', (_req, res) => {
     try {
-      success(res, {
+      createSuccessResponse(res, {
         config: readConfigFile(),
         defaults: getDefaultConfig()[0],
         version: pkg().version,
@@ -220,7 +218,7 @@ export const registerConfigRoutes = () => {
         }
       })
 
-      success(res, {
+      createSuccessResponse(res, {
         bots,
         uptime: Math.round(process.uptime()),
         version: pkg().version,

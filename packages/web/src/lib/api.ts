@@ -3,11 +3,14 @@ import type { BotConfig, ConfigResponse, LoginSnapshot, LoginStartResponse, Stat
 
 const API_BASE = '/api/v1/qqbot'
 
+/** Karin 统一响应体：HTTP 状态码与 `code` 保持一致。 */
 interface ApiEnvelope<T> {
-  success?: boolean
+  code?: number
   data?: T
   message?: string
 }
+
+const HTTP_STATUS_OK = 200
 
 export class ApiError extends Error {
   readonly status: number
@@ -54,7 +57,7 @@ const request = async <T>(path: string, init: RequestInit = {}, retry = true): P
     payload = null
   }
 
-  if (!response.ok || !payload?.success) {
+  if (!response.ok || payload?.code !== HTTP_STATUS_OK) {
     throw new ApiError(payload?.message || `请求失败 (${response.status})`, response.status)
   }
 
