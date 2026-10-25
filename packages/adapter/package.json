@@ -49,7 +49,7 @@
     "@types/qrcode": "^1.5.6",
     "node-karin": "1.16.3",
     "oxlint": "^1.89.0",
-    "tsdown": "^0.23.1",
+    "tsdown": "0.23.1",
     "tsx": "^4.23.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11"
@@ -73,5 +73,5 @@
     "ts-web": "src/web.config.ts",
     "web": "dist/web.config.js"
   },
-  "time": "2026-10-25T12:01:54.144Z"
+  "time": "2026-10-25T12:26:12.524Z"
 }
