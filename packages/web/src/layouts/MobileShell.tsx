@@ -68,7 +68,8 @@ const MobileShellContent = () => {
           <MobilePager items={items} activeKey={activeKey} onChange={handlePagerChange} disabled={sheetOpen} />
         </div>
 
-        {/* 和抽屉底栏同款的三层边缘模糊：只有靠近底部的内容被逐渐化开。 */}
+        {/* 和抽屉底栏同款的三层边缘模糊：只有靠近底部的内容被逐渐化开。
+            模糊层和导航栏一起固定在底部，抽屉 / 翻页动画期间保持显示。 */}
         <div className='pointer-events-none absolute inset-x-0 bottom-0 z-40'>
           <EdgeBlur edge='bottom' tone='surface' className='z-0' />
           <nav

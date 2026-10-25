@@ -70,8 +70,6 @@ interface EdgeBlurProps {
   /** 抽屉顶部的圆角要和抽屉本身一致。 */
   rounded?: boolean
   className?: string
-  /** 抽屉拖动 / 吸附时用来临时关掉顶部的模糊层。 */
-  layerClassName?: string
 }
 
 /**
@@ -86,7 +84,6 @@ export const EdgeBlur = ({
   height = 'default',
   rounded = false,
   className,
-  layerClassName,
 }: EdgeBlurProps) => (
   <div
     aria-hidden='true'
@@ -110,8 +107,7 @@ export const EdgeBlur = ({
           LAYER_BLUR[layer],
           LAYER_MASK[edge][layer],
           rounded && edge === 'top' && 'rounded-t-[28px]',
-          '[@media(prefers-reduced-transparency:reduce)]:hidden',
-          layerClassName
+          '[@media(prefers-reduced-transparency:reduce)]:hidden'
         )}
       />
     ))}

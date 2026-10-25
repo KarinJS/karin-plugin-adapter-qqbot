@@ -22,10 +22,9 @@ export const SHEET_SNAP_DURATION = SHEET_MOTION_DURATION
 /** 抽屉遮罩层最终压暗到的不透明度。 */
 export const SHEET_BACKDROP_ALPHA = 0.38
 
-/** 抽屉打开时外壳的缩放、位移与圆角；拖到 25% 以下时按进度复原。 */
+/** 抽屉打开时外壳的缩放与位移；拖到 25% 以下时按进度复原。 */
 export const SHEET_FRAME_SCALE = 0.94
 export const SHEET_FRAME_Y = 10
-export const SHEET_FRAME_RADIUS = 24
 
 /** 抽屉默认高度占可用屏幕高度的比例。 */
 export const SHEET_COLLAPSED_RATIO = 0.5

@@ -14,7 +14,7 @@ export const mobileSheetStyle: CSSProperties = {
   borderTopRightRadius: '28px',
   borderStartStartRadius: '28px',
   borderStartEndRadius: '28px',
-  // HeroUI 自己还有一条 translate 过渡，会和 GSAP 的 transform 叠加；
+  // HeroUI 自己还有一条 translate 过渡，会和 useSheetMotion 的 transform 叠加；
   // 这里关掉，滑入滑出完全由 useSheetMotion 驱动。
   translate: 'none',
   transition: 'none',
@@ -29,6 +29,15 @@ export const mobileSheetStyle: CSSProperties = {
  */
 export const mobileSheetBackdropStyle: CSSProperties = {
   backgroundColor: 'transparent',
-  // HeroUI 遮罩自带 opacity 过渡，会和 GSAP 驱动的遮罩层冲突。
+  // HeroUI 在 [data-entering] / [data-exiting] 时会把整块遮罩的 opacity 切到 0，
+  // 而抽屉就在这块遮罩里面：退场时抽屉会跟着一起瞬间消失，位移动画
+  // 虽然在跑但肉眼什么都看不到。压暗已经交给内部独立的 scrim 层，
+  // 这里用内联 opacity 固定住，React 每次重渲染也会保留。
+  opacity: 1,
+  // HeroUI 遮罩自带 opacity 过渡，会和 WAAPI 驱动的遮罩层冲突。
   transition: 'none',
+  // 遮罩本身不参与动画（压暗由内部的 data-sheet-scrim 负责），
+  // 不需要 HeroUI 在 entering / exiting 时给它加的 will-change，
+  // 否则会多出一整层全屏合成层，外壳缩放时白白多一层要处理。
+  willChange: 'auto',
 } as CSSProperties

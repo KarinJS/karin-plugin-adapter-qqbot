@@ -1,8 +1,6 @@
-import { useGSAP } from '@gsap/react'
 import { Button, Skeleton, toast } from '@heroui/react'
-import { gsap } from 'gsap'
 import { ArrowLeft, Bot, RotateCcw, Save } from 'lucide-react'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BotAvatar } from '@/components/BotAvatar'
 import { SaveStatus } from '@/components/SaveStatus'
@@ -11,7 +9,7 @@ import { MorphBackButton } from '@/components/mobile/MorphBackButton'
 import { MobileBotFields } from '@/components/mobile/MobileBotFields'
 import { useBotEditor } from '@/hooks/useBotEditor'
 import { useConfigStore } from '@/hooks/useConfigStore'
-import { useSmoothScroll } from '@/hooks/useSmoothScroll'
+import { animateProgress, EASE_POWER2_IN, EASE_POWER3_OUT, readTranslate } from '@/lib/waapi'
 import type { BotConfig } from '@/lib/types'
 
 interface MobileBotDetailPageProps {
@@ -31,12 +29,9 @@ const DetailBody = ({ bot, onBack, onRemoved }: DetailBodyProps) => {
   const navigate = useNavigate()
   const formId = useId()
   const scrollRef = useRef<HTMLDivElement>(null)
-  const scrollContentRef = useRef<HTMLDivElement>(null)
   const [removing, setRemoving] = useState(false)
   const status = statuses[bot.appId]
   const title = status?.name || bot.appId
-
-  useSmoothScroll(scrollRef, scrollContentRef)
 
   const handleSaved = (saved: BotConfig) => {
     if (saved.appId !== bot.appId) {
@@ -68,7 +63,7 @@ const DetailBody = ({ bot, onBack, onRemoved }: DetailBodyProps) => {
       >
         <MorphBackButton scrollRef={scrollRef} onBack={onBack} />
 
-        <div ref={scrollContentRef} className='px-4 pb-6'>
+        <div className='px-4 pb-6'>
           <header className='flex items-center gap-3 pb-4'>
             <BotAvatar name={title} avatar={status?.avatar} size='md' />
             <div className='min-w-0 flex-1'>
@@ -125,17 +120,33 @@ export const MobileBotDetailPage = ({ appId }: MobileBotDetailPageProps) => {
   const { config, loading } = useConfigStore()
   const navigate = useNavigate()
   const rootRef = useRef<HTMLDivElement>(null)
+  const enterRef = useRef<Animation | null>(null)
+  const leavingRef = useRef(false)
   const bot = config.find((item) => item.appId === appId)
 
-  useGSAP(
-    () => {
-      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      if (reduceMotion) return
+  // 进场交给 WAAPI：整页从右侧推入，transform 由合成器插值。
+  useLayoutEffect(() => {
+    const element = rootRef.current
+    if (!element) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
-      gsap.fromTo(rootRef.current, { xPercent: 100 }, { xPercent: 0, duration: 0.32, ease: 'power3.out' })
-    },
-    { scope: rootRef }
-  )
+    const animation = animateProgress(
+      element,
+      (progress) => ({ transform: `translate3d(${(1 - progress) * 100}%, 0, 0)` }),
+      EASE_POWER3_OUT,
+      0.32,
+      () => {
+        enterRef.current = null
+        element.style.transform = 'translate3d(0, 0, 0)'
+      }
+    )
+    enterRef.current = animation
+
+    return () => {
+      animation.cancel()
+      enterRef.current = null
+    }
+  }, [])
 
   useEffect(() => {
     rootRef.current?.focus()
@@ -143,19 +154,30 @@ export const MobileBotDetailPage = ({ appId }: MobileBotDetailPageProps) => {
 
   const handleBack = () => {
     const element = rootRef.current
+    if (!element || leavingRef.current) return
+    leavingRef.current = true
+
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-    if (!element || reduceMotion) {
+    if (reduceMotion) {
       navigate('/bots', { replace: true })
       return
     }
 
-    gsap.to(element, {
-      xPercent: 100,
-      duration: 0.24,
-      ease: 'power2.in',
-      onComplete: () => navigate('/bots', { replace: true }),
-    })
+    // 进场还没跑完就返回时，从当前位置继续滑出，不跳回屏幕内重播。
+    const width = element.offsetWidth
+    const from = readTranslate(element, 'x')
+    enterRef.current?.cancel()
+    enterRef.current = null
+    element.style.transform = `translate3d(${from}px, 0, 0)`
+
+    animateProgress(
+      element,
+      (progress) => ({ transform: `translate3d(${from + (width - from) * progress}px, 0, 0)` }),
+      EASE_POWER2_IN,
+      0.24,
+      () => navigate('/bots', { replace: true })
+    )
   }
 
   const handleRemoved = () => {

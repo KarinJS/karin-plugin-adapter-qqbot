@@ -4,6 +4,7 @@ import { SheetScaffold } from '@/components/mobile/SheetScaffold'
 import { mobileSheetBackdropStyle, mobileSheetStyle } from '@/components/mobile/mobileStyles'
 import { useSheetDrag } from '@/hooks/useSheetDrag'
 import { useSheetMotion } from '@/hooks/useSheetMotion'
+import { syncSheetChrome } from '@/lib/sheetChrome'
 import { SHEET_COLLAPSED_RATIO } from '@/lib/sheetMotion'
 
 interface MobileSheetProps {
@@ -23,9 +24,14 @@ interface MobileSheetProps {
  * 手机端底部抽屉的共用外壳。
  *
  * 打开时默认只占可用高度的 50%（initialRatio 可覆盖），向上拖动带出剩余高度；
- * 超过 75% 吸附到全屏，低于 25% 松手直接退场，其余回到 collapsedRatio 指定的高度。
- * 全屏后继续向上拖会接着滚动表单，内容到顶后向下拖会收起抽屉。
- * 抽屉高度在整个打开周期内用打开瞬间测量的像素值，不跟随 dvh / 地址栏变化。
+ * 超过 75% 吸附到全屏，低于 25% 松手直接退场；全屏（或接近全屏）时快速下扫也直接退场，
+ * 其余回到 collapsedRatio 指定的高度。
+ * 全屏且停稳后表单滚动交给浏览器原生处理，惯性不再经过主线程；
+ * 从半屏一拖到全屏后不松手继续上拖，会接着滚内容（跟手阶段用 JS 写 scrollTop，
+ * 松手后用 WAAPI 平移内容层做惯性）；内容到顶后继续向下拖会收起抽屉。
+ * 抽屉高度在整个打开周期内用打开瞬间测量的像素值，不跟随 dvh / 地址栏变化；
+ * 但输入法弹出时视觉视口会变矮，此时跟着抽屉容器临时改高度并铺满可见区域，
+ * 否则固定高度的 dialog 会被顶出屏幕上方，半屏也会被键盘压得只剩顶栏和底栏。
  */
 export const MobileSheet = ({
   isOpen,
@@ -50,11 +56,15 @@ export const MobileSheet = ({
       const height = Math.max(1, Math.round(base * ratio))
 
       baseHeightRef.current = base
-      dialog.style.height = `${height}px`
+      // dialog 始终是完整可用高度，收起时整体向下平移；
+      // 平移量存下来，进场动画不用重新量布局。
+      dialog.style.height = `${base}px`
       dialog.style.maxHeight = `${base}px`
+      dialog.dataset.sheetRestY = String(base - height)
       // 直接以全屏打开时，顶栏一开始就要让开刘海。
       if (ratio >= 0.999) dialog.dataset.sheetExpanded = 'true'
       else delete dialog.dataset.sheetExpanded
+      syncSheetChrome(dialog)
     },
     [initialRatio]
   )
@@ -64,7 +74,7 @@ export const MobileSheet = ({
     onExited?.()
   }, [onExited])
 
-  const { backdropRef, mounted, handleOpenChange } = useSheetMotion({
+  const { backdropRef, mounted, handleOpenChange, takeOverMotion, stopBackdropMotion } = useSheetMotion({
     isOpen,
     onRequestClose,
     onExited: handleExited,
@@ -80,6 +90,8 @@ export const MobileSheet = ({
     scrimRef,
     scrollerRef,
     baseHeightRef,
+    takeOverMotion,
+    stopBackdropMotion,
     collapsedRatio,
   })
 
@@ -102,7 +114,10 @@ export const MobileSheet = ({
   return (
     <Drawer.Backdrop
       ref={backdropRef}
-      isOpen={mounted}
+      // 用逻辑开关而不是 mounted：关闭时让 React Aria 立即解除背景 inert，
+      // 再用 isExiting 把 DOM 留到退场动画结束。
+      isOpen={isOpen}
+      isExiting={mounted && !isOpen}
       onOpenChange={handleOpenChange}
       isDismissable={false}
       isKeyboardDismissDisabled
@@ -116,9 +131,19 @@ export const MobileSheet = ({
         className='pointer-events-none fixed inset-0 bg-black'
         style={{ opacity: 0 }}
       />
+      {/* 键盘弹出时抽屉只铺到视觉视口底部，Safari 的浮动表单栏会在这和键盘之间
+          露出底下的页面；补一块抽屉底色，看起来像抽屉一直延伸到键盘下面。
+          由 useSheetDrag 在键盘模式下取消 hidden。 */}
+      <div
+        aria-hidden='true'
+        data-sheet-bleed=''
+        hidden
+        className='pointer-events-none fixed inset-x-0 h-32 bg-surface'
+        style={{ top: 'var(--visual-viewport-height)' }}
+      />
       <Drawer.Content placement='bottom'>
         <Drawer.Dialog
-          className='group flex flex-col overflow-hidden border border-border/60 bg-surface shadow-overlay data-[resizing=true]:cursor-grabbing data-[resizing=true]:select-none data-[resizing=true]:shadow-none data-[snapping=true]:shadow-none'
+          className='flex flex-col overflow-hidden border border-border/60 bg-surface shadow-none will-change-transform'
           style={mobileSheetStyle}
         >
           <SheetScaffold scrollerRef={scrollerRef} header={header} footer={footer}>

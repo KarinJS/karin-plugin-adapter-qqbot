@@ -122,8 +122,8 @@ const addTabs = [
  *
  * 默认全屏打开，其余拖动、吸附和退场逻辑与机器人配置抽屉完全一致：
  * 50% 和 100% 两档，低于 25% 松手退场。
- * 扫码和手动共用同一个分段标签；切换标签不会卸载二维码，
- * 只有退出抽屉或点击「重新生成」才会结束当前二维码会话。
+ * 扫码和手动共用同一个分段标签；点击标签、在抽屉里左右轻扫都能切换，
+ * 切换标签不会卸载二维码，只有退出抽屉或点击「重新生成」才会结束当前二维码会话。
  */
 export const MobileAddBotSheet = () => {
   const { isAddOpen, closeAdd } = useMobileSheet()
@@ -146,8 +146,9 @@ export const MobileAddBotSheet = () => {
       onRequestClose={closeAdd}
       onExited={handleExited}
       initialRatio={1}
+      collapsedRatio={1}
       header={
-        <header className='touch-none px-5 pt-2 pb-3 group-data-[sheet-expanded=true]:pt-[max(0.5rem,env(safe-area-inset-top))] group-data-[resizing=true]:bg-surface/92 group-data-[snapping=true]:bg-surface/92'>
+        <header data-sheet-header='' className='touch-none px-5 pt-2 pb-3'>
           <Drawer.Handle className='mx-auto mb-1' />
           <div className='flex items-start justify-between gap-3'>
             <div className='min-w-0'>
@@ -166,6 +167,7 @@ export const MobileAddBotSheet = () => {
           ariaLabel='添加方式'
           items={[...addTabs]}
           selectedKey={mode}
+          swipeable
           className='gap-4'
           onSelectionChange={(key) => {
             if (key === 'qr' || key === 'manual') setMode(key)

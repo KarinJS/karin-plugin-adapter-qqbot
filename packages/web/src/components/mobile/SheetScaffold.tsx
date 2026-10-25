@@ -54,28 +54,28 @@ export const SheetScaffold = ({ header, footer, children, contentClassName, scro
           '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden h-full overflow-y-auto overscroll-contain px-4',
           contentClassName
         )}
-        // 纵向滚动由 useSheetDrag 通过 scrollTop 驱动，关掉原生手势，
-        // 避免 iOS / 安卓在滚动开始后抢走 touch 事件。
-        style={{ paddingTop: insets.top, paddingBottom: insets.bottom, touchAction: 'none' }}
+        // touch-action 由 useSheetDrag 按抽屉状态切换：未全屏时是 none（手势归 JS），
+        // 全屏后是 pan-y（内容滚动和惯性完全交给浏览器）。
       >
-        {children}
+        {/* 上下内边距放在内层：从展开手势交接过来的内容惯性用 transform 平移这一层，
+            位移必须连内边距一起算，视觉位置才和真正写 scrollTop 一致。 */}
+        <div data-sheet-content='' style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}>
+          {children}
+        </div>
       </div>
 
-      <EdgeBlur
-        edge='top'
-        tone='surface'
-        rounded
-        className='z-20'
-        layerClassName='group-data-[resizing=true]:hidden group-data-[snapping=true]:hidden'
-      />
-      {footer ? <EdgeBlur edge='bottom' tone='surface' className='z-20' /> : null}
+      <EdgeBlur edge='top' tone='surface' rounded className='z-20' />
 
       <div ref={headerRef} className='absolute inset-x-0 top-0 z-30'>
         {header}
       </div>
       {footer ? (
-        <div ref={footerRef} className='absolute inset-x-0 bottom-0 z-30'>
-          {footer}
+        // 底栏和底部模糊层放在同一个容器里：抽屉收起时整体反向平移，
+        // 两者一起停在屏幕底部；可见高度低于 25% 后再跟着抽屉一起滑出屏幕。
+        // 平移由 useSheetDrag / useSheetMotion 直接写这个容器的 transform。
+        <div ref={footerRef} data-sheet-footer='' className='absolute inset-x-0 bottom-0 z-30'>
+          <EdgeBlur edge='bottom' tone='surface' className='z-0' />
+          <div className='relative z-10'>{footer}</div>
         </div>
       ) : null}
     </div>

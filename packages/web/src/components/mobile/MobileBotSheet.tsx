@@ -48,7 +48,7 @@ const SheetBody = ({
         onRequestClose={onRequestClose}
         onExited={onExited}
         header={
-          <header className='touch-none px-5 pt-2 pb-3 group-data-[sheet-expanded=true]:pt-[max(0.5rem,env(safe-area-inset-top))] group-data-[resizing=true]:bg-surface/92 group-data-[snapping=true]:bg-surface/92'>
+          <header data-sheet-header='' className='touch-none px-5 pt-2 pb-3'>
             <Drawer.Handle className='mx-auto mb-1' />
             <div className='flex items-start gap-3'>
               <BotAvatar name={title} avatar={status?.avatar} size='md' />
@@ -143,6 +143,13 @@ export const MobileBotSheet = () => {
   useEffect(() => {
     if (isOpen && !bot) close()
   }, [bot, close, isOpen])
+
+  useEffect(() => {
+    if (!isOpen || !pendingRemoveRef.current) return
+    // 退场途中被重新打开：取消待执行的移除，避免下次关闭时补删。
+    pendingRemoveRef.current = null
+    setRemoving(false)
+  }, [isOpen])
 
   const handleSaved = (saved: BotConfig) => {
     if (saved.appId !== activeAppId) open(saved.appId)
