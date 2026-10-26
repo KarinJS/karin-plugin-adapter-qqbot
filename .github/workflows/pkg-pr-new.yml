@@ -34,7 +34,7 @@ jobs:
           cache: pnpm
 
       - name: 安装依赖
-        run: pnpm install --ignore-scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: 构建输出
         run: pnpm --filter @karinjs/adapter-qqbot build
