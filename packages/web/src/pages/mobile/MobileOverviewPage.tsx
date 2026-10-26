@@ -2,6 +2,7 @@ import { cn } from '@heroui/react'
 import { BookOpen, Bot, Database, ExternalLink, GitFork, QrCode, RadioTower, Webhook } from 'lucide-react'
 import { MobileActionRow, MobileGroup, MobilePageHeader, MobileRow } from '@/components/mobile/MobileGroup'
 import { MobileBotList } from '@/components/mobile/MobileBotList'
+import { VersionBadge } from '@/components/VersionBadge'
 import { useConfigStore } from '@/hooks/useConfigStore'
 import { useMobileSheet } from '@/hooks/useMobileSheet'
 
@@ -60,7 +61,11 @@ export const MobileOverviewPage = () => {
 
   return (
     <div className='mx-auto flex w-full max-w-2xl flex-col gap-4'>
-      <MobilePageHeader title='概览' description='连接、事件通道与消息缓存的当前状态。' />
+      <MobilePageHeader
+        title='概览'
+        titleSuffix={<VersionBadge />}
+        description='连接、事件通道与消息缓存的当前状态。'
+      />
 
       <div className='grid grid-cols-2 gap-2.5'>
         <MobileStat

@@ -122,8 +122,10 @@ const addTabs = [
  *
  * 默认全屏打开，其余拖动、吸附和退场逻辑与机器人配置抽屉完全一致：
  * 50% 和 100% 两档，低于 25% 松手退场。
- * 扫码和手动共用同一个分段标签；点击标签、在抽屉里左右轻扫都能切换，
- * 切换标签不会卸载二维码，只有退出抽屉或点击「重新生成」才会结束当前二维码会话。
+ * 扫码和手动共用同一个分段标签；点击标签、在抽屉里左右轻扫都能切换。
+ * 两个面板并排挂在同一条轨道上，横向拖动时整条轨道跟手移动，松手再吸附到目标页，
+ * 和主页的横向分页是同一套画布手感。切换标签不会卸载二维码，
+ * 只有退出抽屉或点击「重新生成」才会结束当前二维码会话。
  */
 export const MobileAddBotSheet = () => {
   const { isAddOpen, closeAdd } = useMobileSheet()
@@ -173,10 +175,10 @@ export const MobileAddBotSheet = () => {
             if (key === 'qr' || key === 'manual') setMode(key)
           }}
         >
-          <Tabs.Panel id='qr' shouldForceMount style={{ display: mode === 'qr' ? undefined : 'none' }}>
+          <Tabs.Panel id='qr' shouldForceMount>
             <QrPanel />
           </Tabs.Panel>
-          <Tabs.Panel id='manual' shouldForceMount style={{ display: mode === 'manual' ? undefined : 'none' }}>
+          <Tabs.Panel id='manual' shouldForceMount>
             <MobileManualAddForm />
           </Tabs.Panel>
         </MobileSegmentedTabs>

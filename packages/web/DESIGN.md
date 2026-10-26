@@ -153,10 +153,14 @@
 抽屉去掉阴影的原因写在 `MobileSheet.tsx` 的类名里。
 
 ```tsx
-<Drawer.Dialog
-  className='flex flex-col overflow-hidden border border-border/60 bg-surface shadow-none will-change-transform'
-  style={mobileSheetStyle}
->
+<div data-sheet-transform='' className='pointer-events-none flex w-full flex-col justify-end will-change-transform'>
+  <Drawer.Dialog
+    className='flex flex-col overflow-hidden border border-border/60 bg-surface shadow-none'
+    style={mobileSheetStyle}
+  >
+    …
+  </Drawer.Dialog>
+</div>
 ```
 
 HeroUI 的 `.drawer__dialog` 自带 `--overlay-shadow: 0 18px 50px rgb(0 0 0 / 0.14)`。这层阴影向上晕开，在抽屉顶部的圆角外侧形成一圈灰黑渐变，停稳时看得很清楚，拖动时反而不明显，因为旧代码在拖动期间临时关掉了阴影。统一去掉以后，抽屉靠 1px 边框和顶部边缘模糊建立边界，圆角附近是干净的。
@@ -238,7 +242,7 @@ export const UI_MOTION_EASE = 'power3.out'
 | 桌面画布翻页 | 0.5s | power3.out | 整页位移，和抽屉一致 |
 | 表单换机器人翻页 | 0.5s | power3.out | 和画布翻页同拍 |
 | 手机横向分页吸附 | 0.32s | power3.out | 位移只有一页，节奏更快 |
-| 抽屉内标签轻扫滑入 | 0.32s | power3.out | 位移只有 24px，不需要 0.5s |
+| 抽屉内标签轨道吸附 | 0.32s | power3.out | 整页位移，和主分页器同一节奏 |
 | 详情页进场 | 0.32s | power3.out | 整页从右侧推入 |
 | 详情页退场 | 0.24s | power2.in | 退出比进入快，减少等待 |
 | 状态交叉淡化 | 0.18s 进入 / 0.16s 退出 | power2.out | 小范围文字变化，不能抢戏 |
@@ -255,7 +259,7 @@ export const UI_MOTION_EASE = 'power3.out'
 
 ### 2.2 为什么松手后的动画统一走 WAAPI
 
-抽屉吸附、内容惯性、横向分页吸附、标签滑入、详情页进出场全部使用 `element.animate()`。原因写在 `src/lib/waapi.ts` 的注释里，松手后的 `transform` 和 `opacity` 由合成器驱动，主线程在忙路由提交、React 渲染或 inert 切换时，动画仍然按帧走。
+抽屉吸附、内容惯性、横向分页吸附、抽屉内标签轨道吸附、详情页进出场全部使用 `element.animate()`。原因写在 `src/lib/waapi.ts` 的注释里，松手后的 `transform` 和 `opacity` 由合成器驱动，主线程在忙路由提交、React 渲染或 inert 切换时，动画仍然按帧走。
 
 GSAP 只保留在三个地方。
 
@@ -338,8 +342,8 @@ rafRef.current = requestAnimationFrame(() => {
   rafRef.current = 0
   raf2Ref.current = requestAnimationFrame(() => {
     raf2Ref.current = 0
-    const from = readState(dialog, footer, scrim, frame)
-    run(dialog, footer, scrim, frame, base, from, target, SHEET_ENTER_DURATION, () => {
+    const from = readState(layer, footer, scrim, frame)
+    run(layer, footer, scrim, frame, base, from, target, SHEET_ENTER_DURATION, () => {
       delete dialog.dataset.animating
     })
   })
@@ -768,7 +772,7 @@ iOS Safari 在输入框字号小于 16px 时会自动放大页面。放大以后
 1. 输入框和可编辑区域的文字选择。
 2. 按钮、链接、开关、下拉触发器、标签栏的点击。
 3. 分段标签的按住拖选。
-4. 抽屉内左右轻扫切换标签。
+4. 抽屉内左右轻扫切换画布页。
 5. 抽屉高度拖动与内容滚动。
 6. 顶层横向分页。
 
@@ -818,6 +822,25 @@ const footerYFor = (y: number, base: number) => -Math.min(y, base * FOOTER_FLOOR
 为什么用固定像素高度，不用 `dvh`。移动端浏览器地址栏展开收起会让 `dvh` 不断变化，抽屉在滚动时忽高忽低。打开瞬间量一次 `clientHeight`，整个打开周期内保持不变。只有输入法弹出这种真正改变可见区域的情况才临时改 `base`，见 4.10。
 
 为什么用 `translate3d`，不改 `height`。`height` 每帧触发布局和重绘，整棵抽屉子树都要重排。`translate3d` 只走合成器。抽屉内容再复杂，拖动成本也不变。
+
+位移统一写在外层一个普通 div 上，dialog 只负责尺寸和内容。
+
+```tsx
+<div data-sheet-transform='' className='pointer-events-none flex w-full flex-col justify-end will-change-transform'>
+  <Drawer.Dialog style={mobileSheetStyle}>…</Drawer.Dialog>
+</div>
+```
+
+dialog 上挂着 HeroUI 的 `.drawer__dialog` 和十几条 Tailwind 类。每帧改它的内联 `transform` 会让整条样式链失效。Chrome 的 invalidation tracking 里，一次 touchmove 会在 dialog 上记一条 `Inline CSS style declaration was mutated`，随后整棵子树重算样式并重排。挪到这层只有几个类的 div 以后，同样的连续拖动里样式重算从 0.100s 降到 0.052s，总任务时间从 0.425s 降到 0.325s（6 倍 CPU 降速、60 帧连续写 transform 的对照测量）。
+
+`mobileSheetStyle` 里同时覆盖了 HeroUI 的两个默认值。
+
+```ts
+willChange: 'auto',   // 取消 .drawer__dialog 的 will-change: translate，dialog 不再动
+isolation: 'isolate', // 让 dialog 成为 backdrop root，模糊只在抽屉内部取样
+```
+
+`will-change: translate` 会额外提升一个合成层。位移已经在外面那层 div 上，dialog 不再需要自己的合成层。`isolation: isolate` 让顶栏和底栏的 `backdrop-filter` 相对 dialog 取样。抽屉本身不透明，视觉不变，合成器每帧要处理的范围小一圈。
 
 `sheetRestY` 记录真正停稳的位置。快速打开又取消时，退场往往从进场中途开始，重新打开要回到上一次停稳的位置，不能拿中途值当落点，否则每次打断都会把落点往下带一点，抽屉越弹越矮。
 
@@ -871,7 +894,7 @@ const target: SheetState = {
 }
 
 if (!reverse) {
-  commitState(dialog, footer, scrim, frame, {
+  commitState(layer, footer, scrim, frame, {
     y: base,
     footerY: footerYFor(base, base),
     opacity: 0,
@@ -1157,8 +1180,8 @@ if (flickDown) {
 吸附动画和进出场使用同一组时长与曲线。
 
 ```ts
-const dialogAnimation = animateProgress(
-  dialog,
+const sheetAnimation = animateProgress(
+  sheet,
   (progress) => ({
     transform: `translate3d(0, ${fromY + (endY - fromY) * progress}px, 0)`,
   }),
@@ -1275,10 +1298,12 @@ export const mobileSheetStyle: CSSProperties = {
   borderStartEndRadius: '28px',
   translate: 'none',
   transition: 'none',
+  willChange: 'auto',
+  isolation: 'isolate',
 }
 ```
 
-部分安卓浏览器在 `overflow` 加 `backdrop-filter` 的组合下会按逻辑属性绘制，只写 `border-radius` 会丢圆角。`translate: none` 和 `transition: none` 用来关掉 HeroUI 自带的位移动画，避免和 `useSheetMotion` 的 `transform` 叠加。
+部分安卓浏览器在 `overflow` 加 `backdrop-filter` 的组合下会按逻辑属性绘制，只写 `border-radius` 会丢圆角。`translate: none` 和 `transition: none` 用来关掉 HeroUI 自带的位移动画，避免和 `useSheetMotion` 的 `transform` 叠加。`willChange: 'auto'` 取消 HeroUI 给 dialog 加的 `will-change: translate`，位移已经在外面那层 div 上，dialog 不需要自己的合成层。`isolation: isolate` 让 dialog 成为 backdrop root，顶栏和底栏的模糊只在抽屉内部取样。
 
 ### 4.10 键盘模式
 
@@ -1646,7 +1671,7 @@ const FALLBACK: Record<Tone, Record<Edge, string>> = {
 
 `EdgeBlur` 在抽屉拖动、吸附、进出场期间保持显示，不做任何 `display` 切换。
 
-原因在 4.9 已经说过。这里补一个性能角度的判断。原生内容滚动时，浏览器本来就要每帧重新采样这三层 `backdrop-filter`，这个成本已经被接受。抽屉拖动是整块平移，模糊层和它下面的内容相对静止，采样结果不变，成本只会更低。中途切 `display` 反而会销毁再重建合成层，安卓上会闪一帧。
+原因在 4.9 已经说过。这里补一个性能角度的判断。原生内容滚动时，浏览器本来就要每帧重新采样这三层 `backdrop-filter`，这个成本已经被接受。抽屉拖动是整块平移，模糊层和它下面的内容相对静止，采样结果不变。中途切 `display` 反而会销毁再重建合成层，安卓上会闪一帧。拖动真正贵的是每帧改 dialog 内联样式带来的样式重算，这个问题在 4.1 用位移层解决。`isolation: isolate` 再让模糊只在抽屉内部取样，合成器每帧处理的范围更小。
 
 ---
 
@@ -1890,17 +1915,29 @@ const selectAt = (x: number) => {
 
 拖拽结束后拦掉 `pointerup` 和 `click`，避免 React Aria 的 press 把选中改回按下的那个标签。
 
-### 7.3 抽屉内左右轻扫
+### 7.3 抽屉内的画布轨道
 
-扫码和手动添加两个标签支持在整块抽屉上左右轻扫。手势挂在 dialog 上，顶栏和表单空白处都能扫。
+扫码和手动添加不是一页消失、另一页原地滑入，而是两个面板并排挂在同一条横向轨道上，横向拖动时整条轨道跟手平移。手势仍然挂在 dialog 上，顶栏和表单空白处都能扫。
 
-```ts
-const swipeTarget = panel.closest<HTMLElement>('[data-slot="drawer-dialog"]') ?? panel
+```tsx
+<div ref={panelRef} className={cn('relative touch-pan-y', swipeable && '-mx-4 overflow-hidden')}>
+  {swipeable ? (
+    <div ref={trackRef} className='flex w-full will-change-transform'>
+      {Children.map(children, (child) => (
+        <div className='w-full shrink-0 px-4'>{child}</div>
+      ))}
+    </div>
+  ) : (
+    children
+  )}
+</div>
 ```
+
+viewport 用 `-mx-4` 吃掉抽屉内容的左右内边距，邻页就能从抽屉边缘滑进来；每个轨道项再用 `px-4` 把内边距补回去，静止时面板内容和标签栏的对齐和改动前完全一致。非 swipeable 的用法（事件通道说明）不套轨道，直接渲染 children。
 
 标签栏、输入框、按钮不参与轻扫，靠 `INTERACTIVE_SELECTOR` 排除。
 
-判定和横向分页一致。
+跟手阶段每帧只写一次轨道 transform，位移按 `-index * pageWidth + offset` 计算，到首尾页之外乘 0.35 的阻尼。判定参数和主分页器一致。
 
 | 参数 | 值 |
 | --- | --- |
@@ -1909,47 +1946,40 @@ const swipeTarget = panel.closest<HTMLElement>('[data-slot="drawer-dialog"]') ??
 | 最小距离 | 48px |
 | 距离阈值 | 面板宽的 20% |
 | 轻扫速度阈值 | 0.45 px/ms |
-| 滑入时长 | 0.32s |
-| 滑入位移 | 24px |
+| 吸附时长 | 0.32s |
+| 边界阻尼 | 0.35 |
 
-滑入动画只移动 24px。
-
-```ts
-const animation = animateProgress(
-  panel,
-  (progress) => ({
-    transform: `translate3d(${intent.direction * SWIPE_ANIM_OFFSET * (1 - progress)}px, 0, 0)`,
-  }),
-  EASE_POWER3_OUT,
-  SWIPE_ANIM_DURATION,
-  () => {
-    panel.style.transform = ''
-  }
-)
-```
-
-为什么只滑 24px。标签内容切换是瞬时的，整页滑动需要给旧内容拍快照，否则会看到新内容从空白里滑进来。24px 的短距离滑入只负责表达方向，成本低，也不会让用户以为两个标签之间还有中间状态。
-
-方向由手势决定。左滑切到下一个标签，面板从右侧 24px 处滑入；右滑相反。
+松手后的吸附交给 WAAPI，`power3.out` 采样成关键帧，由合成器插值。
 
 ```ts
-const step = dx < 0 ? 1 : -1
-...
-swipeIntentRef.current = { direction: step, key: next.key }
-onSelectionChangeRef.current(next.key)
+indexRef.current = nextIndex
+setTrack(-nextIndex * pageWidth, true)
+if (nextIndex !== index) onSelectionChangeRef.current(next.key)
 ```
 
-意图存在 ref 里，等 `selectedKey` 变化后的 `useLayoutEffect` 消费。这样动画和 React 的状态更新对齐，不会在旧面板上先滑一下。
+`setTrack` 会等一帧再启动动画：标签切换会触发一次 React 提交（inert、选中态、指示器），动画和提交撞在同一帧时第一帧可能直接跳到中段。
+
+点击标签走同一条 `setTrack`。`indexRef` 在动画启动前就更新到目标页，`selectedKey` 回流后的 `useLayoutEffect` 看到索引已经一致就直接返回，不会补第二段动画。
+
+```ts
+if (activeIndex === indexRef.current) return
+indexRef.current = activeIndex
+setTrack(-activeIndex * measureWidth(), true)
+```
+
+宽度变化（横竖屏、键盘、分屏）用 ResizeObserver 按当前页重新对齐；拖动中先不动，避免和手指抢位移。首帧用 `firstSyncRef` 直接落位，不播动画。
+
+为什么不再用 24px 滑入。旧实现里旧面板立刻 `display: none`，新面板从 24px 外滑进来，看起来是原地刷新。两个面板同时挂载以后，把内容放在一张轨道上跟手移动，用户能看到邻页从边缘进入，和主页 `MobilePager` 是同一套空间关系；代价只是多一个面板常驻，扫码面板本来就不能卸载。
 
 ### 7.4 标签内容不卸载
 
-添加机器人的两个面板用 `shouldForceMount` 保持挂载。
+添加机器人的两个面板用 `shouldForceMount` 保持挂载，并且不再用 `display` 切换。
 
 ```tsx
-<Tabs.Panel id='qr' shouldForceMount style={{ display: mode === 'qr' ? undefined : 'none' }}>
+<Tabs.Panel id='qr' shouldForceMount>
   <QrPanel />
 </Tabs.Panel>
-<Tabs.Panel id='manual' shouldForceMount style={{ display: mode === 'manual' ? undefined : 'none' }}>
+<Tabs.Panel id='manual' shouldForceMount>
   <MobileManualAddForm />
 </Tabs.Panel>
 ```
@@ -2771,6 +2801,35 @@ className='... transition-[opacity,scale] duration-[160ms] ease-[var(--ease-out)
 
 底部固定按钮用 `form` 属性提交表单。按钮在 `<form>` 外面，不依赖 DOM 嵌套。
 
+### 10.8 概览版本角标
+
+概览页标题「概览」后面用 `VersionBadge` 显示适配器自己的 `package.json` version。版本来自 `/qqbot/config` 的 `version` 字段，和 web 子包的版本无关。
+
+```tsx
+<PageHeader eyebrow='Overview' title='概览' titleSuffix={<VersionBadge />} description='...' />
+```
+
+`PageHeader` 和 `MobilePageHeader` 都多了一个可选的 `titleSuffix`。标题和角标放进 `flex items-end` 的行里，角标底边跟标题行盒的底部对齐，再向下挪 2px，读起来像标题的下角标。它不占描述文字的位置，标题换行时也不会被挤到下一行。
+
+```tsx
+<div className='flex items-end gap-1.5'>
+  <h1 className='...'>{title}</h1>
+  {titleSuffix ? <span className='translate-y-0.5'>{titleSuffix}</span> : null}
+</div>
+```
+
+角标本身：
+
+```tsx
+<span className='tabular-nums inline-flex shrink-0 items-center rounded-md border border-border/60 bg-default/40 px-1.5 py-0.5 text-[10px] leading-4 font-medium text-muted'>
+  v{version}
+</span>
+```
+
+`tabular-nums` 让数字宽度稳定，版本号变化时角标不会左右抖。10px 字号和 muted 颜色让它明显是标题的附属信息，不会跟标题抢注意力。版本还没加载时不渲染，避免标题后面先闪一个空角标。
+
+角标在标题行内，手机端翻页时跟着概览页一起横向移动，桌面端跟着纵向画布移动，不会出现在其他页面上。
+
 ---
 
 ## 11. 滚动驱动的返回按钮
@@ -3134,7 +3193,7 @@ const scheduleDrag = (clientY: number) => {
 
 ### 14.4 松手后的动画交给合成器
 
-抽屉吸附、内容惯性、横向分页、标签滑入、详情页进出场都用 WAAPI。GSAP 只保留在粒子、FLIP 和高度过渡。
+抽屉吸附、内容惯性、横向分页、抽屉内标签轨道吸附、详情页进出场都用 WAAPI。GSAP 只保留在粒子、FLIP 和高度过渡。
 
 原因在 2.2 已经说过。补一个对比。GSAP 的 rAF 回调在主线程运行，路由提交、React 渲染、inert 切换都会阻塞它。WAAPI 的 `transform` 动画由合成器驱动，主线程掉帧不影响动画本身。
 
@@ -3142,19 +3201,20 @@ const scheduleDrag = (clientY: number) => {
 
 | 元素 | will-change |
 | --- | --- |
-| 抽屉 dialog | `transform` |
+| 抽屉位移层 | `transform` |
+| 抽屉 dialog | `auto`，覆盖 HeroUI 自带的 `translate` |
 | 分页轨道 | `transform` |
 | 画布轨道 | `transform` |
 | 惯性内容层 | 动画期间临时加 `transform`，结束移除 |
 | 手机外壳 | `transform` |
 
-不给 `*` 加，也不给不动的容器加。每个提升的图层都占 GPU 内存。
+不给 `*` 加，也不给不动的容器加。每个提升的图层都占 GPU 内存。抽屉的位移已经在外层 div 上，dialog 自己再提升一层只会增加合成器的工作。
 
 ### 14.6 不中途切换 backdrop-filter
 
 `EdgeBlur` 的三层模糊全程保持 `display: block`。拖动、吸附、进出场都不切。
 
-中途切 `display` 会销毁再重建合成层，安卓上会闪一帧。而且抽屉平移时模糊层和内容相对静止，重新采样没有意义。
+中途切 `display` 会销毁再重建合成层，安卓上会闪一帧。而且抽屉平移时模糊层和内容相对静止，重新采样没有意义。抽屉 dialog 上的 `isolation: isolate` 让这三层只在抽屉内部取样，拖动时合成器处理的范围更小。
 
 ### 14.7 Lenis 按需运行
 
@@ -3321,7 +3381,7 @@ className='relative grid items-start gap-5 xl:min-h-0 xl:flex-1 xl:grid-cols-[20
 
 ### 16.3 抽屉
 
-1. 固定像素高度，`translate3d` 控制可见高度。
+1. 固定像素高度，`translate3d` 控制可见高度，位移写在外层普通 div 上。
 2. 底栏反向平移，25% 以下跟着滑出。
 3. 压暗层独立，只动 opacity。
 4. 进出场 0.5s，外壳缩放 0.94、下移 10px。
@@ -3330,6 +3390,7 @@ className='relative grid items-start gap-5 xl:min-h-0 xl:flex-1 xl:grid-cols-[20
 7. 内容回顶后接管成高度拖动。
 8. 键盘弹出时跟着 `drawer-content` 改 base 并铺满。
 9. 顶栏底色和模糊层全程不切换。
+10. dialog 上 `isolation: isolate`，模糊只在抽屉内部取样。
 
 ### 16.4 边缘模糊
 
@@ -3346,7 +3407,7 @@ className='relative grid items-start gap-5 xl:min-h-0 xl:flex-1 xl:grid-cols-[20
 3. 距离阈值页宽 20%，速度阈值 0.45 px/ms。
 4. 吸附 0.32s，等两帧启动。
 5. 标签支持按住拖选，按最近中心选中。
-6. 抽屉内左右轻扫只滑入 24px。
+6. 抽屉内左右轻扫时两个面板在同一张轨道上跟手移动，松手吸附整页。
 7. 切标签不卸载扫码面板。
 
 ### 16.6 桌面
@@ -3475,7 +3536,7 @@ await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints
 | 快曲线 | `cubic-bezier(0.23, 1, 0.32, 1)` |
 | WAAPI 采样 | 60 帧，惯性 120 帧 |
 | 横向分页吸附 | 0.32s |
-| 标签滑入 | 0.32s / 24px |
+| 标签轨道吸附 | 0.32s / 整页 |
 | 详情页进 / 出 | 0.32s / 0.24s |
 | 状态交叉淡化 | 0.18s / 0.16s / 停 0.06s |
 | 保存提示进 / 出 / 更新 | 0.28s / 0.18s / 0.16s |

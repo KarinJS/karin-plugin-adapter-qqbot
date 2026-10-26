@@ -8,6 +8,7 @@ import { BotList } from '@/components/BotList'
 import { EmptyState } from '@/components/EmptyState'
 import { PageHeader } from '@/components/PageHeader'
 import { SectionCard } from '@/components/SectionCard'
+import { VersionBadge } from '@/components/VersionBadge'
 import { useConfigStore } from '@/hooks/useConfigStore'
 import { useEmbedded } from '@/hooks/useEmbedded'
 import { useViewport } from '@/hooks/useViewport'
@@ -96,6 +97,7 @@ export const OverviewPage = () => {
       <PageHeader
         eyebrow='Overview'
         title='概览'
+        titleSuffix={<VersionBadge />}
         description='机器人连接、事件通道和消息缓存的当前状态。'
         actions={
           isMobile ? (

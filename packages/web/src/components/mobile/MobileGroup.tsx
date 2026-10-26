@@ -84,14 +84,18 @@ export const MobileActionRow = ({
 
 interface MobilePageHeaderProps {
   title: string
+  titleSuffix?: ReactNode
   description?: string
   action?: ReactNode
 }
 
-export const MobilePageHeader = ({ title, description, action }: MobilePageHeaderProps) => (
+export const MobilePageHeader = ({ title, titleSuffix, description, action }: MobilePageHeaderProps) => (
   <header className='flex items-end justify-between gap-3 px-1 pb-1'>
     <div className='min-w-0'>
-      <h1 className='text-[26px] leading-tight font-semibold tracking-[-0.03em]'>{title}</h1>
+      <div className='flex items-end gap-1.5'>
+        <h1 className='text-[26px] leading-tight font-semibold tracking-[-0.03em]'>{title}</h1>
+        {titleSuffix ? <span className='translate-y-0.5'>{titleSuffix}</span> : null}
+      </div>
       {description ? <p className='mt-1 text-[12px] leading-5 text-muted'>{description}</p> : null}
     </div>
     {action ? <div className='shrink-0 pb-0.5'>{action}</div> : null}
