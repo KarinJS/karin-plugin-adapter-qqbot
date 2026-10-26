@@ -18,6 +18,13 @@ export const mobileSheetStyle: CSSProperties = {
   // 这里关掉，滑入滑出完全由 useSheetMotion 驱动。
   translate: 'none',
   transition: 'none',
+  // HeroUI 给 dialog 加了 will-change: translate，但位移已经挪到外层 div，
+  // dialog 不再动；保留这条会多出一个没用的合成层，每帧白白多一次图层更新。
+  willChange: 'auto',
+  // 让 dialog 自己成为 backdrop root：顶栏 / 底栏的 backdrop-filter 只在
+  // 抽屉内部取样，不再相对整页计算。抽屉是不透明的，视觉不变，但拖动时
+  // 合成器要处理的范围小一圈，重绘和合成更新都更省。
+  isolation: 'isolate',
 } as CSSProperties
 
 /**

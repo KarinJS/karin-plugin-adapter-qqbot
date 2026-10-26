@@ -70,7 +70,7 @@ const footerYFor = (y: number, base: number) => -Math.min(y, base * FOOTER_FLOOR
 /**
  * 底部抽屉的拖动与内容滚动。
  *
- * 抽屉的 dialog 始终是完整可用高度，拖动只改它的 translate3d 位移：
+ * 抽屉的 dialog 始终是完整可用高度，拖动只改位移层的 translate3d：
  * 可见高度 = base - y。底栏和底部模糊层在同一个容器里，按 -min(y, 0.75 * base)
  * 反向平移，所以 25% 以上底栏钉在屏幕底部，低于 25% 跟着抽屉一起滑出屏幕。
  * 整个拖动只写 transform，不碰 height / 布局。
@@ -104,8 +104,11 @@ export const useSheetDrag = ({
     const backdrop = backdropRef.current
     const scrim = scrimRef.current
     const dialog = backdrop?.querySelector<HTMLElement>('[data-slot="drawer-dialog"]')
+    // 位移层：dialog 上挂着大量 HeroUI / Tailwind 规则，每帧改它的内联 transform
+    // 会连带重算整条样式链并触发整棵子树重排；位移统一写在这层普通 div 上。
+    const sheet = backdrop?.querySelector<HTMLElement>('[data-sheet-transform]')
     const scroller = scrollerRef.current
-    if (!dialog || !scroller || !baseHeightRef.current) return
+    if (!dialog || !sheet || !scroller || !baseHeightRef.current) return
 
     // 底栏和底部模糊层一起反向平移，抽屉收起时仍停在屏幕底部。
     const footer = dialog.querySelector<HTMLElement>('[data-sheet-footer]')
@@ -319,11 +322,11 @@ export const useSheetDrag = ({
       )
     }
 
-    /** 只写 transform：dialog 的 y 和底栏容器的反向位移。 */
+    /** 只写 transform：位移层的 y 和底栏容器的反向位移。 */
     const writeY = (y: number) => {
       if (y !== lastY) {
         lastY = y
-        dialog.style.transform = `translate3d(0, ${y}px, 0)`
+        sheet.style.transform = `translate3d(0, ${y}px, 0)`
       }
 
       if (footer) {
@@ -347,7 +350,7 @@ export const useSheetDrag = ({
     const measureVisible = () => {
       if (!measured) {
         measured = true
-        const y = readTranslate(dialog)
+        const y = readTranslate(sheet)
         lastY = y
         visibleHeight = base() - y
       }
@@ -366,11 +369,11 @@ export const useSheetDrag = ({
       if (!snapAnimations.length) return
 
       // 从动画中间接管：先读当前值，再取消，最后写回内联样式。
-      const currentY = readTranslate(dialog)
+      const currentY = readTranslate(sheet)
       const currentFooterY = footer ? readTranslate(footer) : 0
       for (const animation of snapAnimations) animation.cancel()
       snapAnimations = []
-      dialog.style.transform = `translate3d(0, ${currentY}px, 0)`
+      sheet.style.transform = `translate3d(0, ${currentY}px, 0)`
       if (footer) footer.style.transform = `translate3d(0, ${currentFooterY}px, 0)`
       lastY = currentY
       lastFooterY = currentFooterY
@@ -813,8 +816,8 @@ export const useSheetDrag = ({
 
       const animations: Animation[] = []
 
-      const dialogAnimation = animateProgress(
-        dialog,
+      const sheetAnimation = animateProgress(
+        sheet,
         (progress) => ({
           transform: `translate3d(0, ${fromY + (endY - fromY) * progress}px, 0)`,
         }),
@@ -823,7 +826,7 @@ export const useSheetDrag = ({
         () => {
           for (const animation of animations) animation.cancel()
           snapAnimations = []
-          dialog.style.transform = `translate3d(0, ${endY}px, 0)`
+          sheet.style.transform = `translate3d(0, ${endY}px, 0)`
           if (footer) footer.style.transform = `translate3d(0, ${footerYFor(endY, height)}px, 0)`
           if (scrim) scrim.style.opacity = String(SHEET_BACKDROP_ALPHA)
           if (frame) frame.style.transform = `translate3d(0, ${SHEET_FRAME_Y}px, 0) scale(${SHEET_FRAME_SCALE})`
@@ -839,7 +842,7 @@ export const useSheetDrag = ({
           setExpanded(expanded)
         }
       )
-      animations.push(dialogAnimation)
+      animations.push(sheetAnimation)
 
       if (footer) {
         animations.push(

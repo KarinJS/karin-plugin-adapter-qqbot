@@ -41,13 +41,20 @@ const BACKDROP_SETTLE_DURATION = 0.24
 
 const footerYFor = (y: number, base: number) => -Math.min(y, base * FOOTER_FLOOR)
 
+/**
+ * 抽屉的位移层。dialog 上挂着大量 HeroUI / Tailwind 规则，每帧改它的内联
+ * transform 会重算整条样式链；位移统一写在外面这层普通 div 上。
+ */
+const getSheetLayer = (backdrop: HTMLElement | null) =>
+  backdrop?.querySelector<HTMLElement>('[data-sheet-transform]') ?? null
+
 const readState = (
-  dialog: HTMLElement,
+  layer: HTMLElement,
   footer: HTMLElement | null,
   scrim: HTMLElement | null,
   frame: HTMLElement | null
 ): SheetState => ({
-  y: readTranslate(dialog),
+  y: readTranslate(layer),
   footerY: readTranslate(footer),
   opacity: scrim ? Number(getComputedStyle(scrim).opacity) : 0,
   frameScale: frame ? readScale(frame) : 1,
@@ -55,13 +62,13 @@ const readState = (
 })
 
 const commitState = (
-  dialog: HTMLElement,
+  layer: HTMLElement,
   footer: HTMLElement | null,
   scrim: HTMLElement | null,
   frame: HTMLElement | null,
   state: SheetState
 ) => {
-  dialog.style.transform = `translate3d(0, ${state.y}px, 0)`
+  layer.style.transform = `translate3d(0, ${state.y}px, 0)`
   if (footer) footer.style.transform = `translate3d(0, ${state.footerY}px, 0)`
   if (scrim) scrim.style.opacity = String(state.opacity)
   if (frame) frame.style.transform = `translate3d(0, ${state.frameY}px, 0) scale(${state.frameScale})`
@@ -70,7 +77,7 @@ const commitState = (
 /**
  * 底部抽屉的进入 / 退出动画。
  *
- * 动画全部交给 WAAPI：dialog 只做整块 translate3d，底栏容器做反向位移，
+ * 动画全部交给 WAAPI：位移层只做整块 translate3d，底栏容器做反向位移，
  * 两者都是合成属性，由合成器逐帧驱动，主线程掉帧不会让动画一格一格。
  * 之前用 GSAP 每帧改 dialog 的 height，每帧都要重排整棵抽屉子树，
  * 松手后的吸附和进出场因此在手机上明显比原生滚动卡。
@@ -144,8 +151,10 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter, 
 
     stopBackdropMotion()
 
-    const dialog = backdropRef.current?.querySelector<HTMLElement>('[data-slot="drawer-dialog"]')
-    if (!dialog) {
+    const backdrop = backdropRef.current
+    const dialog = backdrop?.querySelector<HTMLElement>('[data-slot="drawer-dialog"]')
+    const layer = getSheetLayer(backdrop)
+    if (!dialog || !layer) {
       animationsRef.current = []
       return
     }
@@ -153,11 +162,11 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter, 
     const footer = dialog.querySelector<HTMLElement>('[data-sheet-footer]')
     const scrim = scrimRef.current
     const frame = document.querySelector<HTMLElement>('.mobile-frame')
-    const state = readState(dialog, footer, scrim, frame)
+    const state = readState(layer, footer, scrim, frame)
 
     for (const animation of animationsRef.current) animation.cancel()
     animationsRef.current = []
-    commitState(dialog, footer, scrim, frame, state)
+    commitState(layer, footer, scrim, frame, state)
 
     delete dialog.dataset.animating
   }, [scrimRef, stopBackdropMotion])
@@ -180,8 +189,10 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter, 
 
     stopBackdropMotion()
 
-    const dialog = backdropRef.current?.querySelector<HTMLElement>('[data-slot="drawer-dialog"]')
-    if (!dialog) {
+    const backdrop = backdropRef.current
+    const dialog = backdrop?.querySelector<HTMLElement>('[data-slot="drawer-dialog"]')
+    const layer = getSheetLayer(backdrop)
+    if (!dialog || !layer) {
       animationsRef.current = []
       return
     }
@@ -189,12 +200,12 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter, 
     const footer = dialog.querySelector<HTMLElement>('[data-sheet-footer]')
     const scrim = scrimRef.current
     const frame = document.querySelector<HTMLElement>('.mobile-frame')
-    const state = readState(dialog, footer, scrim, frame)
+    const state = readState(layer, footer, scrim, frame)
 
     for (const animation of animationsRef.current) animation.cancel()
     animationsRef.current = []
 
-    dialog.style.transform = `translate3d(0, ${state.y}px, 0)`
+    layer.style.transform = `translate3d(0, ${state.y}px, 0)`
     if (footer) footer.style.transform = `translate3d(0, ${state.footerY}px, 0)`
     if (scrim) scrim.style.opacity = String(state.opacity)
     if (frame) frame.style.transform = `translate3d(0, ${state.frameY}px, 0) scale(${state.frameScale})`
@@ -267,7 +278,7 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter, 
    */
   const run = useCallback(
     (
-      dialog: HTMLElement,
+      layer: HTMLElement,
       footer: HTMLElement | null,
       scrim: HTMLElement | null,
       frame: HTMLElement | null,
@@ -279,8 +290,8 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter, 
     ) => {
       const animations: Animation[] = []
 
-      const dialogAnimation = animateProgress(
-        dialog,
+      const layerAnimation = animateProgress(
+        layer,
         (progress) => ({
           transform: `translate3d(0, ${from.y + (to.y - from.y) * progress}px, 0)`,
         }),
@@ -289,11 +300,11 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter, 
         () => {
           for (const animation of animations) animation.cancel()
           animationsRef.current = []
-          commitState(dialog, footer, scrim, frame, to)
+          commitState(layer, footer, scrim, frame, to)
           onDone()
         }
       )
-      animations.push(dialogAnimation)
+      animations.push(layerAnimation)
 
       if (footer) {
         animations.push(
@@ -346,8 +357,9 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter, 
 
     const backdrop = backdropRef.current
     const dialog = backdrop?.querySelector<HTMLElement>('[data-slot="drawer-dialog"]')
+    const layer = getSheetLayer(backdrop)
     const scrim = scrimRef.current
-    if (!backdrop || !dialog) return
+    if (!backdrop || !dialog || !layer) return
 
     const reverse = reverseRef.current
 
@@ -380,14 +392,14 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter, 
     dialog.dataset.animating = 'true'
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      commitState(dialog, footer, scrim, frame, target)
+      commitState(layer, footer, scrim, frame, target)
       delete dialog.dataset.animating
       return
     }
 
     // 完整进场从屏幕下方开始；反向恢复保持当前 y，只滑回停靠位置。
     if (!reverse) {
-      commitState(dialog, footer, scrim, frame, {
+      commitState(layer, footer, scrim, frame, {
         y: base,
         footerY: footerYFor(base, base),
         opacity: 0,
@@ -402,8 +414,8 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter, 
       rafRef.current = 0
       raf2Ref.current = requestAnimationFrame(() => {
         raf2Ref.current = 0
-        const from = readState(dialog, footer, scrim, frame)
-        run(dialog, footer, scrim, frame, base, from, target, SHEET_ENTER_DURATION, () => {
+        const from = readState(layer, footer, scrim, frame)
+        run(layer, footer, scrim, frame, base, from, target, SHEET_ENTER_DURATION, () => {
           delete dialog.dataset.animating
         })
       })
@@ -419,6 +431,7 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter, 
 
     const backdrop = backdropRef.current
     const dialog = backdrop?.querySelector<HTMLElement>('[data-slot="drawer-dialog"]')
+    const layer = getSheetLayer(backdrop)
     const scrim = scrimRef.current
     const frame = document.querySelector<HTMLElement>('.mobile-frame')
 
@@ -433,7 +446,7 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter, 
       onExitedRef.current?.()
     }
 
-    if (!backdrop || !dialog) {
+    if (!backdrop || !dialog || !layer) {
       complete()
       return
     }
@@ -448,7 +461,7 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter, 
     backdrop.style.pointerEvents = 'none'
     dialog.style.pointerEvents = 'none'
 
-    const from = readState(dialog, footer, scrim, frame)
+    const from = readState(layer, footer, scrim, frame)
     // 重新打开时滑回上一次真正停稳的位置，而不是退场开始时的中途值。
     // 快速连续打开 / 取消时，退场往往从进场中途开始；如果拿 from.y 当落点，
     // 每次打断都会把落点往下带一点，抽屉会越弹越矮。
@@ -466,7 +479,7 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter, 
     dialog.dataset.animating = 'true'
 
     if (!base || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      commitState(dialog, footer, scrim, frame, target)
+      commitState(layer, footer, scrim, frame, target)
       complete()
       return
     }
@@ -477,8 +490,8 @@ export const useSheetMotion = ({ isOpen, onRequestClose, onExited, beforeEnter, 
       raf2Ref.current = requestAnimationFrame(() => {
         raf2Ref.current = 0
         // 等待期间拖动可能已经接管并改了值，启动前重新读一次。
-        const current = readState(dialog, footer, scrim, frame)
-        run(dialog, footer, scrim, frame, base, current, target, SHEET_EXIT_DURATION, complete)
+        const current = readState(layer, footer, scrim, frame)
+        run(layer, footer, scrim, frame, base, current, target, SHEET_EXIT_DURATION, complete)
       })
     })
 

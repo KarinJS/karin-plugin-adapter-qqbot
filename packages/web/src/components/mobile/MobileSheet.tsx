@@ -142,14 +142,22 @@ export const MobileSheet = ({
         style={{ top: 'var(--visual-viewport-height)' }}
       />
       <Drawer.Content placement='bottom'>
-        <Drawer.Dialog
-          className='flex flex-col overflow-hidden border border-border/60 bg-surface shadow-none will-change-transform'
-          style={mobileSheetStyle}
+        {/* 位移放在这层普通 div 上。dialog 自己带大量 HeroUI / Tailwind 规则，
+            每帧改它的内联 transform 会连带重算整条样式链；wrapper 只有几个类，
+            拖动和吸附的样式重算范围小得多。 */}
+        <div
+          data-sheet-transform=''
+          className='pointer-events-none flex w-full flex-col justify-end will-change-transform'
         >
-          <SheetScaffold scrollerRef={scrollerRef} header={header} footer={footer}>
-            {children}
-          </SheetScaffold>
-        </Drawer.Dialog>
+          <Drawer.Dialog
+            className='flex flex-col overflow-hidden border border-border/60 bg-surface shadow-none'
+            style={mobileSheetStyle}
+          >
+            <SheetScaffold scrollerRef={scrollerRef} header={header} footer={footer}>
+              {children}
+            </SheetScaffold>
+          </Drawer.Dialog>
+        </div>
       </Drawer.Content>
     </Drawer.Backdrop>
   )
