@@ -219,3 +219,92 @@
     --muted: oklch(0.82 0 0);
   }
 }
+
+/*
+ * 样机屏幕里的 QQ 界面。
+ *
+ * 颜色单独收一套变量：页面本身是黑白灰主题，样机需要保留 QQ 的蓝色和
+ * iOS 的分组灰，但明暗仍然跟随页面主题。
+ */
+.qq-screen {
+  /* 从屏幕底部到输入框上沿的距离，面板抽屉停在这里：盖住菜单条，露出输入框和工具行。 */
+  --qq-sheet-bottom: 121px;
+  --qq-bg: #f0f0f2;
+  --qq-bar: #f8f8f8;
+  --qq-surface: #ffffff;
+  --qq-surface-strong: #ffffff;
+  --qq-field: #ffffff;
+  --qq-fill: #f0f1f3;
+  --qq-pill-bg: #fcfcfc;
+  --qq-pill-border: #d8d8da;
+  --qq-faint: #cdcdcf;
+  --qq-switch-bg: #e3e6ee;
+  --qq-switch-text: #234ea6;
+  --qq-switch-dot: #2e5aa8;
+  --qq-text: #0b0b0c;
+  --qq-muted: #8d8d90;
+  --qq-line: rgb(0 0 0 / 0.05);
+  --qq-glass: rgb(248 248 248 / 0.92);
+  --qq-bubble-in: #ffffff;
+  --qq-bubble-in-text: #0b0b0c;
+  --qq-bubble-out: #0099ff;
+  --qq-bubble-out-text: #ffffff;
+  --qq-blue: #0099ff;
+  --qq-pill-on: #e3e6ee;
+  --qq-scrim: rgb(0 0 0 / 0.3);
+  --qq-status: rgb(0 0 0 / 0.9);
+  --qq-toast-bg: rgb(0 0 0 / 0.78);
+  --qq-toast-text: #ffffff;
+  --qq-shadow: 0 18px 50px rgb(0 0 0 / 0.16);
+}
+
+.dark .qq-screen {
+  --qq-bg: #0e0e10;
+  --qq-bar: #1c1c1e;
+  --qq-surface: #1c1c1e;
+  --qq-surface-strong: #2c2c2e;
+  --qq-field: #2c2c2e;
+  --qq-fill: #2c2c2e;
+  --qq-pill-bg: #2c2c2e;
+  --qq-pill-border: #3a3a3c;
+  --qq-faint: #5a5a5e;
+  --qq-switch-bg: #2c3345;
+  --qq-switch-text: #9db7e8;
+  --qq-switch-dot: #6f9ce0;
+  --qq-text: #f5f5f7;
+  --qq-muted: #98989d;
+  --qq-line: rgb(255 255 255 / 0.08);
+  --qq-glass: rgb(28 28 30 / 0.92);
+  --qq-bubble-in: #262628;
+  --qq-bubble-in-text: #f5f5f7;
+  --qq-bubble-out: #0099ff;
+  --qq-bubble-out-text: #ffffff;
+  --qq-blue: #0099ff;
+  --qq-pill-on: rgb(255 255 255 / 0.12);
+  --qq-scrim: rgb(0 0 0 / 0.5);
+  --qq-status: #ffffff;
+  --qq-toast-bg: rgb(255 255 255 / 0.92);
+  --qq-toast-text: #0b0b0c;
+  --qq-shadow: 0 18px 50px rgb(0 0 0 / 0.5);
+}
+
+@keyframes qq-message-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.qq-message-in {
+  animation: qq-message-in 0.32s var(--ease-quart-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qq-message-in {
+    animation: none;
+  }
+}

@@ -1,5 +1,5 @@
 import { Toast } from '@heroui/react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ConfigProvider } from '@/hooks/useConfigStore'
 import { useEmbedded } from '@/hooks/useEmbedded'
@@ -32,6 +32,10 @@ const App = () => {
   // 主题只在 App 里初始化一次，嵌入模式没有主题切换入口时也能跟随 Karin。
   useTheme()
 
+  // ConfigProvider 的 reload 依赖这个回调；保持引用稳定，避免主题切换等
+  // 普通重渲染触发配置重新加载，把页面打回骨架屏。
+  const handleAuthExpired = useCallback(() => setAuthenticated(false), [])
+
   useEffect(() => {
     const syncAuth = () => setAuthenticated(hasAuth())
 
@@ -49,7 +53,7 @@ const App = () => {
   }
 
   return (
-    <ConfigProvider onAuthExpired={() => setAuthenticated(false)}>
+    <ConfigProvider onAuthExpired={handleAuthExpired}>
       <Toast.Provider placement={isMobile ? 'top' : 'bottom'} />
       <BrowserRouter basename='/qqbot/web'>
         <Routes>
@@ -63,6 +67,7 @@ const App = () => {
             <Route path='bots' element={null} />
             <Route path='bots/new' element={null} />
             <Route path='bots/:appId' element={null} />
+            <Route path='menu-panel' element={null} />
             <Route path='settings' element={null} />
             <Route path='*' element={<DefaultRedirect />} />
           </Route>
