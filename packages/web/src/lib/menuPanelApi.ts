@@ -27,7 +27,7 @@ export const fetchMenu = (appId: string) =>
 
 export const saveMenu = (appId: string, menu?: Menu) =>
   request<UpdateMenuResponse>('/menu', {
-    method: 'PUT',
+    method: 'POST',
     body: JSON.stringify({ appId, menu }),
   })
 
@@ -49,13 +49,14 @@ export const fetchPanel = (appId: string, panelId: string) =>
 
 export const updatePanel = (appId: string, panelId: string, panel: Panel) =>
   request<UpdatePanelResponse>(`/panels/${encodeURIComponent(panelId)}`, {
-    method: 'PUT',
+    method: 'POST',
     body: JSON.stringify({ appId, panel }),
   })
 
 export const deletePanel = (appId: string, panelId: string) =>
-  request<Record<string, never>>(`/panels/${encodeURIComponent(panelId)}?${query({ appId })}`, {
-    method: 'DELETE',
+  request<Record<string, never>>(`/panels/${encodeURIComponent(panelId)}/delete`, {
+    method: 'POST',
+    body: JSON.stringify({ appId }),
   })
 
 export const updatePanelTarget = (
@@ -66,7 +67,7 @@ export const updatePanelTarget = (
   request<Record<string, never>>(
     `/panels/${encodeURIComponent(panelId)}/target`,
     {
-      method: 'PUT',
+      method: 'POST',
       body: JSON.stringify({ appId, ...body }),
     }
   )

@@ -91,6 +91,12 @@ const readInteger = (value: unknown, field: string, min: number, max: number, fa
   return result
 }
 
+/** 可选整数：字段缺省时返回 undefined，而不是回退到某个值。 */
+const readOptionalInteger = (value: unknown, field: string, min: number, max: number): number | undefined => {
+  if (value === undefined || value === null || value === '') return undefined
+  return readInteger(value, field, min, max, min)
+}
+
 const readArray = (value: unknown, field: string): unknown[] => {
   if (value === undefined || value === null) return []
   if (!Array.isArray(value)) throw new ValidationError(`${field}必须是数组`)
@@ -150,8 +156,10 @@ const sanitizePanel = (raw: unknown): Panel => {
   }
 
   const remark = readString(raw.remark, '面板备注', { maxUnits: 255 })
+  const version = readOptionalInteger(raw.version, '面板版本号', 0, Number.MAX_SAFE_INTEGER)
   const panel: Panel = { items: items.map(sanitizePanelItem) }
   if (remark) panel.remark = remark
+  if (version !== undefined) panel.version = version
   return panel
 }
 
@@ -278,6 +286,9 @@ const handleAsync = (handler: (req: Request, res: Response) => Promise<void>) =>
  *
  * 这些路由挂在 Karin 的 `/api/v1` 下，和配置接口一样继承主 WebUI 的鉴权。
  * 菜单是全局单例；指令面板按 `scope` 查询，创建、修改、删除都需要 `panel_id`。
+ *
+ * 注意：Karin 的鉴权中间件只放行 GET / POST，PUT / DELETE 会在进入路由前
+ * 直接返回 405「方法不允许」。所以写操作统一用 POST，删除用 `/delete` 子路径。
  */
 export const registerMenuPanelRoutes = () => {
   router.get(
@@ -289,7 +300,7 @@ export const registerMenuPanelRoutes = () => {
     })
   )
 
-  router.put(
+  router.post(
     '/qqbot/menu',
     handleAsync(async (req, res) => {
       const body = isRecord(req.body) ? req.body : {}
@@ -369,7 +380,7 @@ export const registerMenuPanelRoutes = () => {
     })
   )
 
-  router.put(
+  router.post(
     '/qqbot/panels/:panelId',
     handleAsync(async (req, res) => {
       const body = isRecord(req.body) ? req.body : {}
@@ -381,17 +392,18 @@ export const registerMenuPanelRoutes = () => {
     })
   )
 
-  router.delete(
-    '/qqbot/panels/:panelId',
+  router.post(
+    '/qqbot/panels/:panelId/delete',
     handleAsync(async (req, res) => {
-      const appId = readAppId(req.query.appId)
+      const body = isRecord(req.body) ? req.body : {}
+      const appId = readAppId(body.appId)
       const panelId = readString(req.params.panelId, 'panelId', { max: 128, required: true })
       const api = await resolveApi(appId)
       createSuccessResponse(res, await api.panels.deletePanel(panelId))
     })
   )
 
-  router.put(
+  router.post(
     '/qqbot/panels/:panelId/target',
     handleAsync(async (req, res) => {
       const body = isRecord(req.body) ? req.body : {}
