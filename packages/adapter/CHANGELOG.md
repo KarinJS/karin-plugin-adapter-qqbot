@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.6.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.5.0...adapter-qqbot-v3.6.0) (2026-10-30)
+
+
+### Features
+
+* **web:** 新增指令面板配置页与仿 QQ 样机预览 ([#78](https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues/78)) ([b043dcc](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/b043dcc8cebe790cf9fce485460dc3ae1207dc0e))
+
+
+### Bug Fixes
+
+* fix ([ed9de37](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/ed9de37041e4c3524a3b14bd41be578dda02290f))
+
 ## [3.5.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.4.0...adapter-qqbot-v3.5.0) (2026-10-26)
 
 
