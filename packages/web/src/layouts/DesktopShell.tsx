@@ -1,5 +1,5 @@
 import { cn } from '@heroui/react'
-import { Bot, Home, QrCode, Settings } from 'lucide-react'
+import { Bot, Home, PanelTop, QrCode, Settings } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Brand } from '@/components/Brand'
@@ -10,6 +10,7 @@ import { useConfigStore } from '@/hooks/useConfigStore'
 import { DesktopCanvasShell } from '@/layouts/DesktopCanvasShell'
 import { AddBotPage } from '@/pages/AddBotPage'
 import { BotsWorkspace } from '@/pages/BotsWorkspace'
+import { MenuPanelPage } from '@/pages/MenuPanelPage'
 import { OverviewPage } from '@/pages/OverviewPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 
@@ -17,11 +18,13 @@ const navItems = [
   { to: '/overview', label: '概览', icon: Home, key: 'overview' },
   { to: '/bots', label: '机器人', icon: Bot, key: 'bots' },
   { to: '/bots/new', label: '扫码添加', icon: QrCode, key: 'add' },
+  { to: '/menu-panel', label: '菜单与面板', icon: PanelTop, key: 'menu-panel' },
   { to: '/settings', label: '设置', icon: Settings, key: 'settings' },
 ] as const
 
 const getActiveKey = (pathname: string) => {
   if (pathname === '/bots/new') return 'add'
+  if (pathname.startsWith('/menu-panel')) return 'menu-panel'
   if (pathname.startsWith('/bots')) return 'bots'
   if (pathname.startsWith('/settings')) return 'settings'
   return 'overview'
@@ -47,6 +50,7 @@ export const DesktopShell = () => {
       { key: 'overview', label: '概览', element: <OverviewPage /> },
       { key: 'bots', label: '机器人列表', element: <BotsWorkspace />, fill: true },
       { key: 'add', label: '扫码添加', element: <AddBotPage /> },
+      { key: 'menu-panel', label: '菜单与面板', element: <MenuPanelPage />, fill: true },
       { key: 'settings', label: '设置', element: <SettingsPage /> },
     ],
     []
@@ -57,10 +61,7 @@ export const DesktopShell = () => {
       activeKey={activeKey}
       pages={pages}
       sidebar={
-        <aside
-          className='flex w-[15.5rem] shrink-0 flex-col border-r border-border/80 bg-surface/55'
-          aria-label='侧边栏'
-        >
+        <aside className='flex w-62 shrink-0 flex-col border-r border-border/80 bg-surface/55' aria-label='侧边栏'>
           <div className='px-5 py-5'>
             <Brand />
           </div>

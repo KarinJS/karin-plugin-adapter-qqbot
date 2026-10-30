@@ -1,6 +1,6 @@
 import { Tooltip, cn } from '@heroui/react'
 import { gsap } from 'gsap'
-import { Bot, LayoutGrid, QrCode } from 'lucide-react'
+import { Bot, LayoutGrid, PanelTop, QrCode } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import type { CanvasPage } from '@/components/desktop/CanvasPager'
@@ -8,16 +8,19 @@ import { CANVAS_SLIDE_DURATION, CANVAS_SLIDE_EASE } from '@/lib/canvasMotion'
 import { DesktopCanvasShell } from '@/layouts/DesktopCanvasShell'
 import { AddBotPage } from '@/pages/AddBotPage'
 import { BotsWorkspace } from '@/pages/BotsWorkspace'
+import { MenuPanelPage } from '@/pages/MenuPanelPage'
 import { OverviewPage } from '@/pages/OverviewPage'
 
 const navItems = [
   { to: '/bots', label: '机器人列表', icon: Bot, key: 'bots' },
   { to: '/bots/new', label: '扫码添加', icon: QrCode, key: 'add' },
+  { to: '/menu-panel', label: '菜单与面板', icon: PanelTop, key: 'menu-panel' },
   { to: '/overview', label: '概览', icon: LayoutGrid, key: 'overview' },
 ] as const
 
 const getActiveKey = (pathname: string) => {
   if (pathname === '/bots/new') return 'add'
+  if (pathname.startsWith('/menu-panel')) return 'menu-panel'
   if (pathname.startsWith('/overview')) return 'overview'
   // 首页重定向发生在挂载之后，这里先按机器人列表落位，避免先闪一下概览再翻页。
   return 'bots'
@@ -42,6 +45,7 @@ export const EmbeddedDesktopShell = () => {
     () => [
       { key: 'bots', label: '机器人列表', element: <BotsWorkspace />, fill: true },
       { key: 'add', label: '扫码添加', element: <AddBotPage /> },
+      { key: 'menu-panel', label: '菜单与面板', element: <MenuPanelPage />, fill: true },
       { key: 'overview', label: '概览', element: <OverviewPage /> },
     ],
     []
@@ -82,7 +86,7 @@ export const EmbeddedDesktopShell = () => {
       activeKey={activeKey}
       pages={pages}
       sidebar={
-        <aside className='flex w-[4.5rem] shrink-0 items-center justify-center py-3' aria-label='侧边栏'>
+        <aside className='flex w-18 shrink-0 items-center justify-center py-3' aria-label='侧边栏'>
           <nav
             className='flex h-full max-h-[calc(100dvh-1.5rem)] w-14 flex-col items-center justify-center rounded-full border border-border/70 bg-surface/80 p-1.5 shadow-sm backdrop-blur'
             aria-label='主导航'

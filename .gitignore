@@ -48,3 +48,6 @@ packages/api-docs/wiki/
 packages/adapter/src/test.ts
 packages/adapter/src/apps/test.ts
 packages/adapter/src/apps/fileToUrl.js
+
+# 样机源文件（PSD 不提交，只提交导出的图片素材）
+/iPhone 18 Pro Max - Black - Portrait.psd

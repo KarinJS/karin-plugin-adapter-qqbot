@@ -337,6 +337,9 @@ importers:
       '@heroui/styles':
         specifier: ^3.2.6
         version: 3.2.6(tailwindcss@4.3.3)
+      '@outpacelabs/avatars':
+        specifier: ^0.6.0
+        version: 0.6.0(react@19.3.1)
       gsap:
         specifier: ^3.15.0
         version: 3.15.0
@@ -1176,6 +1179,11 @@ packages:
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
+
+  '@outpacelabs/avatars@0.6.0':
+    resolution: {integrity: sha512-pTAezn9+Hc3uUIBoaDYjciUgSycbWiUEVlcap7YmTpurQMBTYIcPokvB2vP2YYGlE3jGXzuX6AgVEEC/E63ohw==}
+    peerDependencies:
+      react: '>=18'
 
   '@oxc-project/types@0.154.0':
     resolution: {integrity: sha512-KYOUGQFlLWR+s4QMV2Q9ko38TZm7EdO87Qm7rvZLqk/webse/cDjtyxKhg/47l0byCbs/k46LT8qc4PKjAikzA==}
@@ -4868,6 +4876,10 @@ snapshots:
 
   '@next/swc-win32-x64-msvc@16.4.2':
     optional: true
+
+  '@outpacelabs/avatars@0.6.0(react@19.3.1)':
+    dependencies:
+      react: 19.3.1
 
   '@oxc-project/types@0.154.0': {}
 

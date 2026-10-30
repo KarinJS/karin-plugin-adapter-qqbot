@@ -19,6 +19,10 @@ import type {
  *
  * 一个机器人最多创建 20 个指令面板。
  *
+ * 注意：同一 `scope` 下 `target_type=all` 的全局面板实际上只能有一个，
+ * 再 POST 一个会替换掉旧的（官方文档未写明）。需要多套内容时请使用
+ * `target_type=specific` 按用户 / 群生效，或直接 PUT 修改已有的全局面板。
+ *
  * {@link https://bot.q.qq.com/wiki/develop/api-v2/server-inter/menu-panel/}
  */
 export class PanelsApi extends Http {
