@@ -14,7 +14,7 @@ import { OverviewPage } from '@/pages/OverviewPage'
 const navItems = [
   { to: '/bots', label: '机器人列表', icon: Bot, key: 'bots' },
   { to: '/bots/new', label: '扫码添加', icon: QrCode, key: 'add' },
-  { to: '/menu-panel', label: '指令面板', icon: PanelTop, key: 'menu-panel' },
+  { to: '/menu-panel', label: '菜单与面板', icon: PanelTop, key: 'menu-panel' },
   { to: '/overview', label: '概览', icon: LayoutGrid, key: 'overview' },
 ] as const
 
@@ -45,7 +45,7 @@ export const EmbeddedDesktopShell = () => {
     () => [
       { key: 'bots', label: '机器人列表', element: <BotsWorkspace />, fill: true },
       { key: 'add', label: '扫码添加', element: <AddBotPage /> },
-      { key: 'menu-panel', label: '指令面板', element: <MenuPanelPage />, fill: true },
+      { key: 'menu-panel', label: '菜单与面板', element: <MenuPanelPage />, fill: true },
       { key: 'overview', label: '概览', element: <OverviewPage /> },
     ],
     []

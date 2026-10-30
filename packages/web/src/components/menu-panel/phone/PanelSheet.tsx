@@ -232,7 +232,8 @@ export const PanelSheet = ({ open, panel, scale, onClose, onPick, onToast }: Pan
                 >
                   <span className='flex min-w-0 flex-1 items-center gap-1.5'>
                     <span className='truncate text-[17px] leading-none'>{name || '未命名元素'}</span>
-                    {item.onlyAdmin ? (
+                    {/* 管理员只存在于群聊，单聊面板不展示管理员标记。 */}
+                    {panel?.scope === 'group' && item.onlyAdmin ? (
                       <span className='inline-flex shrink-0 items-center gap-0.5 rounded-[3px] bg-[var(--qq-text)]/6 px-1 py-0.5 text-[9px] leading-none text-[var(--qq-muted)]'>
                         <ShieldCheck className='size-[9px]' aria-hidden='true' />
                         管理员

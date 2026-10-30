@@ -8,8 +8,6 @@ interface EditorSectionProps {
   children: ReactNode
   className?: string
   contentClassName?: string
-  /** 供配置步骤定位；只有需要被引导跳转的区块才传。 */
-  anchor?: string
 }
 
 /**
@@ -25,9 +23,8 @@ export const EditorSection = ({
   children,
   className,
   contentClassName,
-  anchor,
 }: EditorSectionProps) => (
-  <section data-guide-anchor={anchor} className={cn('flex flex-col gap-4', className)}>
+  <section className={cn('flex flex-col gap-4', className)}>
     <header className='flex items-end justify-between gap-3 px-1'>
       <div className='min-w-0'>
         <h2 className='text-[15px] leading-tight font-semibold tracking-[-0.01em]'>{title}</h2>

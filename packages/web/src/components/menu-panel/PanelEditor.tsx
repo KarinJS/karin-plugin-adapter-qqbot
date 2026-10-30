@@ -118,7 +118,7 @@ const OpenidEditor = ({ editor, panel }: { editor: MenuPanelEditor; panel: Panel
               key={openid}
               className='inline-flex max-w-full items-center gap-1 rounded-full bg-surface py-1 pr-1 pl-2.5 text-xs text-muted'
             >
-              <span className='max-w-[15rem] truncate' title={openid}>
+              <span className='max-w-60 truncate' title={openid}>
                 {openid}
               </span>
               <button
@@ -144,11 +144,13 @@ const PanelItemCard = ({
   item,
   index,
   total,
+  scope,
 }: {
   editor: MenuPanelEditor
   item: PanelItemDraft
   index: number
   total: number
+  scope: PanelScene
 }) => {
   const errors = editor.panelErrors
   const nameError = errors[`items.${item.key}.name`]
@@ -229,15 +231,18 @@ const PanelItemCard = ({
         </TextField>
       ) : null}
 
-      <div className='mt-3 flex items-center justify-between gap-3'>
-        <Switch isSelected={item.onlyAdmin} onChange={(onlyAdmin) => editor.patchPanelItem(item.key, { onlyAdmin })}>
-          <Switch.Content>
-            <Switch.Control>
-              <Switch.Thumb />
-            </Switch.Control>
-            <span className='text-xs text-muted'>仅管理员可点击</span>
-          </Switch.Content>
-        </Switch>
+      <div className={cn('mt-3 flex items-center gap-3', scope === 'group' ? 'justify-between' : 'justify-end')}>
+        {/* 管理员只存在于群聊，单聊不提供这个开关。 */}
+        {scope === 'group' ? (
+          <Switch isSelected={item.onlyAdmin} onChange={(onlyAdmin) => editor.patchPanelItem(item.key, { onlyAdmin })}>
+            <Switch.Content>
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+              <span className='text-xs text-muted'>仅群管理员可点击</span>
+            </Switch.Content>
+          </Switch>
+        ) : null}
         <span className='text-[11px] text-muted/70'>{item.type === 'link' ? '链接元素' : '指令元素'}</span>
       </div>
     </div>
@@ -247,10 +252,12 @@ const PanelItemCard = ({
 const PanelBasics = ({ editor, panel }: { editor: MenuPanelEditor; panel: PanelDraft }) => {
   const errors = editor.panelErrors
   const locked = Boolean(panel.panelId)
+  // 当前场景已经有别的全局面板时，新草稿只能是指定生效。
+  const otherAllPanel = editor.sceneAllPanel && editor.sceneAllPanel.key !== panel.key ? editor.sceneAllPanel : null
   const openids = panel.scope === 'c2c' ? panel.userOpenids : panel.groupOpenids
 
   return (
-    <EditorSection title='基础设置' description='决定面板在哪些用户或群聊中生效，以及给开发者看的备注。'>
+    <EditorSection title='基础设置'>
       <div className='flex flex-col gap-5'>
         <div className='flex flex-col gap-2'>
           <div className='flex items-center justify-between gap-3'>
@@ -259,7 +266,7 @@ const PanelBasics = ({ editor, panel }: { editor: MenuPanelEditor; panel: PanelD
           </div>
           <TypeToggle
             value={panel.targetType}
-            isDisabled={locked}
+            isDisabled={locked || Boolean(otherAllPanel)}
             label='生效范围'
             className='grid-cols-2'
             options={[
@@ -270,10 +277,12 @@ const PanelBasics = ({ editor, panel }: { editor: MenuPanelEditor; panel: PanelD
           />
           <p className='text-xs leading-5 text-muted'>
             {locked
-              ? '生效范围在创建后不能修改；如需调整，请删除面板后重新创建。'
-              : panel.targetType === 'all'
-                ? `当前场景下所有${sceneLabel(panel.scope)}用户都能看到这个面板。`
-                : '只有下方列出的 openid 能看到这个面板。'}
+              ? '如需调整，请删除面板后重建。'
+              : otherAllPanel
+                ? '同一场景只能有一个全局面板，请选择现有的全局面板修改。'
+                : panel.targetType === 'all'
+                  ? `当前场景所有${sceneLabel(panel.scope)}用户可见。`
+                  : '仅下方列出的 openid 可见。'}
           </p>
         </div>
 
@@ -327,8 +336,7 @@ const PanelItems = ({ editor, panel }: { editor: MenuPanelEditor; panel: PanelDr
   return (
     <EditorSection
       title='面板元素'
-      description='按顺序展示在指令面板里，最多 20 个元素。'
-      anchor='content'
+      description={panel.scope === 'c2c' ? '单聊没有管理员角色，元素对所有用户可用。' : undefined}
       actions={
         <span className='tabular-nums text-xs text-muted'>
           {panel.items.length} / {MAX_PANEL_ITEMS}
@@ -360,7 +368,14 @@ const PanelItems = ({ editor, panel }: { editor: MenuPanelEditor; panel: PanelDr
         ) : (
           <>
             {panel.items.map((item, index) => (
-              <PanelItemCard key={item.key} editor={editor} item={item} index={index} total={panel.items.length} />
+              <PanelItemCard
+                key={item.key}
+                editor={editor}
+                item={item}
+                index={index}
+                total={panel.items.length}
+                scope={panel.scope}
+              />
             ))}
 
             <div className='flex flex-wrap gap-2 pt-1'>
@@ -398,12 +413,12 @@ const PanelPicker = ({
   panel: PanelDraft | null
 }) => {
   const atLimit = editor.panels.length >= MAX_PANELS
+  const allPanels = panels.filter((item) => item.targetType === 'all')
 
   return (
     <EditorSection
       title='选择面板'
-      description={`每个面板是一组展示在聊天输入框上方的指令，单聊和群聊合计最多 ${MAX_PANELS} 个。`}
-      anchor='picker'
+      description='同一场景只能有一个全局面板，指定生效可以多个。'
       actions={
         <span className='tabular-nums shrink-0 text-xs text-muted'>
           本场景 {panels.length} 个 · 全部 {editor.panels.length} / {MAX_PANELS}
@@ -423,7 +438,7 @@ const PanelPicker = ({
               aria-current={active ? 'true' : undefined}
               onClick={() => editor.selectPanel(item.key)}
               className={cn(
-                'flex min-w-[9.5rem] max-w-[15rem] flex-col gap-1 rounded-2xl px-3 py-2.5 text-left transition-[background-color,color,scale] duration-150 active:scale-[0.99]',
+                'flex min-w-38 max-w-60 flex-col gap-1 rounded-2xl px-3 py-2.5 text-left transition-[background-color,color,scale] duration-150 active:scale-[0.99]',
                 active ? 'bg-accent text-accent-foreground' : 'bg-surface text-foreground hover:bg-default/60'
               )}
             >
@@ -454,15 +469,23 @@ const PanelPicker = ({
           type='button'
           onClick={editor.createPanel}
           disabled={atLimit}
-          className='flex min-w-[8.5rem] flex-col items-center justify-center gap-1 rounded-2xl bg-surface/50 px-3 py-2.5 text-xs text-muted transition-colors duration-150 hover:bg-surface/75 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50'
+          className='flex min-w-34 flex-col items-center justify-center gap-1 rounded-2xl bg-surface/50 px-3 py-2.5 text-xs text-muted transition-colors duration-150 hover:bg-surface/75 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50'
         >
           <span className='flex items-center gap-1.5'>
             <Plus className='size-4' aria-hidden='true' />
-            新建面板
+            {editor.sceneAllPanel ? '新建指定生效面板' : '新建面板'}
           </span>
-          <span className='text-[11px]'>{atLimit ? '已达到上限' : `最多 ${MAX_PANELS} 个`}</span>
+          <span className='text-[11px]'>
+            {atLimit ? '已达到上限' : editor.sceneAllPanel ? '全局面板已存在' : `最多 ${MAX_PANELS} 个`}
+          </span>
         </button>
       </div>
+
+      {allPanels.length > 1 ? (
+        <p className='text-xs leading-5 text-warning'>
+          当前场景有 {allPanels.length} 个全局面板，平台只会生效其中一个；建议删除多余的全局面板。
+        </p>
+      ) : null}
     </EditorSection>
   )
 }

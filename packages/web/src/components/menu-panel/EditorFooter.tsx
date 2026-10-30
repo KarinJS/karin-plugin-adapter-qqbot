@@ -20,7 +20,7 @@ const DirtyStatus = ({ dirty, loading, empty }: { dirty: boolean; loading?: bool
         className={cn('size-1.5 rounded-full', dirty ? 'bg-warning' : empty ? 'bg-muted/50' : 'bg-success')}
       />
     )}
-    {loading ? '正在读取生效对象…' : dirty ? '有未保存的修改' : empty ? '尚未创建' : '已同步'}
+    {loading ? '正在读取生效对象…' : dirty ? '未保存' : empty ? '尚未创建' : '已同步'}
   </span>
 )
 
@@ -103,9 +103,7 @@ export const EditorFooter = ({ editor, onDeletePanel, onClearMenu }: EditorFoote
           ? '生效对象读取失败，请先重试'
           : selectedPanel.items.length === 0
             ? '至少添加一个面板元素后才能保存'
-            : !panelDirty && selectedPanel.panelId
-              ? '没有需要保存的修改'
-              : ''
+            : ''
 
     const handleSave = async () => {
       const ok = await editor.savePanel()
@@ -173,13 +171,7 @@ export const EditorFooter = ({ editor, onDeletePanel, onClearMenu }: EditorFoote
   const pending = savingMenu
   const emptyMenu = (menu?.items.length ?? 0) === 0
   const label = emptyMenu ? '保存并清空' : '保存菜单'
-  const hint = !menu
-    ? '菜单还没有加载'
-    : emptyMenu
-      ? '菜单为空，保存会清空现有菜单'
-      : !menuDirty
-        ? '没有需要保存的修改'
-        : ''
+  const hint = !menu ? '菜单还没有加载' : emptyMenu ? '菜单为空，保存会清空现有菜单' : ''
 
   const handleSave = async () => {
     const ok = await editor.saveMenu()

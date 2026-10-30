@@ -18,7 +18,7 @@ const navItems = [
   { to: '/overview', label: '概览', icon: Home, key: 'overview' },
   { to: '/bots', label: '机器人', icon: Bot, key: 'bots' },
   { to: '/bots/new', label: '扫码添加', icon: QrCode, key: 'add' },
-  { to: '/menu-panel', label: '指令面板', icon: PanelTop, key: 'menu-panel' },
+  { to: '/menu-panel', label: '菜单与面板', icon: PanelTop, key: 'menu-panel' },
   { to: '/settings', label: '设置', icon: Settings, key: 'settings' },
 ] as const
 
@@ -50,7 +50,7 @@ export const DesktopShell = () => {
       { key: 'overview', label: '概览', element: <OverviewPage /> },
       { key: 'bots', label: '机器人列表', element: <BotsWorkspace />, fill: true },
       { key: 'add', label: '扫码添加', element: <AddBotPage /> },
-      { key: 'menu-panel', label: '指令面板', element: <MenuPanelPage />, fill: true },
+      { key: 'menu-panel', label: '菜单与面板', element: <MenuPanelPage />, fill: true },
       { key: 'settings', label: '设置', element: <SettingsPage /> },
     ],
     []

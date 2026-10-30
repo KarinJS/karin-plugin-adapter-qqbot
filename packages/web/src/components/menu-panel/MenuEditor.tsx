@@ -357,7 +357,6 @@ export const MenuEditor = ({ editor }: MenuEditorProps) => {
       <EditorSection
         title='菜单项'
         description='按顺序展示在聊天输入框上方。'
-        anchor='content'
         actions={
           <span className='tabular-nums text-xs text-muted'>
             {menu.items.length} / {MAX_MENU_ITEMS}
@@ -399,7 +398,7 @@ export const MenuEditor = ({ editor }: MenuEditorProps) => {
       </EditorSection>
 
       <div className='rounded-2xl bg-surface/50 p-4 text-xs leading-5 text-muted'>
-        提示：开关类型的菜单项在样机里可以直接点击切换；子菜单会在菜单条上方弹出。 保存后，QQ 客户端里的菜单会立即更新。
+        保存后，QQ 客户端里的菜单会立即更新。
       </div>
     </div>
   )

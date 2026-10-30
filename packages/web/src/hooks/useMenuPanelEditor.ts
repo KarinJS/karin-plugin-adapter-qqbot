@@ -25,6 +25,7 @@ import {
   emptyMenuSubItem,
   emptyPanelDraft,
   emptyPanelItem,
+  findSceneAllPanel,
   isMenuDirty,
   isPanelDirty,
   menuContent,
@@ -96,7 +97,9 @@ export const useMenuPanelEditor = (active = true) => {
   const hasLoadedRef = useRef(false)
   const saveTimerRef = useRef<number | undefined>(undefined)
   const targetLoadingRef = useRef(new Set<string>())
+  const panelsRef = useRef<PanelDraft[]>([])
   const sceneRef = useRef(scene)
+  panelsRef.current = panels
   sceneRef.current = scene
 
   // 默认选中第一个在线的机器人；配置还没加载完时留空。
@@ -152,6 +155,8 @@ export const useMenuPanelEditor = (active = true) => {
       if (result.status === 'rejected') {
         nextLoad[key] = 'error'
         failures.push(key === 'c2c' ? '单聊面板' : '群聊面板')
+        // 单个场景请求失败时保留本地已有面板，避免一次刷新把整屏清空。
+        nextPanels.push(...panelsRef.current.filter((panel) => panel.scope === key))
         continue
       }
       for (const record of result.value.records ?? []) {
@@ -221,6 +226,9 @@ export const useMenuPanelEditor = (active = true) => {
   )
 
   const scenePanels = useMemo(() => panels.filter((panel) => panel.scope === scene), [panels, scene])
+
+  /** 当前场景已有的全局面板；同一场景只允许存在一个。 */
+  const sceneAllPanel = useMemo(() => findSceneAllPanel(panels, scene), [panels, scene])
 
   // 指定生效的面板列表里不带 openid，选中后补一次详情请求。
   const targetKey = selectedPanel?.key
@@ -357,11 +365,22 @@ export const useMenuPanelEditor = (active = true) => {
       toast.warning(`一个机器人最多创建 ${MAX_PANELS} 个指令面板`)
       return
     }
-    const draft = emptyPanelDraft(sceneRef.current)
+
+    const currentScene = sceneRef.current
+    const existingAll = findSceneAllPanel(panelsRef.current, currentScene)
+    // 平台会把同场景的第二个 all 面板当成替换：再 POST 一个会顶掉旧的。
+    // 所以全局面板已存在时，新建的只能是指定生效面板。
+    const draft = emptyPanelDraft(currentScene, existingAll ? 'specific' : 'all')
     setPanels((current) => [...current, draft])
     setSelectedPanelKey(draft.key)
     setTab('panels')
     setPanelErrors({})
+
+    if (existingAll) {
+      toast.warning('同一场景只能有一个全局面板', {
+        description: '已为你新建指定生效面板；如需修改全局面板，请直接选择现有的全局面板。',
+      })
+    }
   }, [panels.length, panelLoad])
 
   const discardSelectedPanel = useCallback(() => {
@@ -383,6 +402,18 @@ export const useMenuPanelEditor = (active = true) => {
     if (draft.targetType === 'specific' && !draft.targetLoaded) {
       toast.warning('正在读取生效对象，请稍候再保存')
       return false
+    }
+
+    // 双保险：即使草稿是通过旧状态或并发操作进来的，也不允许再 POST 一个
+    // 同场景的 all 面板——平台会用新面板替换旧面板。
+    if (!draft.panelId && draft.targetType === 'all') {
+      const existingAll = findSceneAllPanel(panelsRef.current, draft.scope, draft.key)
+      if (existingAll) {
+        const message = '同一场景只能有一个全局面板，请直接编辑现有的全局面板，或改用指定生效。'
+        setError(message)
+        toast.warning('无法创建全局面板', { description: message })
+        return false
+      }
     }
 
     const errors = validatePanelDraft(draft)
@@ -410,12 +441,15 @@ export const useMenuPanelEditor = (active = true) => {
     try {
       let panelId = draft.panelId
       let version = draft.version
+      // 更新时带上读取到的版本号，让平台有机会发现并发修改；
+      // 创建接口不接收版本号，新面板的 version 等下次刷新再补。
+      const updatePayload = draft.version === null ? payload : { ...payload, version: draft.version }
 
       if (!panelId) {
         const created = await createPanelRequest(appId, panelCreateRequest(draft))
         panelId = created.panel_id
       } else {
-        const updated = await updatePanelRequest(appId, panelId, payload)
+        const updated = await updatePanelRequest(appId, panelId, updatePayload)
         version = updated.version
       }
 
@@ -470,35 +504,45 @@ export const useMenuPanelEditor = (active = true) => {
     }
   }, [appId, savingPanel, selectedPanel, showSaveState])
 
-  const removeSelectedPanel = useCallback(async (): Promise<boolean> => {
-    const draft = selectedPanel
-    if (!draft || deleting) return false
+  const removeSelectedPanel = useCallback(
+    async (key?: string): Promise<boolean> => {
+      if (deleting) return false
 
-    if (!draft.panelId) {
-      setPanels((current) => current.filter((panel) => panel.key !== draft.key))
-      setSelectedPanelKey(null)
-      toast.success('已丢弃未保存的面板')
-      return true
-    }
+      // 确认框打开期间可能发生 reload，列表会换成新的 key；
+      // 调用方传 key 时按打开确认框时的目标删除，避免删错面板。
+      const draft = key ? (panelsRef.current.find((panel) => panel.key === key) ?? null) : selectedPanel
+      if (!draft) {
+        if (key) toast.warning('面板已不存在，请刷新后重试')
+        return false
+      }
 
-    setDeleting(true)
-    setError('')
+      if (!draft.panelId) {
+        setPanels((current) => current.filter((panel) => panel.key !== draft.key))
+        setSelectedPanelKey(null)
+        toast.success('已丢弃未保存的面板')
+        return true
+      }
 
-    try {
-      await deletePanelRequest(appId, draft.panelId)
-      setPanels((current) => current.filter((panel) => panel.key !== draft.key))
-      setSelectedPanelKey(null)
-      toast.success('面板已删除')
-      return true
-    } catch (err) {
-      const message = messageOf(err, '删除面板失败')
-      setError(message)
-      toast.danger('删除面板失败', { description: message })
-      return false
-    } finally {
-      setDeleting(false)
-    }
-  }, [appId, deleting, selectedPanel])
+      setDeleting(true)
+      setError('')
+
+      try {
+        await deletePanelRequest(appId, draft.panelId)
+        setPanels((current) => current.filter((panel) => panel.key !== draft.key))
+        setSelectedPanelKey(null)
+        toast.success('面板已删除')
+        return true
+      } catch (err) {
+        const message = messageOf(err, '删除面板失败')
+        setError(message)
+        toast.danger('删除面板失败', { description: message })
+        return false
+      } finally {
+        setDeleting(false)
+      }
+    },
+    [appId, deleting, selectedPanel]
+  )
 
   const saveMenuDraft = useCallback(async (): Promise<boolean> => {
     if (!menu || savingMenu) return false
@@ -780,6 +824,7 @@ export const useMenuPanelEditor = (active = true) => {
     changeTab,
     panels,
     scenePanels,
+    sceneAllPanel,
     selectedPanel,
     selectPanel: setSelectedPanelKey,
     menu,

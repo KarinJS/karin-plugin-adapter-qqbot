@@ -6,7 +6,6 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { EdgeBlur } from '@/components/EdgeBlur'
 import { EmptyState } from '@/components/EmptyState'
 import { EditorFooter } from '@/components/menu-panel/EditorFooter'
-import { EditorGuide } from '@/components/menu-panel/EditorGuide'
 import { MenuEditor } from '@/components/menu-panel/MenuEditor'
 import { PanelEditor } from '@/components/menu-panel/PanelEditor'
 import { PhonePreview } from '@/components/menu-panel/PhonePreview'
@@ -41,7 +40,7 @@ export const MenuPanelPage = () => {
   const active = pathname.startsWith('/menu-panel')
   const editor = useMenuPanelEditor(active)
   const { statuses } = useConfigStore()
-  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ key: string; name: string } | null>(null)
   const [clearOpen, setClearOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const editorScrollRef = useRef<HTMLDivElement>(null)
@@ -99,8 +98,9 @@ export const MenuPanelPage = () => {
     selectedPanel?.items[0]?.name.trim() || selectedPanel?.remark.trim() || selectedPanel?.panelId || '这个面板'
 
   const handleDeletePanel = async () => {
-    await editor.deletePanel()
-    setDeleteOpen(false)
+    if (!deleteTarget) return
+    await editor.deletePanel(deleteTarget.key)
+    setDeleteTarget(null)
   }
 
   const handleClearMenu = async () => {
@@ -140,10 +140,8 @@ export const MenuPanelPage = () => {
           >
             <div className='mx-auto flex w-full max-w-208 flex-col gap-6 px-6 py-6 xl:px-10'>
               <PageHeader
-                eyebrow='Menu & Panels'
-                title='指令面板'
-                description='在左侧样机里预览单聊 / 群聊效果，右侧实时编辑指令面板与自定义菜单。'
-                className='xl:flex-col xl:items-start 2xl:flex-row 2xl:items-end 2xl:justify-between'
+                title='菜单与面板'
+                className='sm:items-center'
                 actions={
                   <>
                     <Select
@@ -175,10 +173,8 @@ export const MenuPanelPage = () => {
                                       botStatus?.online ? 'bg-success' : 'bg-muted/50'
                                     )}
                                   />
-                                  <div className='flex min-w-0 flex-col'>
-                                    <span className='truncate text-sm'>{botStatus?.name || bot.appId}</span>
-                                    <span className='truncate text-[10px] text-muted'>{bot.appId}</span>
-                                  </div>
+                                  <span className='truncate text-sm'>{botStatus?.name || bot.appId}</span>
+                                  <span className='tabular-nums shrink-0 text-[10px] text-muted'>{bot.appId}</span>
                                 </div>
                                 <ListBox.ItemIndicator />
                               </ListBox.Item>
@@ -220,12 +216,16 @@ export const MenuPanelPage = () => {
                     className='w-70 max-w-full'
                   />
                   <div className='flex items-center gap-2'>
-                    <span className='inline-flex items-center gap-1.5 rounded-full bg-surface/60 px-2.5 py-1 text-[11px] text-muted'>
+                    <span
+                      aria-live='polite'
+                      title={editor.anyDirty ? '切换机器人或刷新前，请先保存或撤销修改' : undefined}
+                      className='inline-flex items-center gap-1.5 rounded-full bg-surface/60 px-2.5 py-1 text-[11px] text-muted'
+                    >
                       <span
                         aria-hidden='true'
                         className={cn('size-1.5 rounded-full', editor.anyDirty ? 'bg-warning' : 'bg-success')}
                       />
-                      {editor.anyDirty ? '有未保存的修改' : '已同步'}
+                      {editor.anyDirty ? '未保存' : '已同步'}
                     </span>
                     {editor.scene === 'group' ? (
                       <span className='text-[11px] text-muted'>自定义菜单仅单聊生效</span>
@@ -237,14 +237,6 @@ export const MenuPanelPage = () => {
                   className='pointer-events-none absolute inset-x-0 top-full hidden h-4 bg-[linear-gradient(to_bottom,color-mix(in_oklab,var(--background)_95%,transparent)_0%,transparent_100%)] xl:block'
                 />
               </div>
-
-              <EditorGuide editor={editor} />
-
-              {editor.anyDirty ? (
-                <p className='text-[11px] leading-5 text-muted'>
-                  切换机器人或刷新前，请先保存或撤销修改，避免覆盖草稿。
-                </p>
-              ) : null}
 
               {editor.error ? (
                 <Alert status='danger'>
@@ -260,7 +252,12 @@ export const MenuPanelPage = () => {
 
               <EditorFooter
                 editor={editor}
-                onDeletePanel={() => setDeleteOpen(true)}
+                onDeletePanel={() => {
+                  const target = editor.selectedPanel
+                  if (!target) return
+                  // 打开确认框时冻结目标，避免期间 reload 换掉 selectedPanel 后删错面板。
+                  setDeleteTarget({ key: target.key, name: panelName })
+                }}
                 onClearMenu={() => setClearOpen(true)}
               />
             </div>
@@ -269,12 +266,14 @@ export const MenuPanelPage = () => {
       </div>
 
       <ConfirmDialog
-        isOpen={deleteOpen}
-        onOpenChange={setDeleteOpen}
+        isOpen={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
         title='删除这个面板？'
         description={
           <>
-            将从 QQ 开放平台删除 <span className='font-medium text-foreground'>{panelName}</span>
+            将从 QQ 开放平台删除 <span className='font-medium text-foreground'>{deleteTarget?.name ?? '这个面板'}</span>
             ，该操作不可撤销。面板元素和已关联的 openid 会一起删除。
           </>
         }

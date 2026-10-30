@@ -132,11 +132,11 @@ export const emptyMenuItem = (): MenuItemDraft => ({
   subItems: [],
 })
 
-export const emptyPanelDraft = (scope: PanelScene): PanelDraft => ({
+export const emptyPanelDraft = (scope: PanelScene, targetType: PanelTargetType = 'all'): PanelDraft => ({
   key: nextDraftKey('panel'),
   panelId: null,
   scope,
-  targetType: 'all',
+  targetType,
   userOpenids: [],
   groupOpenids: [],
   remark: '',
@@ -148,6 +148,20 @@ export const emptyPanelDraft = (scope: PanelScene): PanelDraft => ({
   baseline: '',
 })
 
+/**
+ * 同一场景只能有一个 `target_type=all` 的全局面板。
+ *
+ * 官方文档没有写明这一点，但平台会把同场景的第二个 all 面板当成替换：
+ * 刷新列表后旧面板会消失，QQ 客户端也只展示新的那个。因此新建全局面板前
+ * 必须先检查当前场景是否已有 all 面板。
+ */
+export const findSceneAllPanel = (
+  panels: PanelDraft[],
+  scene: PanelScene,
+  excludeKey?: string
+): PanelDraft | undefined =>
+  panels.find((panel) => panel.scope === scene && panel.targetType === 'all' && panel.key !== excludeKey)
+
 export const emptyMenuDraft = (): MenuDraft => {
   const items: MenuItemDraft[] = []
   return {
@@ -158,12 +172,13 @@ export const emptyMenuDraft = (): MenuDraft => {
   }
 }
 
-const panelItemToDraft = (item: PanelItem): PanelItemDraft => ({
+const panelItemToDraft = (item: PanelItem, scope: PanelScene): PanelItemDraft => ({
   key: nextDraftKey('panel-item'),
   type: item.type === 'link' ? 'link' : 'command',
   name: item.name ?? '',
   desc: item.desc ?? '',
-  onlyAdmin: item.only_admin ?? false,
+  // 单聊没有管理员角色，历史数据里即使带 only_admin 也按 false 处理。
+  onlyAdmin: scope === 'group' ? (item.only_admin ?? false) : false,
   link: item.link ?? '',
 })
 
@@ -201,7 +216,7 @@ export const panelRecordToDraft = (record: PanelRecord): PanelDraft => {
     userOpenids: [],
     groupOpenids: [],
     remark: record.panel.remark ?? '',
-    items: (record.panel.items ?? []).map(panelItemToDraft),
+    items: (record.panel.items ?? []).map((item) => panelItemToDraft(item, record.scope as PanelScene)),
     version: record.version ?? record.panel.version ?? null,
     createdAt: record.created_at,
     updatedAt: record.updated_at,
@@ -239,7 +254,8 @@ const panelContentPayload = (draft: PanelDraft): Panel => {
     const next: PanelItem = {
       type: item.type,
       name,
-      only_admin: item.onlyAdmin,
+      // 管理员限制只在群聊有意义，单聊没有管理员角色。
+      only_admin: draft.scope === 'group' ? item.onlyAdmin : false,
     }
     if (desc) next.desc = desc
     if (item.type === 'link') next.link = item.link.trim()
@@ -372,7 +388,7 @@ export const resetPanelDraft = (draft: PanelDraft): PanelDraft | null => {
   const next: PanelDraft = {
     ...draft,
     remark: draft.saved.panel.remark ?? '',
-    items: (draft.saved.panel.items ?? []).map(panelItemToDraft),
+    items: (draft.saved.panel.items ?? []).map((item) => panelItemToDraft(item, draft.scope)),
     // 关联对象没读回来时保留现状，避免用空列表覆盖服务端数据。
     userOpenids: draft.targetError ? [...draft.userOpenids] : [...draft.saved.userOpenids],
     groupOpenids: draft.targetError ? [...draft.groupOpenids] : [...draft.saved.groupOpenids],
