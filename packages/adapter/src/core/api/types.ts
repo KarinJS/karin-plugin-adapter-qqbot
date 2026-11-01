@@ -7,8 +7,8 @@ export type MediaType = 'image' | 'video' | 'record' | 'file'
 
 /** 发送QQ消息请求参数基类 */
 export interface SendQQMessageRequest {
-  /** 消息类型：0 是文本，2 是 markdown， 3 ark，4 embed，6 输入中状态（仅单聊），7 media 富媒体 */
-  msg_type: 0 | 2 | 3 | 4 | 6 | 7
+  /** 消息类型：0 是文本，2 是 markdown， 3 ark，4 embed，6 输入中状态（仅单聊），7 media 富媒体，8 图文卡片 */
+  msg_type: 0 | 2 | 3 | 4 | 6 | 7 | 8
 }
 
 /** 消息引用对象 */
@@ -53,6 +53,33 @@ export interface SendQQTextMessageRequest extends SendQQMessageRequest, QQMessag
 export interface Markdown {
   /** markdown 文本 */
   content: string
+}
+
+/**
+ * 图文卡片内容（`card.type = 'tuwen'`）
+ *
+ * 官方限制（接口文档 v1.46.0）：
+ * - title 1~50 字符
+ * - description 1~200 字符
+ * - url / pic_url 必须为 https，且长度不超过 1024 字符
+ */
+export interface MessageCardContent {
+  /** 卡片标题，1~50 字符 */
+  title: string
+  /** 卡片描述，1~200 字符 */
+  description: string
+  /** 点击卡片后跳转的 https 链接，长度不超过 1024 字符 */
+  url: string
+  /** 卡片封面图 https 链接，长度不超过 1024 字符 */
+  pic_url: string
+}
+
+/** 图文卡片消息结构 */
+export interface MessageCard {
+  /** 卡片类型，目前仅支持 tuwen（图文卡片） */
+  type: 'tuwen'
+  /** 卡片内容 */
+  content: MessageCardContent
 }
 
 /** keyboard 按钮渲染（Button.render_data） */
@@ -214,6 +241,22 @@ export interface SendQQMediaMessageRequest extends SendQQMessageRequest, QQMessa
   keyboard?: Keyboard
 }
 
+/**
+ * 发送QQ图文卡片消息请求参数（msg_type=8）
+ *
+ * 仅 QQ 单聊 / 群聊支持；频道与频道私信不支持。
+ * `url` / `pic_url` 由 QQ 服务端抓取，必须是公网 https 地址。
+ *
+ * 官方字段表把 `keyboard` 列为通用可选字段，但实测 msg_type=8 与 keyboard
+ * 同时发送会被平台以 305007（键盘样式参数错误）拒绝，因此卡片请求体不提供
+ * `keyboard`；需要按钮时请另发一条带 keyboard 的 Markdown / 富媒体消息。
+ */
+export interface SendQQCardMessageRequest extends SendQQMessageRequest, QQMessageID {
+  msg_type: 8
+  /** 图文卡片内容 */
+  card: MessageCard
+}
+
 /** 发送QQ输入中状态请求参数（仅单聊，客户端展示"正在输入"，窗口约 60 秒） */
 export interface SendQQInputNotifyRequest extends SendQQMessageRequest, QQMessageID {
   msg_type: 6
@@ -275,6 +318,7 @@ export type SendQQMsg =
   | SendQQMarkdownMessageRequest
   | SendQQArkMessageRequest
   | SendQQMediaMessageRequest
+  | SendQQCardMessageRequest
 
 // ==============以下是频道相关的接口================
 

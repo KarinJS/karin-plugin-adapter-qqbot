@@ -1,6 +1,7 @@
 import type {
   Markdown,
   Keyboard,
+  MessageCard,
   Embeds,
   Ark,
   SendQQMsg,
@@ -8,6 +9,7 @@ import type {
   SendQQMarkdownMessageRequest,
   SendQQArkMessageRequest,
   SendQQMediaMessageRequest,
+  SendQQCardMessageRequest,
   SendGuildMsg,
   SendGuildTextMessageRequest,
   SendGuildImageMessageRequest,
@@ -37,6 +39,17 @@ export const buildQQMsg = {
    */
   media(fileInfo: string, keyboard?: Keyboard): SendQQMediaMessageRequest {
     return { msg_type: 7, media: { file_info: fileInfo }, keyboard }
+  },
+  /**
+   * 构造 msg_type=8 图文卡片消息体
+   *
+   * 仅 QQ 单聊 / 群聊支持；`card.content.url` 与 `pic_url` 必须是公网 https 地址。
+   * 实测卡片不能携带 keyboard，需要按钮时请另发一条带 keyboard 的消息。
+   *
+   * @param card 图文卡片内容（type=tuwen）。
+   */
+  card(card: MessageCard): SendQQCardMessageRequest {
+    return { msg_type: 8, card }
   },
 }
 
