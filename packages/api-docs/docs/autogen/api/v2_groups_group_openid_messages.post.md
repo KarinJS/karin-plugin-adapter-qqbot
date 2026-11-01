@@ -27,7 +27,7 @@
 
 |名称|类型|必填|描述|
 |---|---|---|---|
-|msg\_type|integer|否|消息类型。决定哪个内容字段生效: 0=纯文本(content) 2=Markdown(markdown) 7=富媒体(media)|
+|msg\_type|integer|否|消息类型。决定哪个内容字段生效: 0=纯文本(content) 2=Markdown(markdown) 7=富媒体(media) 8=图文卡片(card)|
 |content|string|否|文本内容。msg\_type=0 时为全文 注意: 传了 markdown 后此字段必须为空|
 |markdown|[MessageMarkdown](#schema-messagemarkdown)|否|Markdown 消息。msg\_type=2 时必填 注意: 填写此字段后 content/ark 必须全为空|
 |keyboard|[Keyboard](#schema-keyboard)|否|内嵌键盘。短形式只传 id，长形式传 content.rows|
@@ -36,6 +36,7 @@
 |msg\_seq|integer|否|回复消息的序号，与 msg\_id 联合使用，避免相同消息 id 回复重复发送，不填默认是 1。相同的 msg\_id + msg\_seq 重复发送会失败。|
 |media|[MediaInfo](#schema-mediainfo)|否|富媒体消息。msg\_type=7 时填写，file\_info 来自 /v2/groups/{group\_openid}/files|
 |message\_reference|[MessageReference](#schema-messagereference)|否|引用回复。填写后以引用形式展示，关联上下文|
+|card|[MessageCard](#schema-messagecard)|否|msg\_type=8时必须填写|
 
 **MessageMarkdown**
 
@@ -123,6 +124,13 @@
 |名称|类型|必填|描述|
 |---|---|---|---|
 |message\_id|string|否|被引用消息 ID，例如REFIDX\_xxxxxx<br />\- 非机器人发的消息，从消息事件的`MessageScene`的`ext`数组，`msg_idx`字段中获取<br />\- 机器人自己发的消息，从发消息请求响应`ext_info.ref_idx`获取|
+
+**MessageCard**
+
+|名称|类型|必填|描述|
+|---|---|---|---|
+|type|string|否|卡片类型：tuwen： 图文卡片|
+|content|object|否|卡片消息中上传的元素 当type=tuwen, 时必须包括: title(1-50 字符), description(1-200 字符), url(必须为https,链接长度≤ 1024 字符), pic\_url(必须为https,链接长度≤ 1024 字符)|
 
 ### [#](#请求示例) 请求示例
 
@@ -249,6 +257,48 @@ POST /v2/groups/B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5/messages
 10  
 11  
 12
+
+**图文卡片消息 (msg\_type=8)**
+
+```text
+POST /v2/groups/B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5/messages
+{
+  "msg_type": 8,
+  "msg_id": "ROBOT1.0_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "msg_seq": 2,
+  "card": {
+    "type": "tuwen",
+    "content": {
+      "title":       "iPhone 17 Pro 正式发布",
+      "description": "全新 A20 芯片 / 钛金属机身 / 支持卫星通信",
+      "url":         "https://news.qq.com/rain/a/20261014A05XYZ00",
+      "pic_url":     "https://inews.gtimg.com/newsapp_bt/0/xxx/1000.jpg"
+    }
+  },
+  "message_reference": {
+    "message_id": "ROBOT1.0_yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+  }
+}
+```
+
+1  
+2  
+3  
+4  
+5  
+6  
+7  
+8  
+9  
+10  
+11  
+12  
+13  
+14  
+15  
+16  
+17  
+18
 
 ## [#](#响应) 响应
 

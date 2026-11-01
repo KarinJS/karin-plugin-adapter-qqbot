@@ -28,7 +28,7 @@
 
 |名称|类型|必填|描述|
 |---|---|---|---|
-|msg\_type|integer|否|消息类型。决定哪个内容字段生效: 0=纯文本(content) 2=Markdown(markdown) 6=输入中状态（input\_notify) 7=富媒体(media)|
+|msg\_type|integer|否|消息类型。决定哪个内容字段生效: 0=纯文本(content) 2=Markdown(markdown) 6=输入中状态（input\_notify) 7=富媒体(media) 8=图文卡片(card)|
 |content|string|否|文本内容。msg\_type=0 时为全文 注意: 传了 markdown 后此字段必须为空|
 |markdown|[MessageMarkdown](#schema-messagemarkdown)|否|Markdown 消息。msg\_type=2 时必填 注意: 填写此字段后 content/ark 必须全为空|
 |keyboard|[Keyboard](#schema-keyboard)|否|内嵌键盘。短形式只传 id，长形式传 content.rows|
@@ -38,6 +38,7 @@
 |media|[MediaInfo](#schema-mediainfo)|否|富媒体消息。msg\_type=7 时填写，file\_info 来自 /v2/users/{user\_openid}/files|
 |message\_reference|[MessageReference](#schema-messagereference)|否|引用回复。填写后以引用形式展示，关联上下文|
 |is\_wakeup|boolean|否|指明发送消息为互动召回消息，与 msg\_id，event\_id 互斥使用|
+|card|[MessageCard](#schema-messagecard)|否|msg\_type=8时必须填写|
 |input\_notify|[InputNotify](#schema-inputnotify)|否|输入中状态，msg\_type=6时使用|
 
 **MessageMarkdown**
@@ -126,6 +127,13 @@
 |名称|类型|必填|描述|
 |---|---|---|---|
 |message\_id|string|否|被引用消息 ID，例如REFIDX\_xxxxxx<br />\- 非机器人发的消息，从消息事件的`MessageScene`的`ext`数组，`msg_idx`字段中获取<br />\- 机器人自己发的消息，从发消息请求响应`ext_info.ref_idx`获取|
+
+**MessageCard**
+
+|名称|类型|必填|描述|
+|---|---|---|---|
+|type|string|否|卡片类型：tuwen： 图文卡片|
+|content|object|否|卡片消息中上传的元素 当type=tuwen, 时必须包括: title(1-50 字符), description(1-200 字符), url(必须为https,链接长度≤ 1024 字符), pic\_url(必须为https,链接长度≤ 1024 字符)|
 
 **InputNotify**
 
@@ -235,6 +243,42 @@ POST /v2/users/A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4/messages
 7  
 8  
 9
+
+**图文卡片消息 (msg\_type=8)**
+
+```text
+POST /v2/users/A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4/messages
+{
+  "msg_type": 8,
+  "card": {
+    "type": "tuwen",
+    "content": {
+      "title":       "今日天气预报",
+      "description": "深圳 多云转晴 24°C~32°C，紫外线强，注意防晒",
+      "url":         "https://xxx",
+      "pic_url":     "https://xx.png"
+    }
+  },
+  "msg_id": "ROBOT1.0_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "msg_seq": 1
+}
+```
+
+1  
+2  
+3  
+4  
+5  
+6  
+7  
+8  
+9  
+10  
+11  
+12  
+13  
+14  
+15
 
 ## [#](#响应) 响应
 
