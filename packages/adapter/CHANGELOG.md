@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.7.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.6.0...adapter-qqbot-v3.7.0) (2026-11-01)
+
+
+### Features
+
+* 新增图文卡片消息发送支持 (msg_type=8) ([a6974a3](https://github.com/KarinJS/karin-plugin-adapter-qqbot/commit/a6974a322473b9c959cb4393df6fc9980a38ab06))
+
 ## [3.6.0](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/adapter-qqbot-v3.5.0...adapter-qqbot-v3.6.0) (2026-10-30)
 
 
