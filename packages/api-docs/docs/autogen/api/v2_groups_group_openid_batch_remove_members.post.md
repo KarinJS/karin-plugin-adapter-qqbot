@@ -1,8 +1,6 @@
 # [#](#群成员批量移除) 群成员批量移除
 
-批量移除群成员，单次最多 20 个，可选择同时加入黑名单。
-
-该能力正在内邀接入中，敬请期待
+批量移除群成员，单次最多 20 个openid。
 
 ## [#](#请求) 请求
 
@@ -25,7 +23,6 @@
 |名称|类型|必填|描述|
 |---|---|---|---|
 |member\_openids|\[\]string|是|需要移除的成员 member\_openid 列表，单次最多 20 个|
-|add\_to\_member\_blacklist|boolean|否|是否同时加入群黑名单，默认 false|
 
 ### [#](#请求示例) 请求示例
 
@@ -52,27 +49,25 @@ POST /v2/groups/3E5D8A1F7B2C9E4D6A0F1B3C5D7E9F2A/batch_remove_members
 |名称|类型|描述|
 |---|---|---|
 |remove\_members\_result|string|成功时返回 success|
-|add\_to\_member\_blacklist\_fail\_openids|\[\]string|拉黑失败的 openid|
 
 ## [#](#响应示例) 响应示例
 
 ```json
 {
-    "remove_members_result": "success",
-    "add_to_member_blacklist_fail_openids": []
+    "remove_members_result": "success"
 }
 ```
 
 1  
 2  
-3  
-4
+3
 
 ### [#](#错误码) 错误码
 
 |错误码|描述|排查建议|
 |---|---|---|
-|11253|应用无接口访问权限|该接口仅白名单机器人可用，请联系平台运营申请权限|
+|40103012|操作失败, 群主已经关闭操作权限|需要群主给机器人打开“移除群成员”权限开关。|
+|40103011|操作失败, 机器人已经关闭操作权限|需要到WEB管理端给机器人打开"移除群成员"开关。|
 
 ← [获取群成员信息](/wiki/develop/api-v2/autogen/api/v2_groups_group_openid_members_member_openid.get.html) [群黑名单查询](/wiki/develop/api-v2/autogen/api/v2_groups_group_openid_member_blacklist.get.html) →
 

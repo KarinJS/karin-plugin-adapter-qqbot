@@ -16,6 +16,7 @@
 |timestamp|integer|移除时间戳（Unix 秒）|
 |group\_openid|string|群 OpenID|
 |op\_member\_openid|string|操作移除机器人退群的群成员 OpenID|
+|union\_group\_openid|string|跨应用关联群openid，当绑定了3方应用时有效|
 
 ### [#](#事件示例) 事件示例
 

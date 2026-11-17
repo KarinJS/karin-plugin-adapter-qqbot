@@ -132,7 +132,7 @@ GET /users/@me/guilds?limit=20
 34  
 35
 
-← [获取机器人详情](/wiki/develop/api-v2/autogen/api/users_me.get.html) [生成分享链接](/wiki/develop/api-v2/autogen/api/v2_generate_url_link.post.html) →
+← [获取机器人详情](/wiki/develop/api-v2/autogen/api/users_me.get.html) [获取用户基本信息](/wiki/develop/api-v2/autogen/api/v2_users_user_openid_info.get.html) →
 
 手机QQ扫码
 ![开发者社区](https://guild-1251316161.cos.ap-guangzhou.myqcloud.com/miniapp/icons/qq_guild_developer_doc.png)

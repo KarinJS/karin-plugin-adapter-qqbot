@@ -40,6 +40,7 @@ GET /v2/groups/3E5D8A1F7B2C9E4D6A0F1B3C5D7E9F2A/info
 |group\_class\_text|string|群分类|
 |group\_tags|\[\]string|群标签列表|
 |group\_member\_num|integer|群成员人数|
+|union\_group\_openid|string|跨应用关联群openid，当绑定了3方应用时有效|
 
 ## [#](#响应示例) 响应示例
 

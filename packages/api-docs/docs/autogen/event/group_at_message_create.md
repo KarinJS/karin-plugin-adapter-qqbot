@@ -14,29 +14,30 @@
 |名称|类型|描述|
 |---|---|---|
 |id|string|消息 ID，可用于被动回复和撤回|
-|author|[User](#schema-user)|发送者（member\_openid 有值）|
+|author|[GroupUser](#schema-groupuser)|发送者（member\_openid 有值）|
 |content|string|消息文本内容（已去除@机器人的前缀）|
 |group\_openid|string|群 OpenID|
 |timestamp|string|消息发送时间，RFC3339 格式|
 |message\_type|integer|消息内容类型（同 C2C\_MESSAGE\_CREATE）|
 |message\_scene|[MessageScene](#schema-messagescene)|消息场景上下文|
 |attachments|\[\][MessageAttachment](#schema-messageattachment)|消息附件|
-|mentions|\[\][User](#schema-user)|消息中@的用户列表（不含@机器人自身）|
+|mentions|\[\][GroupMentionsUser](#schema-groupmentionsuser)|消息中@的用户列表（不含@机器人自身）|
 |ark\_data|[ARKData](#schema-arkdata)|结构化卡片消息数据|
 |msg\_elements|\[\][MsgElement](#schema-msgelement)|消息元素列表|
+|union\_group\_openid|string|跨应用关联群openid，当绑定了3方应用时有效|
 
-**User**
+**GroupUser**
 
 |名称|类型|描述|
 |---|---|---|
 |id|string|用户唯一标识（OpenID 格式）|
 |username|string|用户昵称|
+|avatar|string|用户头像 URL|
 |bot|boolean|是否为机器人|
-|union\_openid|string|跨应用统一用户 OpenID（可能为空）|
-|union\_user\_account|string|跨应用统一用户账号（可能为空）|
-|user\_openid|string|用户 OpenID（单聊场景使用）|
-|member\_openid|string|群成员 OpenID（群聊场景使用）|
+|union\_openid|string|跨应用关联用户openid，当绑定了3方应用时有效|
+|member\_openid|string|群成员 OpenID|
 |member\_role|string|群内角色。member=普通成员, admin=管理员, owner=群主|
+|member\_nickname|string|群场景：用户在群内的昵称|
 
 **MessageScene**
 
@@ -58,6 +59,19 @@
 |voice\_wav\_url|string|语音消息 SILK 等转换后的 WAV 文件 URL|
 |asr\_refer\_text|string|语音消息 ASR 参考结果|
 
+**GroupMentionsUser**
+
+|名称|类型|描述|
+|---|---|---|
+|id|string|用户唯一标识（OpenID 格式）|
+|username|string|用户昵称|
+|bot|boolean|是否为机器人|
+|member\_openid|string|群成员 OpenID（群聊场景使用）|
+|member\_role|string|群内角色。member=普通成员, admin=管理员, owner=群主|
+|is\_you|boolean|是否是@的当前bot|
+|scope|string|all：@全体成员，single：指定@对象|
+|member\_nickname|string|用户在群内的昵称|
+
 **ARKData**
 
 |名称|类型|描述|
@@ -72,7 +86,6 @@
 |名称|类型|描述|
 |---|---|---|
 |msg\_idx|string|消息元素在列表中的引用消息索引|
-|author|[User](#schema-user)|该元素对应的消息发送者|
 |message\_type|integer|消息内容类型: 0=普通文本, 3=结构化卡片, 101=并行消息, 102=聊天记录, 103=引用消息|
 |content|string|消息正文内容|
 |attachments|\[\][MessageAttachment](#schema-messageattachment)|该元素携带的附件|

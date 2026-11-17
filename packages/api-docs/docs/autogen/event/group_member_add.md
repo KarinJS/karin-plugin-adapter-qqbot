@@ -16,6 +16,7 @@
 |timestamp|integer|事件时间戳（Unix 秒）|
 |group\_openid|string|群 OpenID|
 |member\_openid|string|新加入成员的 OpenID|
+|union\_group\_openid|string|跨应用关联群openid，当绑定了3方应用时有效|
 
 ### [#](#事件示例) 事件示例
 

@@ -17,6 +17,7 @@
 |group\_openid|string|群 OpenID|
 |member\_openid|string|退出成员的 OpenID|
 |user\_openid|string|退出成员的用户 OpenID（可能为空）|
+|union\_group\_openid|string|跨应用关联群openid，当绑定了3方应用时有效|
 
 ### [#](#事件示例) 事件示例
 
