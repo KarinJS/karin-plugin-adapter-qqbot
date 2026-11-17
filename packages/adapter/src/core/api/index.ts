@@ -20,7 +20,7 @@ import { buildQQMsg, buildGuildMsg } from './builders'
  * - media：富媒体上传
  * - mediaImages：Markdown 素材图片管理
  * - interaction：按钮回调 ack
- * - meta：@me / dms / gateway / 分享链接
+ * - meta：机器人与用户资料 / dms / gateway / 分享链接
  * - groups：群基础信息 / 机器人群内状态 / 群成员列表与详情 / 禁言 / 批量移除 / 群黑名单 / 入群申请（白名单接口）
  * - guilds：频道与子频道的查询和增删改
  * - menu：全局自定义菜单（仅单聊）

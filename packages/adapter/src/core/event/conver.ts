@@ -155,8 +155,9 @@ export const convertToKarin = (
     })
   } else if (ev.t === EventEnum.GROUP_MESSAGE_CREATE || ev.t === EventEnum.GROUP_AT_MESSAGE_CREATE) {
     ;(ev.d.mentions as QQMention[] | undefined)?.forEach((v) => {
-      mentionMap.set(v.id, v.username)
-      mentionMap.set(v.member_openid, v.username)
+      const name = v.member_nickname || v.username
+      mentionMap.set(v.id, name)
+      mentionMap.set(v.member_openid, name)
       if (v.is_you) {
         selfMentionIds.add(v.id)
         selfMentionIds.add(v.member_openid)
@@ -273,6 +274,9 @@ export const convertToKarin = (
     elements.push(segment.text(text))
   }
 
+  /** 结构化卡片保留原生字段，插件可通过标准 JSON 消息段读取。 */
+  if ('ark_data' in data && data.ark_data) elements.push(segment.json(JSON.stringify(data.ark_data)))
+
   /** content 中未出现占位符的普通附件，按 QQ 报文顺序追加。 */
   for (; attachmentIndex < attachments.length; attachmentIndex++) {
     pushAttachment(attachments[attachmentIndex])
@@ -287,7 +291,7 @@ export const convertToKarin = (
       // 仅在 content 中不存在 self at 时补一个
       const hasSelfAt = elements.some((e) => e.type === 'at' && (e.targetId === appid || e.targetId === selfSubId))
       if (!hasSelfAt) {
-        elements.unshift(segment.at(appid, youMention?.username || ''))
+        elements.unshift(segment.at(appid, youMention?.member_nickname || youMention?.username || ''))
       }
     }
   }
@@ -310,8 +314,10 @@ export const convertReferenceToKarin = (
     ...ev,
     d: {
       ...ev.d,
+      author: reference.author ?? { id: '' },
       content: reference.content,
       attachments: reference.attachments,
+      ark_data: reference.ark_data,
       mentions: undefined,
       message_scene: undefined,
       msg_elements: undefined,

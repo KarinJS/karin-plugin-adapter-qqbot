@@ -33,7 +33,6 @@ QQ 官方 Bot API 和 OneBot 不对等。下面这些方法保留了签名，调
 | `getGroupHonor`         | 不支持获取群荣誉                      |
 | `getNotJoinedGroupInfo` | 不支持获取陌生群信息                  |
 | `getFriendList`         | 不支持获取好友列表                    |
-| `getStrangerInfo`       | 不支持获取陌生人信息                  |
 | `setFriendApplyResult`  | 不支持设置好友申请结果                |
 | `getAtAllCount`         | 不支持获取 @全体成员剩余次数          |
 
@@ -59,6 +58,8 @@ QQ 官方 Bot API 和 OneBot 不对等。下面这些方法保留了签名，调
 
 ## 部分支持
 
-- 群踢人。官方没有踢人理由字段，`kickReason` 只写日志；`rejectAddRequest` 会同时加入群黑名单。
+- 用户信息。`getStrangerInfo` 可查询与机器人存在好友关系的用户；无好友关系或接口查询失败时，返回已知昵称或空昵称。头像通过 `getAvatarUrl` 获取，其他官方资料通过 `bot.super.meta.getUserInfo` 获取。
+- 群踢人。官方没有踢人理由字段，`kickReason` 只写日志；`rejectAddRequest=true` 时先移除，再调用仍需内邀权限的群黑名单接口。移除失败、拉黑失败均会抛错；拉黑失败不撤销已经完成的移除。
 - 频道 Markdown。没开通内邀时降级成普通消息，按钮丢失。
 - 群头像。官方没有接口，`getGroupAvatarUrl` 用 QQ 群头像 CDN 兜底。
+- 用户头像。优先使用消息事件或用户资料接口中的原图；无头像且用户资料查询失败时使用 CDN 兜底。`size` 只影响兜底地址。

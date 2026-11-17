@@ -23,7 +23,9 @@ export class MessagesApi extends Http {
 
   /** 群聊消息 */
   sendGroupMsg(groupOpenid: string, body: SendQQMsg): Promise<SendQQMsgResponse> {
-    return this.post(`/v2/groups/${groupOpenid}/messages`, body)
+    const message = { ...body }
+    delete message.is_wakeup
+    return this.post(`/v2/groups/${groupOpenid}/messages`, message)
   }
 
   /**

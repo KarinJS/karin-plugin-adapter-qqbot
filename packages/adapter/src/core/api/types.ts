@@ -53,6 +53,8 @@ export interface SendQQTextMessageRequest extends SendQQMessageRequest, QQMessag
 export interface Markdown {
   /** markdown 文本 */
   content: string
+  /** 为 true 时校验图片转存结果，转存失败会中断消息发送。 */
+  force_verify_image_resource?: boolean
 }
 
 /**
@@ -444,14 +446,16 @@ export interface GetMeResponse {
   username: string
   /** 用户头像 */
   avatar: string
+  /** 是否为机器人。 */
+  bot: boolean
   /** 特殊关联应用的 openid */
-  union_openid: string
+  union_openid?: string
   /** 机器人关联的互联应用的用户信息 */
-  union_user_account: string
+  union_user_account?: string
   /** 机器人的分享url */
-  share_url: string
+  share_url?: string
   /** 机器人介绍 */
-  welcome_msg: string
+  welcome_msg?: string
 }
 
 /** 创建私信会话接口响应 */
@@ -477,6 +481,17 @@ export interface SendQQMsgResponse {
   }
 }
 
+/** 用户基本信息（GET /v2/users/{user_openid}/info，需存在好友关系）。 */
+export interface QQUserInfoResponse {
+  username: string
+  /** 用户头像原图。 */
+  avatar: string
+  /** 是否允许主动推送消息。 */
+  allow_proactive_msg: boolean
+  /** 绑定第三方应用时提供的跨应用用户标识。 */
+  union_openid?: string
+}
+
 /** 获取群基础信息接口响应（GET /v2/groups/{group_openid}/info，白名单接口） */
 export interface QQGroupInfoResponse {
   /** 群 openid */
@@ -491,6 +506,8 @@ export interface QQGroupInfoResponse {
   group_tags?: string[]
   /** 群成员人数 */
   group_member_num?: number
+  /** 绑定第三方应用时提供的跨应用群标识。 */
+  union_group_openid?: string
 }
 
 /** 获取机器人群内状态接口响应（GET /v2/groups/{group_openid}/bot_state，白名单接口） */
@@ -1128,16 +1145,12 @@ export interface GetGroupMemberListResponse {
 export interface BatchRemoveGroupMembersBody {
   /** 需要移除的成员 member_openid 列表，单次最多 20 个 */
   member_openids: string[]
-  /** 是否同时加入群黑名单，默认 false */
-  add_to_member_blacklist?: boolean
 }
 
 /** 群成员批量移除响应 */
 export interface BatchRemoveGroupMembersResponse {
   /** 成功时返回 success */
-  remove_members_result?: string
-  /** 拉黑失败的 openid */
-  add_to_member_blacklist_fail_openids?: string[]
+  remove_members_result: string
 }
 
 /** 群黑名单用户（GET /v2/groups/{group_openid}/member_blacklist 列表项） */

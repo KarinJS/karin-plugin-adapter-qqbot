@@ -2,12 +2,19 @@ import { convertReferenceToKarin, convertToKarin, getMessageSceneIndex } from '.
 import {
   karin,
   segment,
+  senderGroup,
   createGroupMessage,
   createFriendMessage,
   createGuildMessage,
   createDirectMessage,
 } from 'node-karin'
 import { log } from '@/utils/logger'
+import {
+  cacheGroupMemberProfile,
+  cacheUserProfile,
+  getGroupMemberProfile,
+  getUserProfile,
+} from '@/core/adapter/profiles'
 import type { AdapterQQBot } from '@/core/adapter/base'
 import type { C2CMsgEvent, DirectMsgEvent, GroupMsgEvent, GuildMsgEvent } from '@/types/event'
 import type { Contact, ElementTypes, Sender } from 'node-karin'
@@ -104,14 +111,30 @@ const normalizeQuickReplyReference = (
 export const onGroupMsg = (client: AdapterQQBot, ev: GroupMsgEvent, opts: GroupOptions) => {
   const selfId = client.selfId
   const userId = ev.d.author.member_openid || ev.d.author.id
-  const username = ev.d.author.username || ''
-  if (userId && username) client.nicknameCache.set(userId, username)
-  ev.d.mentions?.forEach((m) => {
-    if (m.member_openid && m.username) client.nicknameCache.set(m.member_openid, m.username)
+  const groupId = ev.d.group_openid || ev.d.group_id || ''
+  cacheUserProfile(client, userId, {
+    nick: ev.d.author.username || undefined,
+    avatar: ev.d.author.avatar || undefined,
   })
-  const contact = karin.contactGroup(ev.d.group_openid || ev.d.group_id)
-  // `member_role` 是 QQ 官方在群消息事件中下发的真实身份；旧报文不含时保留为未知。
-  const sender = karin.groupSender(userId, ev.d.author.member_role || 'unknown', username)
+  cacheGroupMemberProfile(client, groupId, userId, {
+    card: ev.d.author.member_nickname,
+  })
+  ev.d.mentions?.forEach((m) => {
+    if (m.scope === 'all' || m.scope === 'everyone') return
+    const memberId = m.member_openid || m.id
+    cacheUserProfile(client, memberId, { nick: m.username || undefined })
+    cacheGroupMemberProfile(client, groupId, memberId, { card: m.member_nickname })
+  })
+  const username = getUserProfile(client, userId)?.nick ?? client.nicknameCache.get(userId) ?? ''
+  const member = getGroupMemberProfile(client, groupId, userId)
+  const contact = karin.contactGroup(groupId)
+  const sender = senderGroup({
+    userId,
+    nick: username,
+    name: username,
+    role: ev.d.author.member_role ?? 'unknown',
+    card: member?.card,
+  })
   const elements = convertToKarin(selfId, ev, client.selfSubId('id'), {
     forceAtSelf: opts.forceAtSelf,
   })
@@ -172,8 +195,11 @@ export const onGroupMsg = (client: AdapterQQBot, ev: GroupMsgEvent, opts: GroupO
 export const onFriendMsg = (client: AdapterQQBot, ev: C2CMsgEvent) => {
   const selfId = client.selfId
   const userId = ev.d.author.user_openid || ev.d.author.id
-  const username = ev.d.author.username || ''
-  if (userId && username) client.nicknameCache.set(userId, username)
+  cacheUserProfile(client, userId, {
+    nick: ev.d.author.username || undefined,
+    avatar: ev.d.author.avatar || undefined,
+  })
+  const username = getUserProfile(client, userId)?.nick ?? client.nicknameCache.get(userId) ?? ''
   const contact = karin.contactFriend(userId)
   const sender = karin.friendSender(userId, username)
   const elements = convertToKarin(selfId, ev, client.selfSubId('id'))

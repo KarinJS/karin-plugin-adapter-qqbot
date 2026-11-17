@@ -23,6 +23,9 @@ export const httpStatusMap: Record<number, string> = {
 
 /** 业务错误码(err_code)映射 */
 export const errorCodeMap: Record<number, string> = {
+  40103011: '机器人未开启移除群成员权限，请在 Web 管理端开启“移除群成员”开关',
+  40103012: '群主未授予机器人移除群成员权限，请群主开启“移除群成员”开关',
+  40184001: '用户与机器人无好友关系，无法查询用户信息或发送消息',
   10001: 'UnknownAccount 账号异常',
   10003: 'UnknownChannel 子频道异常',
   10004: 'UnknownGuild 频道异常',

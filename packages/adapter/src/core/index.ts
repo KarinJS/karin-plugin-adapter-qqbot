@@ -84,11 +84,18 @@ export const createBot = async (input: QQBotConfig): Promise<void> => {
     client.account.avatar = me.avatar
     client.account.selfId = appId
 
-    const qq = new URL(me.share_url).searchParams.get('robot_uin')!
+    let qq = ''
+    if (me.share_url) {
+      try {
+        qq = new URL(me.share_url).searchParams.get('robot_uin') || ''
+      } catch {
+        /** share_url 不是基础字段，旧版扩展缺失或异常时不影响用 appId / id 初始化。 */
+      }
+    }
     client.account.subId.id = me.id
     client.account.subId.qq = qq
     client.account.subId.appid = appId
-    client.account.subId.union_openid = me.union_openid
+    client.account.subId.union_openid = me.union_openid || ''
 
     bus.on(appId, (ev: Event) => {
       dispatchEvent(client, ev)
@@ -108,11 +115,11 @@ export const createBot = async (input: QQBotConfig): Promise<void> => {
     }
   })()
 
-  initState.set(appId, { hash, promise })
-  promise.finally(() => {
-    if (initState.get(appId)?.hash === hash) initState.delete(appId)
+  const tracked = promise.finally(() => {
+    if (initState.get(appId)?.promise === tracked) initState.delete(appId)
   })
-  return promise
+  initState.set(appId, { hash, promise: tracked })
+  return tracked
 }
 
 /**

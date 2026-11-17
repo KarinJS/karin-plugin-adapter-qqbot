@@ -10,7 +10,7 @@ import type { MessageCacheLevel } from '@/types/config'
  * 直接决定 db 文件体积。字段含义由本文件的 encode/decode 对偶保证。
  */
 interface StoredElement {
-  /** 消息段类型编码：t=text a=at r=reply f=face i=image v=video s=record d=file m=markdown。 */
+  /** 消息段类型编码：t=text a=at r=reply f=face i=image v=video s=record d=file m=markdown j=json。 */
   c: string
   /** 主值：文本内容 / 目标 ID / 媒体路径等。 */
   v?: string | number
@@ -140,6 +140,8 @@ const encodeElement = (element: ElementTypes): StoredElement | null => {
       }
     case 'markdown':
       return { c: 'm', v: truncateText(element.markdown) }
+    case 'json':
+      return { c: 'j', v: element.data }
     default:
       return null
   }
@@ -191,6 +193,8 @@ const decodeElement = (item: StoredElement): ElementTypes[] => {
       ]
     case 'm':
       return [{ type: 'markdown', markdown: stringValue(item.v) }]
+    case 'j':
+      return [{ type: 'json', data: stringValue(item.v) }]
     default:
       return []
   }

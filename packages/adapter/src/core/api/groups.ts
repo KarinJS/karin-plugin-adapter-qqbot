@@ -22,10 +22,9 @@ import type {
 /**
  * QQ 群信息与群成员管理接口
  *
- * 注意：以下接口均为白名单接口，未开通权限时平台返回错误码 11253，
- * 需要向平台运营申请后可用。接口文档 v1.28.0（2026-09-03）新增的群成员管理
- * 接口（成员列表 / 批量移除 / 黑名单）官方标注为「正在内邀接入中」，
- * 开放范围可能比其它白名单接口更窄。
+ * 部分接口需平台白名单，未开通时返回 11253；成员列表、详情和黑名单仍处于内邀。
+ * API 1.50.0 的批量移除接口检查群主和 Web 管理端的“移除群成员”权限开关，
+ * 对应错误码为 40103012 / 40103011，不能将所有群管理接口视为同一权限范围。
  */
 export class GroupsApi extends Http {
   /**
@@ -75,17 +74,17 @@ export class GroupsApi extends Http {
   /**
    * 群成员批量移除
    *
-   * 单次最多 20 个成员，可通过 `add_to_member_blacklist` 在移除的同时拉黑。
-   * 机器人需拥有群管理员身份。
+   * 单次最多 20 个成员，需群主和 Web 管理端开启“移除群成员”权限。
+   * API 1.50.0 不再支持同时拉黑；需要拉黑时在移除成功后调用 setGroupMemberBlacklist。
    *
    * @param groupOpenid 群 openid
-   * @param body 待移除的成员列表与是否同时拉黑
+   * @param body 待移除的成员列表
    */
   batchRemoveGroupMembers(
     groupOpenid: string,
     body: BatchRemoveGroupMembersBody
   ): Promise<BatchRemoveGroupMembersResponse> {
-    return this.post(`/v2/groups/${groupOpenid}/batch_remove_members`, body)
+    return this.post(`/v2/groups/${groupOpenid}/batch_remove_members`, { member_openids: body.member_openids })
   }
 
   /**
@@ -134,7 +133,13 @@ export class GroupsApi extends Http {
    * @param duration 禁言时间使用RFC3339 格式
    */
   setGroupMute(groupOpenid: string, memberOpenid: string, op: 'add' | 'update' | 'del', duration: string): Promise<{}> {
-    return this.setGroupMuteBatch(groupOpenid, [{ op, member_openid: memberOpenid, mute_expire_at: duration }])
+    return this.setGroupMuteBatch(groupOpenid, [
+      {
+        op,
+        member_openid: memberOpenid,
+        ...(op === 'del' ? {} : { mute_expire_at: duration }),
+      },
+    ])
   }
 
   /**

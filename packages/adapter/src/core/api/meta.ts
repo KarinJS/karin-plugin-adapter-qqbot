@@ -1,13 +1,24 @@
 import { Http } from './http'
-import type { GetMeResponse, DmsResponse, GenerateUrlLinkRequest, GenerateUrlLinkResponse } from './types'
+import type {
+  GetMeResponse,
+  QQUserInfoResponse,
+  DmsResponse,
+  GenerateUrlLinkRequest,
+  GenerateUrlLinkResponse,
+} from './types'
 
 /**
- * 元信息接口：@me / dms / gateway / 分享链接
+ * 元信息接口：机器人与用户资料 / dms / gateway / 分享链接
  */
 export class MetaApi extends Http {
   /** 当前机器人详情 */
   getMe(): Promise<GetMeResponse> {
     return this.get('/users/@me')
+  }
+
+  /** 用户基本信息；用户需与机器人存在好友关系，否则平台返回 40184001。 */
+  getUserInfo(userOpenid: string): Promise<QQUserInfoResponse> {
+    return this.get(`/v2/users/${userOpenid}/info`)
   }
 
   /** 创建频道私信会话 */

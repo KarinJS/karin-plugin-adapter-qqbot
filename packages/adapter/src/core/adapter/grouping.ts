@@ -1,4 +1,6 @@
 import type { ElementTypes, ButtonElement, KeyboardElement, MarkdownElement } from 'node-karin'
+import type { MessageCard } from '@/core/api/types'
+import { parseQQCard } from './message-card'
 
 /** 富媒体待发送项（视频/语音/文件） */
 export interface PendingMedia {
@@ -39,6 +41,8 @@ export interface Grouping<T extends 'qq' | 'guild'> {
   markdowns: MarkdownElement[]
   /** 视频 / 语音 / 文件 */
   media: PendingMedia[]
+  /** QQ 图文卡片，通过 Karin JSON 消息段传入。 */
+  cards: MessageCard[]
   /** 显式引用回复；QQ 群聊/单聊发送前会把 API 消息 ID 映射为 msg_idx/REFIDX */
   reply: { messageId: string }
   /** 被动消息 */
@@ -76,6 +80,7 @@ export const createGrouping = <T extends 'qq' | 'guild'>(): Grouping<T> => ({
   keyboards: [],
   markdowns: [],
   media: [],
+  cards: [],
   reply: { messageId: '' },
   pasmsg: {
     type: 'msg',
@@ -141,6 +146,11 @@ export const groupElements = <T extends 'qq' | 'guild'>(
       case 'markdown':
         g.markdowns.push(v)
         break
+      case 'json': {
+        const card = isQQ ? parseQQCard(v.data) : undefined
+        if (card) g.cards.push(card)
+        break
+      }
       case 'video':
         g.media.push({ kind: 'video', source: v.file, name: v.name })
         break

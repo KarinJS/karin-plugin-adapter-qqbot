@@ -14,7 +14,7 @@ description: 通过 bot.super 调用 QQ 官方 OpenAPI。
 | `media`        | 图片、视频、语音、文件上传                             |
 | `mediaImages`  | Markdown 素材图片，返回 `qqbot-media://`               |
 | `interaction`  | 按钮回调 ack                                           |
-| `meta`         | 机器人信息、私信会话、网关、分享链接                   |
+| `meta`         | 机器人和用户信息、私信会话、网关、分享链接             |
 | `groups`       | 群信息、成员、禁言、黑名单、入群申请，大多是白名单接口 |
 | `guilds`       | 频道和子频道                                           |
 | `menu`         | 全局自定义菜单，只在单聊生效                           |
@@ -24,6 +24,34 @@ description: 通过 bot.super 调用 QQ 官方 OpenAPI。
 | `guild`        | 频道请求体构造器                                       |
 
 字段和返回值以 TypeScript 类型和[官方接口文档](https://bot.q.qq.com/wiki/develop/api-v2/)为准。
+
+## bot 标准方法
+
+适配器方法使用 Karin 基类定义的返回类型。`bot.getStrangerInfo(userOpenid)` 返回 `UserInfo` 中的 `userId` 和 `nick`，底层调用官方用户信息接口；平台只允许查询与机器人存在好友关系的用户，其他用户查询失败时使用已收到消息中的昵称。
+
+`bot.getAvatarUrl(userOpenid)` 优先使用消息事件中的真实头像，再查询用户资料。`bot.getGroupMemberInfo()` 和 `getGroupMemberList()` 返回 Karin 的成员结构，QQ 昵称放在 `nick`，群内昵称放在 `card`；头像通过 `getAvatarUrl()` 获取。
+
+用户主动消息开关、跨应用用户或群标识等官方扩展字段保留在原生响应中，不扩展 Karin 标准返回类型。
+
+```ts twoslash
+import type { AdapterQQBot } from '@karinjs/adapter-qqbot'
+
+declare const bot: AdapterQQBot
+declare const userOpenid: string
+declare const groupOpenid: string
+
+const user = await bot.super.meta.getUserInfo(userOpenid)
+//    ^?
+const canPush = user.allow_proactive_msg
+const userUnionId = user.union_openid
+
+const group = await bot.super.groups.getGroupInfo(groupOpenid)
+const groupUnionId = group.union_group_openid
+```
+
+用户资料接口的频率限制为 10 QPS，无好友关系时返回 `40184001`。事件中的昵称、头像和群名片按机器人实例隔离，群名片还按群隔离，缓存有效期为 5 分钟。查询方法直接取官方结果，成员身份不使用缓存；查询失败时返回 `unknown`。
+
+群踢人直接调用 `bot.groupKickMember(groupOpenid, memberOpenid, rejectAddRequest)`。批量移除只接收 `member_openids`，需要群主与 Web 管理端打开“移除群成员”开关；`40103012` 和 `40103011` 分别表示这两处权限未开启。`rejectAddRequest=true` 时，适配器在移除成功后调用独立的黑名单接口，黑名单能力仍需内邀权限。移除或拉黑失败会抛错，部分成功的错误会说明成员已经移除。
 
 ## 示例
 

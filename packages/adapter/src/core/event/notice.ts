@@ -1,5 +1,6 @@
 import type { AdapterQQBot } from '@/core/adapter/base'
 import { cacheJoinRequest } from '@/core/adapter/join-request-cache'
+import { cacheUserProfile, clearGroupMemberProfile, clearUserProfile } from '@/core/adapter/profiles'
 import {
   karin,
   SrcReply,
@@ -57,6 +58,7 @@ export const onGroupAddRobot = (client: AdapterQQBot, event: GroupAddRobotEvent)
  * @param event 事件
  */
 export const onGroupDelRobot = (client: AdapterQQBot, event: GroupDelRobotEvent) => {
+  clearGroupMemberProfile(client, event.d.group_openid)
   const selfId = client.selfId
   const userId = event.d.op_member_openid
   const groupId = event.d.group_openid
@@ -116,6 +118,7 @@ export const onGroupMemberAdd = (client: AdapterQQBot, event: GroupMemberAddEven
  */
 export const onGroupMemberRemove = (client: AdapterQQBot, event: GroupMemberRemoveEvent) => {
   const memberId = event.d.member_openid
+  clearGroupMemberProfile(client, event.d.group_openid, memberId)
   const contact = karin.contactGroup(event.d.group_openid)
   const sender = karin.groupSender(memberId, 'unknown')
 
@@ -184,6 +187,7 @@ export const onFriendAdd = (client: AdapterQQBot, event: FriendAddEvent) => {
  * @param event 事件
  */
 export const onFriendDel = (client: AdapterQQBot, event: FriendDelEvent) => {
+  clearUserProfile(client, event.d.openid)
   const selfId = client.selfId
   const userId = event.d.openid
   const contact = karin.contactFriend(userId)
@@ -235,7 +239,7 @@ export const onGroupJoinRequest = (client: AdapterQQBot, event: GroupJoinRequest
     groupId: event.d.group_openid,
     memberId: event.d.member_openid,
   })
-  if (event.d.username) client.nicknameCache.set(event.d.member_openid, event.d.username)
+  if (event.d.username) cacheUserProfile(client, event.d.member_openid, { nick: event.d.username })
   if (event.d.member_openid === client.selfId) {
     createGroupInviteRequest({
       bot: client,

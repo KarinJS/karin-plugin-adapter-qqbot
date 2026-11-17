@@ -1,4 +1,4 @@
-import { AdapterBase, logger, buttonHandle, segment, senderGroup } from 'node-karin'
+import { AdapterBase, logger, buttonHandle, segment } from 'node-karin'
 import { QQBotApi } from '@/core/api'
 import { sendQQ } from './pipeline-qq'
 import { sendGuild } from './pipeline-guild'
@@ -6,6 +6,8 @@ import { cacheSelfMessage, prepareSelfMessageCache, shouldCacheSelfMessage } fro
 import { getJoinRequest, removeJoinRequest } from './join-request-cache'
 import { getAdapterConfig, setAdapterConfig } from './config-store'
 import { selfAvatarUrl } from './self-avatar'
+import { clearGroupMemberProfile, getUserProfile } from './profiles'
+import { buildGroupMemberInfo } from './group-member-info'
 import { getMessageStore, type MessageStore } from '@/core/storage/message'
 import { GROUP_MEMBER_LIST_MAX_PAGES, HTTP_URL_RE, MAX_GROUP_MUTE_SECONDS } from '@/core/constants'
 import { normalizeMediaElements } from './media-source'
@@ -36,32 +38,6 @@ import type {
   AdapterType,
 } from 'node-karin'
 import type { QQBotConfig } from '@/types/config'
-
-/**
- * 按 Karin 接口约定构造群成员信息。
- *
- * `sender` 用 getter 即时构建，避免整个适配器被系统接口序列化时带出多余引用。
- *
- * @param userId 成员 openid。
- * @param role 群内角色。
- * @param nick 成员昵称。
- * @param joinTime 入群时间戳（毫秒）。
- * @returns Karin 标准群成员信息。
- */
-const buildGroupMemberInfo = (
-  userId: string,
-  role: GroupMemberInfo['role'],
-  nick?: string,
-  joinTime?: number
-): GroupMemberInfo => ({
-  userId,
-  role,
-  nick,
-  joinTime,
-  get sender() {
-    return senderGroup({ userId, nick: nick || '', name: nick || '', role })
-  },
-})
 
 /**
  * QQ Official Bot 适配器
@@ -328,7 +304,18 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
     if (_userId && (_userId === this.selfId || _userId === this.selfSubId('id'))) {
       return selfAvatarUrl(this)
     }
-    return `https://thirdqq.qlogo.cn/qqapp/${this.cfg.appId}/${_userId}/${_size}`
+    const cached = getUserProfile(this, _userId)
+    if (cached?.avatar) return cached.avatar
+    const fallback = `https://thirdqq.qlogo.cn/qqapp/${this.cfg.appId}/${_userId}/${_size}`
+    try {
+      const info = await this.super.meta.getUserInfo(_userId)
+      return getUserProfile(this, _userId)?.avatar || info.avatar || fallback
+    } catch (err) {
+      const recent = getUserProfile(this, _userId)?.avatar
+      if (recent) return recent
+      this.logger('warn', `[getAvatarUrl] 获取用户头像失败，退回默认拼接: ${err instanceof Error ? err.message : err}`)
+      return fallback
+    }
   }
 
   /**
@@ -457,10 +444,10 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
   /**
    * 群踢人
    *
-   * 走官方 `POST /v2/groups/{group_openid}/batch_remove_members`，机器人需拥有群
-   * 管理员身份。Karin 的 `rejectAddRequest` 映射为官方的 `add_to_member_blacklist`：
-   * 移除的同时拉入群黑名单，该用户之后无法再次入群。官方接口没有踢人理由字段，
-   * `kickReason` 只会被记录到日志。
+   * 需群主与 Web 管理端开启“移除群成员”权限。rejectAddRequest 为 true 时，
+   * 先确认移除成功，再调用独立的群黑名单接口（仍需内邀权限）。
+   * 官方接口没有踢人理由字段，kickReason 只记录到日志。
+   * 任一步失败都会抛错；移除成功但拉黑失败时，错误明确说明成员已经移除。
    *
    * 需要一次移除多人时用 `bot.super.groups.batchRemoveGroupMembers()`，单次最多 20 个。
    *
@@ -482,14 +469,32 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
     try {
       const result = await this.super.groups.batchRemoveGroupMembers(_groupId, {
         member_openids: [_targetId],
-        ...(_rejectAddRequest ? { add_to_member_blacklist: true } : {}),
       })
-      const failed = result.add_to_member_blacklist_fail_openids ?? []
-      if (failed.length) {
-        this.logger('warn', `[groupKickMember] 成员已移除，但加入群黑名单失败: ${failed.join('、')}`)
+      if (result?.remove_members_result !== 'success') {
+        throw new Error(`[groupKickMember] 移除群成员失败: ${result?.remove_members_result || '平台未返回成功结果'}`)
+      }
+      clearGroupMemberProfile(this, _groupId, _targetId)
+
+      if (_rejectAddRequest) {
+        const blacklist = await this.super.groups
+          .setGroupMemberBlacklist(_groupId, {
+            op: 'add',
+            member_openids: [_targetId],
+          })
+          .catch((err) => {
+            throw new Error(
+              `[groupKickMember] 成员已移除，但加入群黑名单失败: ${err instanceof Error ? err.message : err}`,
+              { cause: err }
+            )
+          })
+        const failed = blacklist?.fail_openids ?? []
+        if (failed.length) {
+          throw new Error(`[groupKickMember] 成员已移除，但加入群黑名单失败: ${failed.join('、')}`)
+        }
       }
     } catch (err) {
-      this.logger('error', '[groupKickMember] 移除群成员失败（该接口为白名单接口，未开通权限会返回 11253）:', err)
+      this.logger('error', '[groupKickMember] 群成员移除或黑名单操作失败:', err)
+      throw err
     }
   }
 
@@ -571,14 +576,29 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
   }
 
   /**
-   * 获取陌生人信息
+   * 获取用户信息，优先使用官方资料接口；平台仅允许查询与机器人存在好友关系的用户。
+   * 无好友关系或查询失败时保留已收到消息中的昵称。
+   * 头像、主动消息权限和跨应用标识等原生字段见 bot.super.meta.getUserInfo。
    */
   async getStrangerInfo(_targetId: string): Promise<UserInfo> {
-    // TODO: QQ 官方 Bot API 暂不支持获取陌生人信息
-    this.logger('warn', '[getStrangerInfo] QQ Official Bot API 暂不支持获取陌生人信息')
+    const previous = getUserProfile(this, _targetId)
+    try {
+      const info = await this.super.meta.getUserInfo(_targetId)
+      const recent = getUserProfile(this, _targetId)
+      return {
+        userId: _targetId,
+        nick: recent !== previous && recent?.nick !== undefined ? recent.nick : (info.username ?? ''),
+      }
+    } catch (err) {
+      this.logger(
+        'warn',
+        `[getStrangerInfo] 获取用户资料失败（需与机器人存在好友关系）: ${err instanceof Error ? err.message : err}`
+      )
+    }
+    const cached = getUserProfile(this, _targetId)
     return {
       userId: _targetId,
-      nick: '',
+      nick: cached?.nick ?? this.nicknameCache.get(_targetId) ?? '',
     }
   }
 
@@ -666,40 +686,31 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
    * 两者都是白名单接口，未开通权限（11253）或查询失败时降级为占位结构并告警。
    */
   async getGroupMemberInfo(_groupId: string, _targetId: string, _refresh?: boolean): Promise<GroupMemberInfo> {
-    if (_targetId === this.selfId) {
+    if (_targetId === this.selfId || _targetId === this.selfSubId('id')) {
       try {
         const state = await this.super.groups.getBotState(_groupId)
-        return buildGroupMemberInfo(
-          state.member_openid || _targetId,
-          state.member_role || 'member',
-          undefined,
-          state.joined_at ? new Date(state.joined_at).getTime() : undefined
-        )
+        return buildGroupMemberInfo(this, _groupId, state.member_openid || _targetId, {
+          ...state,
+          username: this.selfName,
+        })
       } catch (err) {
         this.logger(
           'warn',
           `[getGroupMemberInfo] 获取机器人群内状态失败（该接口为白名单接口，未开通权限会返回 11253）: ${err instanceof Error ? err.message : err}`
         )
-        return buildGroupMemberInfo(_targetId, 'member')
+        return buildGroupMemberInfo(this, _groupId, _targetId)
       }
     }
 
     try {
       const member = await this.super.groups.getGroupMember(_groupId, _targetId)
-      const nick = member.username || member.nick
-      if (nick) this.nicknameCache.set(_targetId, nick)
-      return buildGroupMemberInfo(
-        member.member_openid || _targetId,
-        member.member_role || 'member',
-        nick,
-        member.joined_at ? new Date(member.joined_at).getTime() : undefined
-      )
+      return buildGroupMemberInfo(this, _groupId, member.member_openid || _targetId, member)
     } catch (err) {
       this.logger(
         'warn',
         `[getGroupMemberInfo] 获取群成员详情失败（该接口为白名单接口，未开通权限会返回 11253）: ${err instanceof Error ? err.message : err}`
       )
-      return buildGroupMemberInfo(_targetId, 'member')
+      return buildGroupMemberInfo(this, _groupId, _targetId)
     }
   }
 
@@ -707,8 +718,7 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
    * 获取群成员列表
    *
    * 走官方 `GET /v2/groups/{group_openid}/members`（白名单接口），每页最多 30 条，
-   * 这里按 `next_cursor` 自动翻完所有页；顺便把昵称写入
-   * {@link AdapterQQBot.nicknameCache}，让后续消息事件能直接取到昵称。
+   * 这里按 next_cursor 自动翻完所有页，返回 Karin 的成员列表。
    *
    * 为防止平台返回的游标不收敛，翻页数有安全上限（约 6000 人），触顶会告警并返回已取到的部分。
    * 未开通权限（11253）或查询失败时返回已取到的部分并告警。
@@ -723,15 +733,7 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
       for (let page = 0; page < GROUP_MEMBER_LIST_MAX_PAGES; page++) {
         const data = await this.super.groups.getGroupMemberList(_groupId, cursor ? { cursor } : {})
         for (const member of data.members ?? []) {
-          if (member.username) this.nicknameCache.set(member.member_openid, member.username)
-          result.push(
-            buildGroupMemberInfo(
-              member.member_openid,
-              member.member_role || 'member',
-              member.username,
-              member.joined_at ? new Date(member.joined_at).getTime() : undefined
-            )
-          )
+          result.push(buildGroupMemberInfo(this, _groupId, member.member_openid, member))
         }
 
         const next = data.next_cursor || ''
@@ -996,7 +998,6 @@ export class AdapterQQBot extends AdapterBase implements AdapterType {
     try {
       const setting = await this.super.groups.getGroupMuteSetting(_groupId)
       return (setting.members ?? []).map((member) => {
-        if (member.username) this.nicknameCache.set(member.member_openid, member.username)
         const expireAt = member.mute_expire_at ? Date.parse(member.mute_expire_at) : NaN
         return {
           userId: member.member_openid,

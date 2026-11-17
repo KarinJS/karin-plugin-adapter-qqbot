@@ -22,6 +22,24 @@ const elements = [
 ] as unknown as ElementTypes[]
 
 describe('编解码往返', () => {
+  it('keeps full JSON card content valid when encoded and decoded', () => {
+    const data = JSON.stringify({
+      msg_type: 8,
+      card: {
+        type: 'tuwen',
+        content: {
+          title: '活动',
+          description: '邀请',
+          url: 'https://example.com',
+          pic_url: 'https://example.com/a.png',
+        },
+      },
+    })
+    const json: ElementTypes = { type: 'json', data }
+    expect(decodeElements(encodeElements(filterElementsByLevel([json], 'full')).json)).toEqual([{ type: 'json', data }])
+    expect(filterElementsByLevel([json], 'standard')).toEqual([])
+    expect(filterElementsByLevel([json], 'minimal')).toEqual([])
+  })
   const encoded = encodeElements(elements)
   const decoded = decodeElements(encoded.json)
 

@@ -16,6 +16,12 @@ description: 官方事件到 Karin 事件的映射。
 
 插件用 `karin.command` 接收，`e.contact.scene` 是对应场景。
 
+单聊和群聊消息会提供发送者昵称与头像。群消息的 `member_nickname` 映射到 `e.sender.card`，`username` 仍作为 QQ 昵称保存在 `nick` / `name`；提及消息段的显示名优先使用群内昵称。消息中的头像会进入 bot 的资料缓存，可用 `e.bot.getAvatarUrl()` 查询。
+
+群消息、机器人进退群及成员增减事件中的 `union_group_openid` 保留在 `e.rawEvent.d`，绑定第三方应用时可用于跨应用关联。旧事件缺少这些字段时仍可转换。
+
+结构化卡片的 `ark_data` 转为 Karin JSON 消息段，保留卡片类型和原生字段。引用消息使用被引用内容自己的卡片数据；平台未提供引用发送者时，适配器不会将当前消息发送者填入引用。
+
 ## 通知与请求
 
 | 官方事件              | Karin 事件                 |

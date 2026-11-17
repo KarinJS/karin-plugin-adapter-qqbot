@@ -115,6 +115,10 @@ const prepareSelfCacheElement = async (
       const cached = { ...element } as ElementTypes
       return { send: cached, cache: cached }
     }
+    case 'json': {
+      const cached = { ...element }
+      return { send: cached, cache: cached }
+    }
     case 'image':
     case 'video':
     case 'record':

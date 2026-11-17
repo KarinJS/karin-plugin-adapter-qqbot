@@ -90,7 +90,7 @@ export const enum EventEnum {
 }
 
 /**
- * QQ 消息发送者（官方 `User`）
+ * QQ 消息发送者的兼容超集；新事件分别使用 C2CUser / GroupUser。
  *
  * 群聊使用 member_openid；单聊使用 user_openid
  */
@@ -107,21 +107,30 @@ export interface QQAuthor {
    * 仅群聊消息事件提供：`member`=普通成员，`admin`=管理员，`owner`=群主。
    */
   member_role?: 'owner' | 'admin' | 'member'
-  /** 跨应用统一用户 OpenID，需特殊申请，未开通为空字符串 */
+  /** 跨应用关联用户 OpenID，绑定第三方应用时有效。 */
   union_openid?: string
-  /** 跨应用统一用户账号，需特殊申请，可能为空 */
+  /** @deprecated API 1.50.0 已不再声明该字段，保留以兼容旧报文。 */
   union_user_account?: string
-  /** 用户昵称（群昵称 / QQ 昵称） */
+  /** 用户 QQ 昵称。 */
   username?: string
+  /** 用户头像原图 URL。 */
+  avatar?: string
+  /** 用户在当前群内的昵称。 */
+  member_nickname?: string
   /** 是否为机器人 */
   bot?: boolean
 }
 
+/** 官方单聊发送者；旧事件可能不提供昵称和头像。 */
+export type C2CUser = Omit<QQAuthor, 'member_openid' | 'member_role' | 'member_nickname'>
+
+/** 官方群聊发送者。 */
+export type GroupUser = Omit<QQAuthor, 'user_openid'>
+
 /**
  * QQ 群消息 mentions 元素
  *
- * 官方文档中 `mentions` 标注为 `User` 数组且不含 @机器人自身，
- * 实际下行报文额外附带 `is_you`、`scope` 两个字段。
+ * 对应官方 GroupMentionsUser；is_you 表示提及当前机器人。
  */
 export interface QQMention {
   /** 是否为机器人 */
@@ -132,11 +141,17 @@ export interface QQMention {
   member_openid: string
   /** 是否 @ 当前机器人 */
   is_you: boolean
-  /** @ 范围：`single`=@单人，`everyone`=@全体成员 */
+  /** @ 范围：`single`=@单人，`all`=@全体成员；旧报文的 everyone 同义。 */
   scope: string
   /** 用户昵称 */
   username: string
+  /** 用户在当前群内的昵称。 */
+  member_nickname?: string
+  /** 当前群内的角色。 */
+  member_role?: 'owner' | 'admin' | 'member'
 }
+
+export type GroupMentionsUser = QQMention
 
 /**
  * 消息场景上下文（官方 `MessageScene`）
@@ -195,7 +210,7 @@ export interface ARKData {
  * 适配器以该索引作为 `bot.getMsg` 的可查询消息 ID。
  */
 export interface QQReferencedMessageElement {
-  /** 该元素对应的消息发送者 */
+  /** @deprecated API 1.50.0 的 MsgElement 不再提供作者，保留以兼容旧报文。 */
   author?: Pick<QQAuthor, 'bot' | 'username'>
   /** 消息正文内容 */
   content: string
@@ -279,7 +294,7 @@ export interface C2CMsgEvent extends BaseEvent {
   id: string
   d: {
     /** 发送者，单聊场景 `user_openid` 有值 */
-    author: QQAuthor
+    author: C2CUser
     /** 消息文本内容 */
     content: string
     /** 消息 ID，可用于被动回复和撤回 */
@@ -319,7 +334,7 @@ export interface GroupMsgEvent extends BaseEvent {
   id: string
   d: {
     /** 发送者，群聊场景 `member_openid` 有值 */
-    author: QQAuthor
+    author: GroupUser
     /**
      * 消息文本内容。
      *
@@ -327,10 +342,12 @@ export interface GroupMsgEvent extends BaseEvent {
      * 被 @ 的成员列表见 `mentions` 字段。
      */
     content: string
-    /** 与 group_openid 一致 */
-    group_id: string
+    /** @deprecated 旧报文中的群标识，正式字段为 group_openid。 */
+    group_id?: string
     /** 群 OpenID */
     group_openid: string
+    /** 绑定第三方应用时提供的跨应用群标识。 */
+    union_group_openid?: string
     /** 消息 ID，可用于被动回复和撤回 */
     id: string
     /** 消息发送时间，RFC3339 格式 */
@@ -471,6 +488,8 @@ export interface GroupAddRobotEvent extends BaseEvent {
     timestamp: number
     /** 群 OpenID */
     group_openid: string
+    /** 绑定第三方应用时提供的跨应用群标识。 */
+    union_group_openid?: string
     /** 操作添加机器人进群的群成员 OpenID */
     op_member_openid: string
   }
@@ -489,6 +508,8 @@ export interface GroupDelRobotEvent extends BaseEvent {
     timestamp: number
     /** 群 OpenID */
     group_openid: string
+    /** 绑定第三方应用时提供的跨应用群标识。 */
+    union_group_openid?: string
     /** 操作移除机器人退群的群成员 OpenID */
     op_member_openid: string
   }
@@ -508,6 +529,8 @@ export interface GroupMemberAddEvent extends BaseEvent {
     timestamp: number
     /** 群 OpenID */
     group_openid: string
+    /** 绑定第三方应用时提供的跨应用群标识。 */
+    union_group_openid?: string
     /** 新加入成员的 OpenID */
     member_openid: string
   }
@@ -527,6 +550,8 @@ export interface GroupMemberRemoveEvent extends BaseEvent {
     timestamp: number
     /** 群 OpenID */
     group_openid: string
+    /** 绑定第三方应用时提供的跨应用群标识。 */
+    union_group_openid?: string
     /** 退出成员的 OpenID */
     member_openid: string
     /** 退出成员的用户 OpenID（可能为空） */

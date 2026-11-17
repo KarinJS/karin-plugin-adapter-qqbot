@@ -88,10 +88,12 @@ export const buildDirectLink = (rawUrl: string, type: MediaType, fileName?: stri
 
 /** QQ 分片上传准备接口返回的单个分片信息。 */
 interface UploadPart {
-  /** 分片序号，QQ 使用从 1 开始的序号。 */
+  /** 当前文档从 0 开始；旧响应可能从 1 开始。 */
   index: number
   /** 当前分片需要 PUT 的临时地址。 */
   presigned_url: string
+  /** 当前分片大小，新文档使用字符串；兼容旧版数字。 */
+  block_size?: string | number
 }
 
 /** QQ 分片上传准备接口响应。 */
@@ -99,13 +101,19 @@ interface UploadPrepareResponse {
   /** 本次分片上传任务 ID。 */
   upload_id: string
   /** 服务端指定的分片大小。 */
-  block_size: number
+  block_size: string | number
   /** 服务端返回的所有待上传分片。 */
   parts: UploadPart[]
-  /** 服务端建议的分片上传并发。 */
+  /** 官方上传配置。 */
+  upload_config?: {
+    concurrency?: number
+    retry_timeout?: number
+    retry_delay?: number
+  }
+  /** 兼容旧响应中的顶层配置。 */
   concurrency?: number
-  /** 服务端建议的分片确认重试时间，当前只保留字段兼容。 */
   retry_timeout?: number
+  retry_delay?: number
 }
 
 /** upload_prepare 所需的文件校验值。 */
@@ -604,7 +612,8 @@ export class MediaApi extends Http {
     scene: Scene,
     peer: string,
     body: Record<string, unknown>,
-    retryTimeout?: number
+    retryTimeout?: number,
+    retryDelay?: number
   ): Promise<void> {
     let lastError: unknown
 
@@ -616,7 +625,7 @@ export class MediaApi extends Http {
         return
       } catch (err) {
         if (shouldRetryPartFinishPersistently(err)) {
-          await this.retryUploadPartFinish(scene, peer, body, retryTimeout)
+          await this.retryUploadPartFinish(scene, peer, body, retryTimeout, retryDelay)
           return
         }
 
@@ -642,12 +651,17 @@ export class MediaApi extends Http {
     scene: Scene,
     peer: string,
     body: Record<string, unknown>,
-    retryTimeout?: number
+    retryTimeout?: number,
+    retryDelay?: number
   ): Promise<void> {
     const retryTimeoutMs = retryTimeout
       ? Math.min(Number(retryTimeout) * 1000, PART_FINISH_MAX_RETRY_TIMEOUT)
       : PART_FINISH_DEFAULT_RETRY_TIMEOUT
     const deadline = Date.now() + retryTimeoutMs
+    const retryInterval =
+      retryDelay !== undefined && Number.isFinite(retryDelay) && retryDelay > 0
+        ? retryDelay * 1000
+        : PART_FINISH_RETRY_INTERVAL
     let attempts = 0
     let lastError: unknown
 
@@ -661,7 +675,7 @@ export class MediaApi extends Http {
         lastError = err
         if (!shouldRetryPartFinishPersistently(err)) throwError(err)
         attempts += 1
-        await sleep(Math.min(PART_FINISH_RETRY_INTERVAL, Math.max(0, deadline - Date.now())))
+        await sleep(Math.min(retryInterval, Math.max(0, deadline - Date.now())))
       }
     }
 
@@ -728,7 +742,7 @@ export class MediaApi extends Http {
     const prepareBody: Record<string, unknown> = {
       file_type: FILE_TYPE[type],
       file_name: source.fileName,
-      file_size: source.size,
+      file_size: String(source.size),
       md5: hashes.md5,
       sha1: hashes.sha1,
     }
@@ -749,17 +763,37 @@ export class MediaApi extends Http {
       throw new Error('分片上传准备失败：QQ 未返回分片信息')
     }
 
-    const concurrency = Math.min(
-      prepare.concurrency || DEFAULT_PART_CONCURRENCY,
-      MAX_PART_CONCURRENCY,
-      prepare.parts.length
+    const blockSize = Number(prepare.block_size)
+    if (!Number.isSafeInteger(blockSize) || blockSize <= 0) {
+      throw new Error('分片上传准备失败：QQ 返回的分片大小无效')
+    }
+    const indexBase = prepare.parts.some((part) => part.index === 0) ? 0 : 1
+
+    const concurrency = Math.max(
+      1,
+      Math.min(
+        Math.floor(prepare.upload_config?.concurrency ?? prepare.concurrency ?? DEFAULT_PART_CONCURRENCY) ||
+          DEFAULT_PART_CONCURRENCY,
+        MAX_PART_CONCURRENCY,
+        prepare.parts.length
+      )
     )
     const handle = source.kind === 'local' ? await open(source.file, 'r') : undefined
 
     try {
       const tasks = prepare.parts.map((part) => async () => {
-        const offset = (part.index - 1) * prepare.block_size
-        const length = Math.min(prepare.block_size, source.size - offset)
+        const offset = (part.index - indexBase) * blockSize
+        const partSize = Number(part.block_size ?? blockSize)
+        const length = Math.min(partSize, source.size - offset)
+        if (
+          !Number.isSafeInteger(part.index) ||
+          offset < 0 ||
+          !Number.isSafeInteger(partSize) ||
+          partSize <= 0 ||
+          length <= 0
+        ) {
+          throw new Error(`分片上传准备失败：分片 ${part.index} 的索引或大小无效`)
+        }
         const data = await readPart(source, handle, offset, length)
         const md5 = crypto.createHash('md5').update(data).digest('hex')
 
@@ -770,10 +804,11 @@ export class MediaApi extends Http {
           {
             upload_id: prepare.upload_id,
             part_index: part.index,
-            block_size: data.length,
+            block_size: String(data.length),
             md5,
           },
-          prepare.retry_timeout
+          prepare.upload_config?.retry_timeout ?? prepare.retry_timeout,
+          prepare.upload_config?.retry_delay ?? prepare.retry_delay
         )
       })
 

@@ -14,6 +14,7 @@ import {
   C2C_PASSIVE_REPLY_LIMIT,
   FRIEND_EVENT_WHITELIST,
   GROUP_EVENT_WHITELIST,
+  GROUP_PASSIVE_REPLY_LIMIT,
   KEYBOARD_MAX_BUTTONS_PER_ROW,
   KEYBOARD_MAX_ROWS,
   QQ_NUMBER_RE,
@@ -121,6 +122,7 @@ const sendQQMarkdown = async (
   }
 
   items.push(...mediaItems)
+  for (const card of grouping.cards) items.push(ctx.super.qq.card(card))
 
   if (!items.length) {
     items.push(ctx.super.qq.text('不支持发送的消息类型'))
@@ -351,13 +353,20 @@ const flushQQ = async (
       : (peer: string, item: SendQQMsg) => ctx.super.messages.sendGroupMsg(peer, item)
 
   /**
-   * 仅单聊 `msg_id` 回复受四次上限约束。`event_id` 事件回复和群聊不适用该限制。
-   * 这是 QQ 官方 2026-01-10 更新后的限制，超出部分不请求平台接口。
+   * 同一个 msg_id 的单聊回复最多四次、群聊最多五次；event_id 回复不使用此批次限制。
+   * 超出部分不请求平台接口，避免在一次拆分发送中超过平台配额。
    */
   const maxItems =
-    contact.scene === 'friend' && passiveSource?.type === 'msg' && passiveSource.id ? C2C_PASSIVE_REPLY_LIMIT : Infinity
+    passiveSource?.type === 'msg' && passiveSource.id
+      ? contact.scene === 'friend'
+        ? C2C_PASSIVE_REPLY_LIMIT
+        : GROUP_PASSIVE_REPLY_LIMIT
+      : Infinity
   if (items.length > maxItems) {
-    ctx.logger('warn', `单聊被动回复最多 ${C2C_PASSIVE_REPLY_LIMIT} 条，已跳过 ${items.length - maxItems} 条`)
+    ctx.logger(
+      'warn',
+      `${contact.scene === 'friend' ? '单聊' : '群聊'}被动回复最多 ${maxItems} 条，已跳过 ${items.length - maxItems} 条`
+    )
   }
 
   let referenceHandled = false

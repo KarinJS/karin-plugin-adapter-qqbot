@@ -13,6 +13,7 @@ description: 各场景能发什么，以及被动回复限制。
 | 图片               | ✅   | ✅   | ✅              |
 | 视频 / 语音 / 文件 | ✅   | ✅   | ❌              |
 | 流式消息           | ✅   | ❌   | ❌              |
+| 图文卡片           | ✅   | ✅   | ❌              |
 
 ## 发送规则
 
@@ -20,6 +21,56 @@ description: 各场景能发什么，以及被动回复限制。
 - 单聊和群聊的 Markdown 已对所有机器人开放。频道需要内邀，适配器先试 Markdown，被权限错误拒绝后降级成普通消息，并记住这个机器人，本次运行不再重试。
 - 按钮只能挂在 Markdown 上，频道降级后按钮不会发送。
 - `segment.reply` 在纯文本场景走 `msg_type=0`，其余场景走原通道。
+
+## 图文卡片
+
+通过 Karin 的 JSON 消息段传入官方 `{ msg_type: 8, card }`，也可直接传入 `card` 对象。适配器会将其发送为图文卡片，`sendMsg` 的返回类型仍为 Karin 的 `SendMsgResults`。
+
+```ts twoslash
+import { karin, segment } from 'node-karin'
+import type { AdapterQQBot } from '@karinjs/adapter-qqbot'
+
+declare const bot: AdapterQQBot
+declare const groupOpenid: string
+
+await bot.sendMsg(karin.contactGroup(groupOpenid), [
+  segment.json(
+    JSON.stringify({
+      msg_type: 8,
+      card: {
+        type: 'tuwen',
+        content: {
+          title: '活动邀请',
+          description: '周末读书会',
+          url: 'https://example.com/activity',
+          pic_url: 'https://example.com/cover.png',
+        },
+      },
+    })
+  ),
+])
+```
+
+标题长度为 1 到 50 字符，描述为 1 到 200 字符，链接和封面必须使用公网 HTTPS 地址且长度不超过 1024 字符。卡片不能携带 keyboard；同时传入按钮时，会单独发送按钮消息。`full` 缓存会保留 JSON 卡片内容，其他存储级别不保存 JSON 正文。
+
+## Markdown 图片校验
+
+原生 Markdown 请求可在 `markdown` 对象内设置 `force_verify_image_resource`。为 `true` 时，图片转存失败会中断消息发送；默认关闭。
+
+```ts twoslash
+import type { AdapterQQBot } from '@karinjs/adapter-qqbot'
+
+declare const bot: AdapterQQBot
+declare const userOpenid: string
+
+await bot.super.messages.sendFriendMsg(
+  userOpenid,
+  bot.super.qq.markdown({
+    content: '![封面](https://example.com/cover.png)',
+    force_verify_image_resource: true,
+  })
+)
+```
 
 ## 按钮
 
@@ -53,6 +104,8 @@ await e.reply([
 | 频道 | 5 分钟  | 无限制     |
 
 超过时间或次数后改用主动消息。主动消息受平台配额和用户开关限制。
+
+同一次拆分发送中，单聊 `msg_id` 被动回复最多发送 4 条，群聊最多 5 条，超出部分会告警并跳过；`event_id` 回复和主动消息不使用这个批次限制。
 
 ## 流式消息
 

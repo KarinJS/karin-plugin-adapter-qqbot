@@ -1,5 +1,7 @@
 /** QQ 官方限制：单聊中同一 `msg_id` 最多发送四次被动回复。 */
 export const C2C_PASSIVE_REPLY_LIMIT = 4
+/** QQ 官方限制：群聊中同一 msg_id 最多发送五次被动回复。 */
+export const GROUP_PASSIVE_REPLY_LIMIT = 5
 
 /** QQ keyboard 限制：最多 5 行。 */
 export const KEYBOARD_MAX_ROWS = 5
